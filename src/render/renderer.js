@@ -111,7 +111,9 @@ export class Renderer {
   }
 
   resize(cam) {
-    this.dpr = window.devicePixelRatio || 1;
+    // Até 2x: em telas 3x (celulares) o cache do mapa ficaria pesado demais
+    // e a diferença quase não aparece.
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
     this.margin = Math.round(Math.max(w, h) * CACHE_MARGIN);
