@@ -1,103 +1,367 @@
-import { createNewState, placeTile, stepDay, TILE, TILE_INFO } from './game/state.js';
+import { createWorld } from './world/world.js';
+import { ZONE, ZONE_INFO } from './world/catalog.js';
+import { applyCommand, lineTiles, planCommand, rectTiles } from './world/commands.js';
+import { prepare, tick } from './systems/simulation.js';
+import { startLoop } from './core/loop.js';
+import { formatDate } from './core/time.js';
+import { Renderer } from './render/renderer.js';
+import { Minimap } from './render/minimap.js';
+import {
+  centerOn, createCamera, panBy, screenToTile, worldToScreen, zoomAt,
+} from './render/camera.js';
+import { renderInspector } from './ui/inspector.js';
 import { SaveManager } from './save/SaveManager.js';
 import { detectBackend } from './save/backends.js';
 
-const TILE_SIZE = 10;
-const MS_PER_DAY = 250;
 const AUTOSAVE_MS = 60_000;
+const KEY_PAN_SPEED = 900; // pixels por segundo
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('map');
-const ctx = canvas.getContext('2d');
 
-let state = createNewState();
-let tool = TILE.ROAD;
-let paused = false;
-let dirty = false; // há mudanças desde o último save manual?
+// Ferramentas: `shape` define como o arraste seleciona tiles.
+const TOOLS = [
+  { id: 'inspect', name: 'Inspecionar', key: 'v' },
+  { id: 'road', name: 'Estrada', key: 'e', shape: 'line', color: 'rgba(255,255,255,0.35)' },
+  ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL].map((zone) => ({
+    id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
+    shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
+  })),
+  { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)' },
+];
+
+let state;
+let rt;
+let cam;
+let speed = 1;
+let tool = TOOLS[1];
+let dirty = false; // mudanças desde o último save manual
+let hover = null;
+let drag = null; //   { kind: 'tool' | 'pan', start, last, moved }
+let selection = null; // { type: 'building' | 'citizen', id }
+let following = false;
+const keysDown = new Set();
+
+const renderer = new Renderer(canvas);
+const minimap = new Minimap($('minimap'));
 
 const saves = new SaveManager({
   backend: await detectBackend(),
   getState: () => state,
   onEvent: handleSaveEvent,
 });
-saves.startNew(state.city.name);
-saves.startAutosave(AUTOSAVE_MS);
 $('storage-mode').textContent = `Saves: ${saves.backend.label}`;
 
 // ---------------------------------------------------------------------------
-// Jogo
+// Partida
 // ---------------------------------------------------------------------------
 
-function setState(next) {
+function setWorld(next) {
   state = next;
-  canvas.width = state.map.width * TILE_SIZE;
-  canvas.height = state.map.height * TILE_SIZE;
+  rt = prepare(state);
+  cam = createCamera(state.map.width, state.map.height);
+  renderer.resize(cam);
+  selection = null;
+  following = false;
   dirty = false;
-  render();
+  updateInspector();
 }
 
-function render() {
-  const { width, height, tiles } = state.map;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      ctx.fillStyle = TILE_INFO[tiles[y * width + x]].color;
-      ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+function newCity(name) {
+  setWorld(createWorld({ name }));
+  saves.startNew(state.city.name);
+}
+
+newCity('Nova Cidade');
+saves.startAutosave(AUTOSAVE_MS);
+
+startLoop({
+  getSpeed: () => speed,
+  tick: () => tick(state, rt),
+  render: (dt) => {
+    if (speed > 0) state.playTimeSeconds += dt;
+    panWithKeys(dt);
+    if (following && selection?.type === 'citizen') {
+      const c = rt.citizenById.get(selection.id);
+      if (c) centerOn(cam, c.x, c.y);
     }
-  }
-  ctx.strokeStyle = 'rgb(0 0 0 / .08)';
-  ctx.beginPath();
-  for (let x = 0; x <= width; x++) ctx.moveTo(x * TILE_SIZE + 0.5, 0), ctx.lineTo(x * TILE_SIZE + 0.5, canvas.height);
-  for (let y = 0; y <= height; y++) ctx.moveTo(0, y * TILE_SIZE + 0.5), ctx.lineTo(canvas.width, y * TILE_SIZE + 0.5);
-  ctx.stroke();
+    renderer.render(state, rt, cam, {
+      hover,
+      preview: currentPreview(),
+      selected: selectedObjects(),
+    });
+    minimap.render(state, rt, cam);
+    throttledHud();
+  },
+});
+
+window.addEventListener('resize', () => renderer.resize(cam));
+
+// Acesso pelo console do navegador, para depurar: jogo.state, jogo.rt, ...
+window.jogo = {
+  get state() { return state; },
+  get rt() { return rt; },
+  get cam() { return cam; },
+  applyCommand: (cmd) => applyCommand(state, rt, cmd),
+  setSpeed,
+};
+
+// ---------------------------------------------------------------------------
+// HUD
+// ---------------------------------------------------------------------------
+
+let lastHud = 0;
+function throttledHud() {
+  const now = performance.now();
+  if (now - lastHud < 200) return;
+  lastHud = now;
   renderHud();
+  if (selection) updateInspector();
 }
 
 function renderHud() {
-  const { time, economy, stats, city } = state;
-  $('city-name').textContent = city.name + (dirty ? ' *' : '');
-  $('date').textContent = `Ano ${time.year}, mês ${time.month}, dia ${time.day}`;
-  $('population').textContent = stats.population.toLocaleString('pt-BR');
-  $('money').textContent = `$${economy.money.toLocaleString('pt-BR')}`;
-  $('btn-pause').textContent = paused ? '▶' : '⏸';
+  const s = rt.stats;
+  $('city-name').textContent = state.city.name + (dirty ? ' *' : '');
+  $('date').textContent = formatDate(state.time.tick);
+  $('population').textContent = s.population.toLocaleString('pt-BR');
+  $('employment').textContent = `${s.employed.toLocaleString('pt-BR')} / ${s.unemployed.toLocaleString('pt-BR')}`;
+  $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
+  for (const [id, value] of [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial], ['demand-i', rt.demand.industrial]]) {
+    const bar = $(id).firstElementChild;
+    const pct = Math.min(50, Math.abs(value) * 2);
+    bar.style.height = `${pct}%`;
+    bar.style.bottom = value >= 0 ? '50%' : `${50 - pct}%`;
+    bar.style.opacity = value >= 0 ? '1' : '0.45';
+  }
+  for (const b of $('speeds').children) b.classList.toggle('active', Number(b.dataset.speed) === speed);
 }
 
-setInterval(() => {
-  if (paused) return;
-  stepDay(state);
-  state.playTimeSeconds += MS_PER_DAY / 1000;
+function setSpeed(value) {
+  speed = value;
   renderHud();
-}, MS_PER_DAY);
+}
+for (const b of $('speeds').children) b.onclick = () => setSpeed(Number(b.dataset.speed));
 
-// Ferramentas
-for (const [type, info] of Object.entries(TILE_INFO)) {
+// ---------------------------------------------------------------------------
+// Ferramentas e mouse
+// ---------------------------------------------------------------------------
+
+for (const t of TOOLS) {
   const button = document.createElement('button');
-  button.innerHTML = `<span class="swatch" style="background:${info.color}"></span>${info.name} ($${info.cost})`;
-  button.dataset.tool = type;
-  button.onclick = () => selectTool(Number(type));
+  button.innerHTML = `${t.swatch ? `<span class="swatch" style="background:${t.swatch}"></span>` : ''}${t.name}<kbd>${t.key.toUpperCase()}</kbd>`;
+  button.dataset.tool = t.id;
+  button.onclick = () => selectTool(t);
   $('tools').append(button);
 }
-function selectTool(type) {
-  tool = type;
-  for (const b of $('tools').children) b.classList.toggle('active', Number(b.dataset.tool) === type);
+function selectTool(t) {
+  tool = t;
+  drag = null;
+  for (const b of $('tools').children) b.classList.toggle('active', b.dataset.tool === t.id);
 }
 selectTool(tool);
 
-// Pintar no mapa (clicar e arrastar)
-let painting = false;
-function paintAt(event) {
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor(((event.clientX - rect.left) / rect.width) * state.map.width);
-  const y = Math.floor(((event.clientY - rect.top) / rect.height) * state.map.height);
-  if (placeTile(state, x, y, tool)) {
-    dirty = true;
-    render();
-  }
+function toolCommand() {
+  if (!drag || drag.kind !== 'tool' || !tool.shape || !hover) return null;
+  const { width } = state.map;
+  const { start } = drag;
+  const tiles = tool.shape === 'line'
+    ? lineTiles(width, start.x, start.y, hover.x, hover.y)
+    : rectTiles(width, start.x, start.y, hover.x, hover.y);
+  if (tool.id === 'road') return { type: 'road', tiles };
+  if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
+  return { type: 'zone', zone: tool.zone, tiles };
 }
-canvas.addEventListener('pointerdown', (e) => { painting = true; paintAt(e); });
-canvas.addEventListener('pointermove', (e) => painting && paintAt(e));
-window.addEventListener('pointerup', () => { painting = false; });
 
-$('btn-pause').onclick = () => { paused = !paused; renderHud(); };
+function currentPreview() {
+  const cmd = toolCommand();
+  const tooltip = $('tooltip');
+  if (!cmd) {
+    tooltip.hidden = true;
+    return null;
+  }
+  const plan = planCommand(state, rt, cmd);
+  const [sx, sy] = worldToScreen(cam, hover.x + 0.5, hover.y + 0.5);
+  tooltip.hidden = false;
+  tooltip.style.left = `${sx + 16}px`;
+  tooltip.style.top = `${sy - 10}px`;
+  tooltip.textContent = `${plan.tiles.length} tiles · $${plan.cost.toLocaleString('pt-BR')}`;
+  tooltip.style.color = plan.cost > state.economy.money ? '#ff8a80' : '';
+  return { tiles: plan.tiles, color: tool.color };
+}
+
+function selectedObjects() {
+  if (!selection) return null;
+  if (selection.type === 'citizen') return { citizen: rt.citizenById.get(selection.id) };
+  return { building: rt.buildingById.get(selection.id) };
+}
+
+function pointerPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return [e.clientX - rect.left, e.clientY - rect.top];
+}
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  const [sx, sy] = pointerPos(e);
+  const panButton = e.button === 1 || e.button === 2;
+  if (panButton || tool.id === 'inspect') {
+    drag = { kind: 'pan', last: [sx, sy], origin: [sx, sy], moved: false, click: !panButton };
+  } else if (e.button === 0 && hover) {
+    drag = { kind: 'tool', start: hover };
+  }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  const [sx, sy] = pointerPos(e);
+  hover = screenToTile(cam, sx, sy);
+  if (drag?.kind === 'pan') {
+    if (Math.hypot(sx - drag.origin[0], sy - drag.origin[1]) > 4) drag.moved = true;
+    if (drag.moved) {
+      panBy(cam, sx - drag.last[0], sy - drag.last[1]);
+      following = false;
+      canvas.classList.add('panning');
+    }
+    drag.last = [sx, sy];
+  }
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  const [sx, sy] = pointerPos(e);
+  canvas.classList.remove('panning');
+  if (drag?.kind === 'tool') {
+    const cmd = toolCommand();
+    if (cmd) {
+      const result = applyCommand(state, rt, cmd);
+      if (result.ok) dirty = true;
+      else status(result.reason);
+    }
+  } else if (drag?.kind === 'pan' && drag.click && !drag.moved) {
+    pick(sx, sy);
+  }
+  drag = null;
+});
+
+canvas.addEventListener('pointerleave', () => {
+  if (!drag) hover = null;
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const [sx, sy] = pointerPos(e);
+  zoomAt(cam, Math.exp(-e.deltaY * 0.0015), sx, sy);
+}, { passive: false });
+
+// Clique com "Inspecionar": cidadão andando perto do cursor, senão o prédio.
+function pick(sx, sy) {
+  let best = null;
+  let bestDist = 12;
+  for (const id of rt.movers) {
+    const c = rt.citizenById.get(id);
+    const [cx, cy] = worldToScreen(cam, c.x, c.y);
+    const d = Math.hypot(cx - sx, cy - 4 * cam.zoom - sy);
+    if (d < bestDist) {
+      best = c;
+      bestDist = d;
+    }
+  }
+  const tile = screenToTile(cam, sx, sy);
+  const buildingId = tile ? rt.buildingAt[tile.y * state.map.width + tile.x] : 0;
+  if (best) select({ type: 'citizen', id: best.id });
+  else if (buildingId) select({ type: 'building', id: buildingId });
+  else select(null);
+}
+
+function select(next) {
+  selection = next;
+  following = false;
+  updateInspector();
+}
+
+function updateInspector() {
+  const panel = $('inspector');
+  panel.hidden = !selection;
+  if (selection) renderInspector($('inspector-body'), selection, rt, { following });
+}
+
+$('inspector-close').onclick = () => select(null);
+$('inspector-body').addEventListener('click', (e) => {
+  const target = e.target.closest('button');
+  if (!target) return;
+  if (target.dataset.citizen) select({ type: 'citizen', id: Number(target.dataset.citizen) });
+  else if (target.dataset.building) {
+    select({ type: 'building', id: Number(target.dataset.building) });
+    const b = rt.buildingById.get(selection.id);
+    centerOn(cam, (b.tile % state.map.width) + 0.5, Math.floor(b.tile / state.map.width) + 0.5);
+  } else if ('follow' in target.dataset) {
+    following = !following;
+    updateInspector();
+  }
+});
+
+// Minimapa: clicar ou arrastar move a câmera.
+const minimapCanvas = $('minimap');
+function minimapJump(e) {
+  const rect = minimapCanvas.getBoundingClientRect();
+  const [x, y] = minimap.toWorld(e.clientX - rect.left, e.clientY - rect.top, state);
+  centerOn(cam, x, y);
+  following = false;
+}
+minimapCanvas.addEventListener('pointerdown', (e) => {
+  minimapCanvas.setPointerCapture(e.pointerId);
+  minimapJump(e);
+});
+minimapCanvas.addEventListener('pointermove', (e) => e.buttons && minimapJump(e));
+
+// ---------------------------------------------------------------------------
+// Teclado
+// ---------------------------------------------------------------------------
+
+const PAN_KEYS = {
+  w: [0, 1], arrowup: [0, 1], s: [0, -1], arrowdown: [0, -1],
+  a: [1, 0], arrowleft: [1, 0], d: [-1, 0], arrowright: [-1, 0],
+};
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest('input, textarea, dialog')) return;
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 's') {
+    e.preventDefault();
+    attempt(() => saves.save());
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (key === ' ') {
+    e.preventDefault();
+    setSpeed(speed === 0 ? 1 : 0);
+  } else if (['1', '2', '3'].includes(key)) {
+    setSpeed(Number(key));
+  } else if (key === 'escape') {
+    drag = null;
+    select(null);
+  } else if (PAN_KEYS[key]) {
+    e.preventDefault();
+    keysDown.add(key);
+  } else {
+    const t = TOOLS.find((x) => x.key === key);
+    if (t) selectTool(t);
+  }
+});
+window.addEventListener('keyup', (e) => keysDown.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => keysDown.clear());
+
+function panWithKeys(dt) {
+  if (keysDown.size === 0) return;
+  let dx = 0;
+  let dy = 0;
+  for (const key of keysDown) {
+    dx += PAN_KEYS[key][0];
+    dy += PAN_KEYS[key][1];
+  }
+  panBy(cam, dx * KEY_PAN_SPEED * dt, dy * KEY_PAN_SPEED * dt);
+  following = false;
+}
 
 // ---------------------------------------------------------------------------
 // Salvamento
@@ -113,7 +377,6 @@ function handleSaveEvent(event) {
   } else if (event.type === 'error') {
     status(`Erro ao salvar: ${event.error.message}`);
   }
-  renderHud();
 }
 
 function status(text) {
@@ -136,16 +399,14 @@ function confirmDiscard() {
 }
 
 function adopt({ state: loaded, meta }) {
-  setState(loaded);
+  setWorld(loaded);
   status(`Carregado: ${meta.name}`);
 }
 
 $('btn-new').onclick = () => {
   if (!confirmDiscard()) return;
   const name = prompt('Nome da cidade:', 'Nova Cidade');
-  if (!name) return;
-  setState(createNewState({ name: name.trim() }));
-  saves.startNew(state.city.name);
+  if (name) newCity(name.trim());
 };
 
 $('btn-save').onclick = () => attempt(() => saves.save());
@@ -168,10 +429,10 @@ $('btn-load').onclick = () => attempt(async () => {
     const info = document.createElement('div');
     info.className = 'info';
     const { population = 0, date = {} } = meta.summary || {};
-    info.innerHTML = `<strong></strong><small></small>`;
+    info.innerHTML = '<strong></strong><small></small>';
     info.querySelector('strong').textContent = meta.name + (meta.autosave ? ' (automático)' : '');
     info.querySelector('small').textContent =
-      `Ano ${date.year}, mês ${date.month} · ${population.toLocaleString('pt-BR')} hab. · ` +
+      `${date.day}/${date.month}, ano ${date.year} · ${population.toLocaleString('pt-BR')} hab. · ` +
       new Date(meta.updatedAt).toLocaleString('pt-BR');
 
     const load = document.createElement('button');
@@ -224,21 +485,10 @@ $('btn-code-load').onclick = () => attempt(() => {
   $('code-dialog').close();
 });
 
-window.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    attempt(() => saves.save());
-  } else if (e.key === ' ' && e.target === document.body) {
-    e.preventDefault();
-    paused = !paused;
-    renderHud();
-  }
+// Ao esconder/fechar a aba: grava um save automático e avisa se há mudanças.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saves.save({ autosave: true }).catch(() => {});
 });
-
-// Ao fechar a aba: grava um save automático e avisa se há mudanças não salvas.
 window.addEventListener('beforeunload', (e) => {
-  saves.save({ autosave: true, keepalive: true }).catch(() => {});
   if (dirty) e.preventDefault();
 });
-
-setState(state);

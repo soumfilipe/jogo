@@ -6,15 +6,17 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  1,                 // versão do FORMATO (para migrações)
+//   "version":  2,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
 // }
 
+import { calendar } from '../core/time.js';
+
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 1;
-export const GAME_VERSION = '0.1.0';
+export const SAVE_VERSION = 2;
+export const GAME_VERSION = '0.2.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -36,7 +38,38 @@ export class SaveError extends Error {
 //     save.version = 2;
 //     return save;
 //   },
-const MIGRATIONS = {};
+const MIGRATIONS = {
+  // v1 -> v2: mapa único de tiles virou camadas (terreno, zona, estrada) e o
+  // estado ganhou relógio em ticks, semente, prédios e cidadãos.
+  1: (save) => {
+    const old = save.data;
+    const { width, height } = old.map;
+    const tiles = rleDecode(old.map.tiles, width * height);
+    const road = new Uint8Array(width * height);
+    const zone = new Uint8Array(width * height);
+    for (let i = 0; i < tiles.length; i++) {
+      if (tiles[i] === 1) road[i] = 1;
+      else if (tiles[i] >= 2) zone[i] = tiles[i] - 1; // 2,3,4 -> R,C,I
+    }
+    const days = ((old.time.year - 1) * 12 + (old.time.month - 1)) * 30 + (old.time.day - 1);
+    const seed = parseInt(save.checksum, 16) >>> 0;
+    save.data = encodeState({
+      city: old.city,
+      seed,
+      rng: { s: seed },
+      time: { tick: days * 1440 + 7 * 60 },
+      playTimeSeconds: old.playTimeSeconds || 0,
+      economy: { money: old.economy.money, taxRate: old.economy.taxRate, lastMonth: null },
+      map: { width, height, terrain: new Uint8Array(width * height), zone, road },
+      buildings: [],
+      citizens: [],
+      pathQueue: [],
+      nextId: 1,
+    });
+    save.version = 2;
+    return save;
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Criação e leitura
@@ -167,24 +200,38 @@ export function decodeSaveCode(code) {
 // Codificação do estado
 // ---------------------------------------------------------------------------
 
-// O mapa é a maior parte do save e tem longas sequências de tiles iguais,
-// então ele é gravado com run-length encoding: [qtd, tile, qtd, tile, ...].
-function encodeState(state) {
-  const data = structuredClone(state);
-  data.map.tiles = rleEncode(state.map.tiles);
-  data.map.encoding = 'rle';
-  return data;
+// Typed arrays (as camadas do mapa) não existem em JSON. Em qualquer lugar do
+// estado eles viram { "$typed": "Uint8Array", "length": n, "rle": [...] },
+// com run-length encoding ([qtd, valor, qtd, valor, ...]): o mapa tem longas
+// sequências de tiles iguais, então fica bem menor.
+const TYPED_ARRAYS = { Uint8Array, Int8Array, Uint16Array, Int16Array, Uint32Array, Int32Array, Float32Array, Float64Array };
+
+export function encodeState(value) {
+  if (ArrayBuffer.isView(value)) {
+    return { $typed: value.constructor.name, length: value.length, rle: rleEncode(value) };
+  }
+  if (Array.isArray(value)) return value.map(encodeState);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value)) out[key] = encodeState(value[key]);
+    return out;
+  }
+  return value;
 }
 
-function decodeState(data) {
-  const state = structuredClone(data);
-  if (state.map.encoding === 'rle') {
-    state.map.tiles = rleDecode(state.map.tiles, state.map.width * state.map.height);
-  } else {
-    state.map.tiles = Uint8Array.from(state.map.tiles);
+export function decodeState(value) {
+  if (Array.isArray(value)) return value.map(decodeState);
+  if (value && typeof value === 'object') {
+    if (typeof value.$typed === 'string') {
+      const Type = TYPED_ARRAYS[value.$typed];
+      if (!Type) throw new SaveError('INVALID_SHAPE', `Tipo de dado desconhecido: ${value.$typed}`);
+      return rleDecode(value.rle, value.length, Type);
+    }
+    const out = {};
+    for (const key of Object.keys(value)) out[key] = decodeState(value[key]);
+    return out;
   }
-  delete state.map.encoding;
-  return state;
+  return value;
 }
 
 export function rleEncode(tiles) {
@@ -200,11 +247,11 @@ export function rleEncode(tiles) {
   return out;
 }
 
-export function rleDecode(runs, expectedLength) {
-  if (!Array.isArray(runs) || runs.length % 2 !== 0) {
+export function rleDecode(runs, expectedLength, Type = Uint8Array) {
+  if (!Array.isArray(runs) || runs.length % 2 !== 0 || !Number.isInteger(expectedLength)) {
     throw new SaveError('INVALID_SHAPE', 'Mapa do save corrompido.');
   }
-  const tiles = new Uint8Array(expectedLength);
+  const tiles = new Type(expectedLength);
   let pos = 0;
   for (let i = 0; i < runs.length; i += 2) {
     const run = runs[i];
@@ -222,10 +269,13 @@ export function rleDecode(runs, expectedLength) {
 }
 
 function summarize(state) {
+  const { day, month, year } = calendar(state.time.tick);
   return {
-    population: state.stats.population,
+    population: state.citizens.length,
+    buildings: state.buildings.length,
     money: state.economy.money,
-    date: { ...state.time },
+    date: { day, month, year },
+    mapSize: `${state.map.width}x${state.map.height}`,
   };
 }
 
