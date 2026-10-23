@@ -142,7 +142,8 @@ class SaveStore {
     await fs.mkdir(this.dir, { recursive: true });
     const target = this.file(id);
     const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(save, null, 2), 'utf8');
+    // JSON compacto: com milhares de cidadãos, a indentação dobraria o arquivo.
+    await fs.writeFile(tmp, JSON.stringify(save), 'utf8');
     await fs.copyFile(target, `${target}.bak`).catch(() => {});
     await fs.rename(tmp, target);
   }

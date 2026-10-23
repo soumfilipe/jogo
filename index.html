@@ -9,20 +9,37 @@
 <body>
   <header class="topbar">
     <strong id="city-name">—</strong>
-    <span id="date"></span>
-    <span>👥 <span id="population">0</span></span>
-    <span>💰 <span id="money">0</span></span>
+    <span id="date" class="mono"></span>
+    <span title="População">👥 <span id="population">0</span></span>
+    <span title="Empregados / desempregados">💼 <span id="employment">0</span></span>
+    <span title="Dinheiro">💰 <span id="money">0</span></span>
+    <span class="rci" title="Demanda: residencial, comercial, industrial">
+      <span class="bar" id="demand-r"><i></i></span>
+      <span class="bar" id="demand-c"><i></i></span>
+      <span class="bar" id="demand-i"><i></i></span>
+    </span>
     <span class="spacer"></span>
-    <button id="btn-pause" title="Espaço">⏸</button>
+    <span class="speeds" id="speeds">
+      <button data-speed="0" title="Pausar (espaço)">⏸</button>
+      <button data-speed="1" title="Velocidade 1 (tecla 1)">▶</button>
+      <button data-speed="2" title="Velocidade 2 (tecla 2)">▶▶</button>
+      <button data-speed="3" title="Velocidade 3 (tecla 3)">▶▶▶</button>
+    </span>
   </header>
 
   <nav class="toolbar" id="tools"></nav>
 
-  <main>
+  <main id="viewport">
     <canvas id="map"></canvas>
+    <div id="tooltip" hidden></div>
+    <aside id="inspector" hidden>
+      <button id="inspector-close" class="close" title="Fechar">×</button>
+      <div id="inspector-body"></div>
+    </aside>
+    <canvas id="minimap" width="220" height="120"></canvas>
   </main>
 
-  <aside class="savebar">
+  <footer class="savebar">
     <button id="btn-new">Nova cidade</button>
     <button id="btn-save" title="Ctrl+S">Salvar</button>
     <button id="btn-save-as">Salvar como…</button>
@@ -34,7 +51,7 @@
     <span class="spacer"></span>
     <span id="storage-mode" class="muted"></span>
     <span id="status" class="muted"></span>
-  </aside>
+  </footer>
 
   <dialog id="load-dialog">
     <h2>Carregar cidade</h2>

@@ -77,7 +77,7 @@ export class SaveManager {
     const state = this.getState();
     if (!this.current) this.startNew(state.city.name);
     const save = createSave(state, { ...this.current, gameId: this.current.id });
-    const blob = new Blob([JSON.stringify(save, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(save)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
