@@ -8,13 +8,14 @@
 //   { type: 'zone',     tiles, zone }       (zone = ZONE.NONE remove a zona)
 //   { type: 'bulldoze', tiles }
 
-import { COSTS, TERRAIN, ZONE } from './catalog.js';
+import { BUILDINGS, COSTS, TERRAIN, ZONE } from './catalog.js';
 import { recomputeRoads, removeBuilding } from './runtime.js';
 import { isBuildable } from './world.js';
 
 export function planCommand(state, rt, cmd) {
   const { road, zone, terrain } = state.map;
   const tiles = [];
+  const buildings = new Set(); // prédios grandes ocupam vários tiles: conta uma vez
   let cost = 0;
 
   for (const tile of new Set(cmd.tiles)) {
@@ -29,8 +30,12 @@ export function planCommand(state, rt, cmd) {
       if (rt.buildingAt[tile]) continue; // demolir antes de rezonear
       cost += cmd.zone === ZONE.NONE ? 0 : COSTS.zone;
     } else if (cmd.type === 'bulldoze') {
-      if (rt.buildingAt[tile]) cost += COSTS.demolishBuilding;
-      else if (road[tile]) cost += COSTS.demolishRoad;
+      const id = rt.buildingAt[tile];
+      if (id) {
+        if (buildings.has(id)) continue;
+        buildings.add(id);
+        cost += COSTS.demolishBuilding * BUILDINGS[rt.buildingById.get(id).type].level;
+      } else if (road[tile]) cost += COSTS.demolishRoad;
       else if (forest) cost += COSTS.clearForest;
       else if (!zone[tile]) continue;
     } else {

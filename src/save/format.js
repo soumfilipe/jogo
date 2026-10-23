@@ -16,7 +16,7 @@ import { calendar } from '../core/time.js';
 
 export const SAVE_FORMAT = 'jogo-save';
 export const SAVE_VERSION = 2;
-export const GAME_VERSION = '0.2.0';
+export const GAME_VERSION = '0.3.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';

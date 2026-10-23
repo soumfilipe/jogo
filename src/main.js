@@ -1,10 +1,10 @@
 import { createWorld } from './world/world.js';
 import { ZONE, ZONE_INFO } from './world/catalog.js';
 import { applyCommand, lineTiles, planCommand, rectTiles } from './world/commands.js';
-import { prepare, tick } from './systems/simulation.js';
+import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
-import { Renderer } from './render/renderer.js';
+import { MAP_MODES, Renderer } from './render/renderer.js';
 import { Minimap } from './render/minimap.js';
 import {
   centerOn, createCamera, panBy, screenToTile, worldToScreen, zoomAt,
@@ -39,6 +39,7 @@ let dirty = false; // mudanças desde o último save manual
 let hover = null;
 let drag = null; //   { kind: 'tool' | 'pan', start, last, moved }
 let selection = null; // { type: 'building' | 'citizen', id }
+let mapMode = null; //   chave de MAP_MODES (valor do terreno, poluição) ou null
 let following = false;
 const keysDown = new Set();
 
@@ -89,6 +90,7 @@ startLoop({
       hover,
       preview: currentPreview(),
       selected: selectedObjects(),
+      mapMode,
     });
     minimap.render(state, rt, cam);
     throttledHud();
@@ -103,6 +105,7 @@ window.jogo = {
   get rt() { return rt; },
   get cam() { return cam; },
   applyCommand: (cmd) => applyCommand(state, rt, cmd),
+  advance: (ticks) => advance(state, rt, ticks),
   setSpeed,
 };
 
@@ -156,9 +159,26 @@ for (const t of TOOLS) {
 function selectTool(t) {
   tool = t;
   drag = null;
-  for (const b of $('tools').children) b.classList.toggle('active', b.dataset.tool === t.id);
+  for (const b of $('tools').querySelectorAll('[data-tool]')) b.classList.toggle('active', b.dataset.tool === t.id);
 }
 selectTool(tool);
+
+// Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
+const MAP_KEYS = { valor: 'l', poluicao: 'p' };
+const separator = document.createElement('span');
+separator.className = 'separator';
+$('tools').append(separator);
+for (const [id, mode] of Object.entries(MAP_MODES)) {
+  const button = document.createElement('button');
+  button.innerHTML = `${mode.name}<kbd>${MAP_KEYS[id].toUpperCase()}</kbd>`;
+  button.dataset.map = id;
+  button.onclick = () => toggleMap(id);
+  $('tools').append(button);
+}
+function toggleMap(id) {
+  mapMode = mapMode === id ? null : id;
+  for (const b of $('tools').querySelectorAll('[data-map]')) b.classList.toggle('active', b.dataset.map === mapMode);
+}
 
 function toolCommand() {
   if (!drag || drag.kind !== 'tool' || !tool.shape || !hover) return null;
@@ -282,7 +302,7 @@ function select(next) {
 function updateInspector() {
   const panel = $('inspector');
   panel.hidden = !selection;
-  if (selection) renderInspector($('inspector-body'), selection, rt, { following });
+  if (selection) renderInspector($('inspector-body'), selection, state, rt, { following });
 }
 
 $('inspector-close').onclick = () => select(null);
@@ -345,7 +365,9 @@ window.addEventListener('keydown', (e) => {
     keysDown.add(key);
   } else {
     const t = TOOLS.find((x) => x.key === key);
+    const map = Object.keys(MAP_KEYS).find((id) => MAP_KEYS[id] === key);
     if (t) selectTool(t);
+    else if (map) toggleMap(map);
   }
 });
 window.addEventListener('keyup', (e) => keysDown.delete(e.key.toLowerCase()));
