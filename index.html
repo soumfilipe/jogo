@@ -12,7 +12,7 @@
     <span id="date" class="mono"></span>
     <span title="População">👥 <span id="population">0</span></span>
     <span title="Empregados / desempregados">💼 <span id="employment">0</span></span>
-    <span title="Dinheiro">💰 <span id="money">0</span></span>
+    <button id="btn-budget" class="money" title="Orçamento (O)">💰 <span id="money">0</span></button>
     <span id="power" title="Energia: consumo / produção">⚡ <span>0</span></span>
     <span id="water" title="Água: consumo / produção">💧 <span>0</span></span>
     <span id="utility-hint" class="hint" hidden></span>
@@ -35,6 +35,7 @@
   <main id="viewport">
     <canvas id="map"></canvas>
     <div id="tooltip" hidden></div>
+    <aside id="budget" class="budget" hidden></aside>
     <aside id="inspector" hidden>
       <button id="inspector-close" class="close" title="Fechar">×</button>
       <div id="inspector-body"></div>

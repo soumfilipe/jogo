@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  3,                 // versão do FORMATO (para migrações)
+//   "version":  4,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -15,8 +15,8 @@
 import { calendar } from '../core/time.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 3;
-export const GAME_VERSION = '0.4.0';
+export const SAVE_VERSION = 4;
+export const GAME_VERSION = '0.5.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -74,6 +74,22 @@ const MIGRATIONS = {
   2: (save) => {
     save.data.utilities = { imported: { power: true, water: true } };
     save.version = 3;
+    return save;
+  },
+  // v3 -> v4: orçamento. A taxa única vira impostos por zona (em %), e entram
+  // empréstimos e histórico mensal.
+  3: (save) => {
+    const e = save.data.economy;
+    const pct = Math.round((e.taxRate ?? 0.09) * 100);
+    save.data.economy = {
+      money: e.money,
+      taxes: { residential: pct, commercial: pct, industrial: pct },
+      loans: [],
+      nextLoanId: 1,
+      history: [],
+      lastMonth: null,
+    };
+    save.version = 4;
     return save;
   },
 };

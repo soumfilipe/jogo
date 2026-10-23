@@ -19,7 +19,15 @@ export function createWorld({
     rng: createRng(seed),
     time: { tick: 7 * 60 }, // começa às 07:00 do dia 1
     playTimeSeconds: 0,
-    economy: { money: ECONOMY.startMoney, taxRate: ECONOMY.taxRate, lastMonth: null },
+    economy: {
+      money: ECONOMY.startMoney,
+      // Impostos em % por zona.
+      taxes: { residential: ECONOMY.taxDefault, commercial: ECONOMY.taxDefault, industrial: ECONOMY.taxDefault },
+      loans: [], //   { id, amount, balance, payment, monthsLeft }
+      nextLoanId: 1,
+      history: [], // um registro por mês fechado (ver systems/economy.js)
+      lastMonth: null,
+    },
     map: {
       width,
       height,

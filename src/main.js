@@ -11,6 +11,8 @@ import {
   centerOn, createCamera, panBy, screenToTile, worldToScreen, zoomAt,
 } from './render/camera.js';
 import { renderInspector } from './ui/inspector.js';
+import { BudgetPanel } from './ui/budget.js';
+import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
 import { detectBackend } from './save/backends.js';
 
@@ -136,6 +138,7 @@ function throttledHud() {
   lastHud = now;
   renderHud();
   if (selection) updateInspector();
+  budget.render(state, rt);
 }
 
 function renderHud() {
@@ -223,6 +226,23 @@ function selectTool(t) {
   for (const b of $('tools').querySelectorAll('[data-tool]')) b.classList.toggle('active', b.dataset.tool === t.id);
 }
 selectTool(tool);
+
+// Orçamento: painel aberto pelo dinheiro no topo ou pela tecla O.
+const budget = new BudgetPanel($('budget'), {
+  act: (cmd) => {
+    const result = applyCommand(state, rt, cmd);
+    if (result.ok) {
+      dirty = true;
+      computeDemand(state, rt); // imposto muda a demanda na hora
+      renderHud();
+    }
+    return result;
+  },
+});
+$('btn-budget').onclick = () => {
+  budget.toggle();
+  budget.render(state, rt);
+};
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
 const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h' };
@@ -435,6 +455,10 @@ window.addEventListener('keydown', (e) => {
   } else if (key === 'escape') {
     drag = null;
     select(null);
+    budget.toggle(false);
+  } else if (key === 'o') {
+    budget.toggle();
+    budget.render(state, rt);
   } else if (PAN_KEYS[key]) {
     e.preventDefault();
     keysDown.add(key);
