@@ -62,6 +62,23 @@ andando e seguir com a câmera.
 - Tipos, capacidades, exigências e aparência ficam em `src/world/catalog.js`; o
   desenho de cada estilo em `src/render/buildings.js`.
 
+## Noite e luzes
+
+Entre 17h30 e 6h30 a cidade escurece e as janelas acendem e apagam sozinhas
+(`src/render/lights.js`). Cada janela tem seu próprio horário, sorteado de forma
+fixa pelo id do prédio, então nada pisca:
+
+| Tipo | Acende | Apaga |
+| --- | --- | --- |
+| Residências | 17h30 a 20h; parte também acende cedo, antes do trabalho (5h30 a 7h) | 22h a 1h30 (alguns ficam acordados até 2h a 4h) |
+| Comércio | 17h a 18h30 | 20h a 23h (alguns escritórios até de madrugada) |
+| Indústria | turno da noite, cerca de 30% das janelas | 6h |
+
+Nas residências, a fração de janelas acesas acompanha quantos moradores estão em
+casa: casa vazia fica apagada. As luzes ficam numa camada própria, redesenhada a
+cada 15 minutos de jogo, em que cada prédio esconde as luzes dos que estão atrás.
+À noite os cidadãos andando aparecem por cima da escuridão, como faróis.
+
 ## Como a simulação funciona
 
 - **Tempo**: 1 tick = 1 minuto de jogo. O estado guarda só o número do tick; data

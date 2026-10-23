@@ -10,10 +10,17 @@
 
 import { BUILDINGS, TERRAIN, ZONE, ZONE_INFO } from '../world/catalog.js';
 import { hash2 } from '../core/rng.js';
-import { calendar } from '../core/time.js';
+import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
 import { visibleRange, worldToScreen } from './camera.js';
-import { drawBuilding } from './buildings.js';
+import { buildingGeometry, drawBuilding, silhouette, windowSize } from './buildings.js';
+import { LIGHT_COLORS, darkness, isWindowLit } from './lights.js';
+
+// As luzes são redesenhadas a cada tantos minutos de jogo (e quando a câmera
+// ou o mapa mudam), não a cada quadro.
+const LIGHTS_EVERY_MINUTES = 15;
+const LIGHTS_MIN_ZOOM = 0.15;
+const NIGHT_TINT = 'rgba(10, 18, 48, 0.55)';
 
 const GRASS = ['#7db460', '#7ab15d', '#80b763'];
 const WATER = ['#3f7fc4', '#3b79bd'];
@@ -43,6 +50,10 @@ export class Renderer {
     this.staticCanvas = document.createElement('canvas');
     this.staticCtx = this.staticCanvas.getContext('2d');
     this.staticKey = '';
+    // Camada de luzes das janelas, por cima da escuridão da noite.
+    this.lightsCanvas = document.createElement('canvas');
+    this.lightsCtx = this.lightsCanvas.getContext('2d');
+    this.lightsKey = '';
     this.dpr = 1;
   }
 
@@ -50,7 +61,7 @@ export class Renderer {
     this.dpr = window.devicePixelRatio || 1;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
-    for (const c of [this.canvas, this.staticCanvas]) {
+    for (const c of [this.canvas, this.staticCanvas, this.lightsCanvas]) {
       c.width = Math.round(w * this.dpr);
       c.height = Math.round(h * this.dpr);
     }
@@ -78,6 +89,29 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(this.staticCanvas, 0, 0);
+
+    // Noite: escurece tudo e acende as janelas por cima. Os cidadãos andando
+    // vêm depois, então à noite parecem faróis nas ruas.
+    const minute = state.time.tick % MINUTES_PER_DAY;
+    const dark = mode ? 0 : darkness(minute);
+    if (dark > 0) {
+      ctx.globalAlpha = dark;
+      ctx.fillStyle = NIGHT_TINT;
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      if (cam.zoom >= LIGHTS_MIN_ZOOM) {
+        const lightsKey = [
+          cam.version, rt.mapVersion, this.canvas.width, this.canvas.height,
+          Math.floor(state.time.tick / LIGHTS_EVERY_MINUTES),
+        ].join(':');
+        if (lightsKey !== this.lightsKey) {
+          this.lightsKey = lightsKey;
+          this.#drawLights(state, rt, cam, minute);
+        }
+        ctx.globalAlpha = Math.min(1, dark * 1.6);
+        ctx.drawImage(this.lightsCanvas, 0, 0);
+      }
+      ctx.globalAlpha = 1;
+    }
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     if (overlay.preview) this.#drawTiles(ctx, state, cam, overlay.preview.tiles, overlay.preview.color);
@@ -90,7 +124,53 @@ export class Renderer {
     if (overlay.hover) {
       this.#outlineTile(ctx, state, cam, overlay.hover.y * state.map.width + overlay.hover.x, 'rgba(255,255,255,0.8)', 1.5);
     }
-    this.#drawNight(ctx, state, cam);
+  }
+
+  // Desenha as janelas acesas, prédio a prédio de trás para frente. Antes das
+  // janelas de cada prédio, o contorno dele é recortado da camada: assim as
+  // luzes dos prédios de trás ficam escondidas atrás dos da frente.
+  #drawLights(state, rt, cam, minute) {
+    const ctx = this.lightsCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.lightsCanvas.width, this.lightsCanvas.height);
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    const width = state.map.width;
+    const range = visibleRange(cam);
+    const [w, wh] = windowSize(cam.zoom);
+    for (let d = range.x0 + range.y0; d <= range.x1 + range.y1; d++) {
+      const xStart = Math.max(range.x0, d - range.y1);
+      const xEnd = Math.min(range.x1, d - range.y0);
+      for (let x = xStart; x <= xEnd; x++) {
+        const tile = (d - x) * width + x;
+        const id = rt.buildingAt[tile];
+        if (!id) continue;
+        const b = rt.buildingById.get(id);
+        if (tile !== frontTile(state, b)) continue;
+
+        const g = buildingGeometry(cam, b.tile % width, Math.floor(b.tile / width), b);
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = '#000';
+        silhouette(ctx, g);
+        ctx.globalCompositeOperation = 'source-over';
+        if (g.windows.length === 0) continue;
+
+        const occupancy = buildingOccupancy(rt, b, g.info);
+        if (occupancy <= 0) continue;
+        const lit = new Path2D();
+        const glow = new Path2D();
+        g.windows.forEach(([wx, wy], k) => {
+          if (!isWindowLit(b, g.info, k, minute, occupancy)) return;
+          lit.rect(wx - w / 2, wy - wh / 2, w, wh);
+          glow.rect(wx - w, wy - wh, w * 2, wh * 2);
+        });
+        ctx.fillStyle = LIGHT_COLORS[g.info.zone];
+        ctx.globalAlpha = 0.18;
+        ctx.fill(glow);
+        ctx.globalAlpha = 1;
+        ctx.fill(lit);
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -210,21 +290,19 @@ export class Renderer {
       ctx.stroke();
     }
   }
-
-  #drawNight(ctx, state, cam) {
-    const hour = calendar(state.time.tick).minuteOfDay / 60;
-    // 0 durante o dia, até 0.4 de madrugada, com transições ao amanhecer/anoitecer.
-    let dark = 0;
-    if (hour < 5 || hour >= 20) dark = 1;
-    else if (hour < 7) dark = 1 - (hour - 5) / 2;
-    else if (hour >= 18) dark = (hour - 18) / 2;
-    if (dark <= 0) return;
-    ctx.fillStyle = `rgba(10, 18, 48, ${0.4 * dark})`;
-    ctx.fillRect(0, 0, cam.viewW, cam.viewH);
-  }
 }
 
 // ---------------------------------------------------------------------------
+
+// Fração de gente no prédio: moradores em casa, ou se tem alguém trabalhando.
+function buildingOccupancy(rt, b, info) {
+  if (info.residents) {
+    let home = 0;
+    for (const id of rt.residents.get(b.id)) if (rt.citizenById.get(id).state === 'casa') home++;
+    return home / info.residents;
+  }
+  return rt.workers.get(b.id).size > 0 ? 0.9 : 0;
+}
 
 function diamond(path, cam, x, y, inset, size = 1) {
   const [tx, ty] = worldToScreen(cam, x + inset, y + inset);

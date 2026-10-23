@@ -18,7 +18,8 @@ export const ZONE_INFO = {
 //   style:     como desenhar (ver src/render/buildings.js)
 //     height:   altura em "andares" (1 = altura de meio tile)
 //     roof:     'hip' (telhado de quatro águas) | 'flat'
-//     windows, chimney, stripes: detalhes opcionais
+//     windows, chimney, stripes, awning: detalhes opcionais
+//     windowCols: janelas por andar em cada face (padrão 3)
 //     palettes: variações de cor; cada prédio sorteia uma pelo id
 //
 // Os ids 'casa', 'loja' e 'fabrica' existem desde o formato de save 2 e não
@@ -42,7 +43,7 @@ export const BUILDINGS = {
   casa: {
     name: 'Casa', zone: ZONE.RESIDENTIAL, level: 1, size: 1, residents: 4, jobs: 0,
     style: {
-      height: 0.6, roof: 'hip',
+      height: 0.6, roof: 'hip', windows: true, windowCols: 2,
       palettes: [p('creme', '#e9d8b4', { roof: '#b5523b' }), p('branco', '#f0ece4', { roof: '#7a4b3a' }),
         p('azul', '#dce6ef', { roof: '#9c4a3a' }), p('verde', '#e1ebdc', { roof: '#6f5b4b' })],
     },
