@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2a2e36">
   <title>Jogo</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -56,6 +57,54 @@
     <span id="storage-mode" class="muted"></span>
     <span id="status" class="muted"></span>
   </footer>
+
+  <!-- Celular: barra inferior e painéis que sobem de baixo (no computador ficam escondidos). -->
+  <nav class="mobile-nav" id="mobile-nav">
+    <button data-mobile="inspect"><span class="ico">✋</span><span>Mover</span></button>
+    <button data-sheet="sheet-build"><span class="ico">🏗️</span><span data-build-label>Construir</span></button>
+    <button data-sheet="sheet-maps"><span class="ico">🗺️</span><span data-maps-label>Mapas</span></button>
+    <button data-mobile="budget"><span class="ico">💰</span><span>Orçamento</span></button>
+    <button data-sheet="sheet-file"><span class="ico">💾</span><span>Arquivo</span></button>
+  </nav>
+
+  <div class="sheet" id="sheet-build" hidden>
+    <div class="sheet-backdrop" data-sheet-close></div>
+    <section class="sheet-panel" role="dialog" aria-label="Construir">
+      <div class="grabber"></div>
+      <h3>Construir</h3>
+      <h4>Ruas e zonas</h4>
+      <div class="sheet-grid" data-build-group="ground"></div>
+      <h4>Serviços públicos</h4>
+      <div class="sheet-grid" data-build-group="utility"></div>
+    </section>
+  </div>
+
+  <div class="sheet" id="sheet-maps" hidden>
+    <div class="sheet-backdrop" data-sheet-close></div>
+    <section class="sheet-panel" role="dialog" aria-label="Mapas">
+      <div class="grabber"></div>
+      <h3>Mapas</h3>
+      <div class="sheet-grid" data-maps></div>
+    </section>
+  </div>
+
+  <div class="sheet" id="sheet-file" hidden>
+    <div class="sheet-backdrop" data-sheet-close></div>
+    <section class="sheet-panel" role="dialog" aria-label="Arquivo">
+      <div class="grabber"></div>
+      <h3>Arquivo</h3>
+      <div class="sheet-list">
+        <button data-click="btn-save"><span class="ico">💾</span>Salvar</button>
+        <button data-click="btn-save-as"><span class="ico">📝</span>Salvar como…</button>
+        <button data-click="btn-load"><span class="ico">📂</span>Carregar…</button>
+        <button data-click="btn-export"><span class="ico">⬇️</span>Exportar arquivo</button>
+        <button data-click="btn-import"><span class="ico">⬆️</span>Importar arquivo</button>
+        <button data-click="btn-code"><span class="ico">🔑</span>Código de save</button>
+        <button data-click="btn-new"><span class="ico">✨</span>Nova cidade</button>
+      </div>
+      <p class="muted small" data-file-status></p>
+    </section>
+  </div>
 
   <dialog id="load-dialog">
     <h2>Carregar cidade</h2>

@@ -36,6 +36,22 @@ npm test   # testes da simulação, do formato de save e do servidor
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
 | Minimapa | clique ou arraste para ir até um ponto |
 
+### No celular
+
+Em telas estreitas (ou celular deitado) a interface muda:
+
+- **Barra inferior**: Mover (arrastar a câmera e tocar para inspecionar),
+  Construir, Mapas, Orçamento e Arquivo. O rótulo mostra a ferramenta ou o mapa
+  escolhido.
+- **Painéis que sobem de baixo**, como o teclado do iOS: Construir (ruas, zonas e
+  serviços públicos, com preço), Mapas e Arquivo (salvar, carregar, exportar,
+  importar, código de save, nova cidade). Fecham ao tocar fora ou ao deslizar
+  para baixo. Orçamento, inspetor e a lista de saves também abrem de baixo (com o
+  celular deitado, orçamento e inspetor abrem ao lado).
+- **Gestos**: um dedo arrasta a câmera (Mover) ou desenha com a ferramenta
+  escolhida; dois dedos movem e dão zoom (pinça) a qualquer momento, sem
+  construir nada.
+
 Prédios surgem sozinhos nas zonas que ficam a até 2 tiles de uma estrada, conforme
 a demanda (as três barrinhas RCI no topo), e **sobem de nível** com o tempo. Cada morador é um **cidadão individual**:
 tem nome, idade, casa e emprego, sai de casa de manhã, vai pelas estradas até o

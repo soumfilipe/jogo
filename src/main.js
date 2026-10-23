@@ -1,5 +1,5 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, COSTS, ZONE, ZONE_INFO } from './world/catalog.js';
 import { applyCommand, lineTiles, planCommand, rectTiles } from './world/commands.js';
 import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
@@ -12,6 +12,7 @@ import {
 } from './render/camera.js';
 import { renderInspector } from './ui/inspector.js';
 import { BudgetPanel } from './ui/budget.js';
+import { Sheets } from './ui/sheets.js';
 import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
 import { detectBackend } from './save/backends.js';
@@ -41,6 +42,13 @@ const TOOLS = [
   })),
 ];
 
+// Preço mostrado nos botões do painel "Construir" (celular).
+const TOOL_COSTS = {
+  road: `$${COSTS.road}/tile`,
+  bulldoze: 'varia',
+  ...Object.fromEntries([ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL].map((z) => [`zone-${z}`, `$${COSTS.zone}/tile`])),
+};
+
 let state;
 let rt;
 let cam;
@@ -55,6 +63,7 @@ let following = false;
 const keysDown = new Set();
 
 const renderer = new Renderer(canvas);
+const sheets = new Sheets(); // painéis do celular (ver mais abaixo)
 const minimap = new Minimap($('minimap'));
 
 const saves = new SaveManager({
@@ -223,7 +232,8 @@ function utilityTitle(id) {
 function selectTool(t) {
   tool = t;
   drag = null;
-  for (const b of $('tools').querySelectorAll('[data-tool]')) b.classList.toggle('active', b.dataset.tool === t.id);
+  for (const b of document.querySelectorAll('[data-tool]')) b.classList.toggle('active', b.dataset.tool === t.id);
+  updateMobileNav();
 }
 selectTool(tool);
 
@@ -258,9 +268,82 @@ for (const [id, mode] of Object.entries(MAP_MODES)) {
   $('tools').append(button);
 }
 function toggleMap(id) {
-  mapMode = mapMode === id ? null : id;
-  for (const b of $('tools').querySelectorAll('[data-map]')) b.classList.toggle('active', b.dataset.map === mapMode);
+  setMap(mapMode === id ? null : id);
 }
+function setMap(id) {
+  mapMode = id;
+  for (const b of document.querySelectorAll('[data-map]')) b.classList.toggle('active', (b.dataset.map || null) === mapMode);
+  updateMobileNav();
+}
+
+// --- Celular: barra inferior e painéis que sobem de baixo -------------------
+
+for (const t of TOOLS) {
+  if (t.id === 'inspect') continue;
+  const button = document.createElement('button');
+  button.dataset.tool = t.id;
+  const cost = t.building ? `$${BUILDINGS[t.building].utility.cost.toLocaleString('pt-BR')}` : TOOL_COSTS[t.id] ?? '';
+  button.innerHTML = `<span class="swatch" style="background:${t.swatch || t.color}"></span>
+    <span>${t.label || t.name}</span><small>${cost}</small>`;
+  button.onclick = () => {
+    selectTool(t);
+    sheets.close();
+  };
+  document.querySelector(`[data-build-group="${t.building ? 'utility' : 'ground'}"]`).append(button);
+}
+
+for (const [id, mode] of [[null, { name: 'Nenhum' }], ...Object.entries(MAP_MODES)]) {
+  const button = document.createElement('button');
+  button.dataset.map = id ?? '';
+  button.textContent = mode.name;
+  button.onclick = () => {
+    setMap(id);
+    sheets.close();
+  };
+  document.querySelector('[data-maps]').append(button);
+}
+
+for (const button of document.querySelectorAll('[data-click]')) {
+  // Os botões do painel "Arquivo" fazem o mesmo que os da barra de baixo do computador.
+  button.onclick = () => {
+    sheets.close();
+    $(button.dataset.click).click();
+  };
+}
+
+for (const button of $('mobile-nav').children) {
+  button.onclick = () => {
+    if (button.dataset.sheet) {
+      if (button.dataset.sheet === 'sheet-file') {
+        document.querySelector('[data-file-status]').textContent =
+          [$('storage-mode').textContent, $('status').textContent].filter(Boolean).join(' · ');
+      }
+      sheets.toggle(button.dataset.sheet);
+    } else if (button.dataset.mobile === 'inspect') {
+      sheets.close();
+      selectTool(TOOLS[0]);
+    } else if (button.dataset.mobile === 'budget') {
+      sheets.close();
+      budget.toggle();
+      budget.render(state, rt);
+    }
+  };
+}
+sheets.onChange = () => updateMobileNav();
+
+// Destaca o botão ativo e mostra a ferramenta/mapa escolhidos nos rótulos.
+function updateMobileNav() {
+  const nav = $('mobile-nav');
+  if (!nav) return;
+  const building = tool.id !== 'inspect';
+  nav.querySelector('[data-mobile="inspect"]').classList.toggle('active', !building);
+  nav.querySelector('[data-sheet="sheet-build"]').classList.toggle('active', building);
+  nav.querySelector('[data-build-label]').textContent = building ? (tool.label || tool.name) : 'Construir';
+  nav.querySelector('[data-maps-label]').textContent = mapMode ? MAP_MODES[mapMode].label || MAP_MODES[mapMode].name : 'Mapas';
+  nav.querySelector('[data-sheet="sheet-maps"]').classList.toggle('active', Boolean(mapMode));
+  for (const b of nav.querySelectorAll('[data-sheet]')) b.classList.toggle('open', sheets.openId === b.dataset.sheet);
+}
+updateMobileNav();
 
 function toolCommand() {
   if (!tool.shape || !hover) return null;
@@ -312,9 +395,32 @@ function pointerPos(e) {
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// Toque: dois dedos movem a câmera e dão zoom (pinça), em qualquer
+// ferramenta; um dedo funciona como o mouse.
+const touches = new Map(); // pointerId -> [x, y]
+let pinch = null; //          { dist, mid } do último quadro com dois dedos
+
+function twoFingers() {
+  const [a, b] = [...touches.values()];
+  return { dist: Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+}
+
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
   const [sx, sy] = pointerPos(e);
+  if (e.pointerType === 'touch') {
+    touches.set(e.pointerId, [sx, sy]);
+    if (touches.size >= 2) {
+      // Segundo dedo: cancela o que o primeiro estava fazendo e vira pinça.
+      drag = null;
+      canvas.classList.remove('panning');
+      pinch = twoFingers();
+      return;
+    }
+    // No toque não existe "passar o mouse": o tile é o que está sob o dedo.
+    hover = screenToTile(cam, sx, sy);
+  }
+  if (pinch) return;
   const panButton = e.button === 1 || e.button === 2;
   if (panButton || tool.id === 'inspect') {
     drag = { kind: 'pan', last: [sx, sy], origin: [sx, sy], moved: false, click: !panButton };
@@ -325,6 +431,17 @@ canvas.addEventListener('pointerdown', (e) => {
 
 canvas.addEventListener('pointermove', (e) => {
   const [sx, sy] = pointerPos(e);
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, [sx, sy]);
+  if (pinch) {
+    if (touches.size >= 2) {
+      const now = twoFingers();
+      zoomAt(cam, now.dist / pinch.dist, now.mid[0], now.mid[1]);
+      panBy(cam, now.mid[0] - pinch.mid[0], now.mid[1] - pinch.mid[1]);
+      following = false;
+      pinch = now;
+    }
+    return;
+  }
   hover = screenToTile(cam, sx, sy);
   if (drag?.kind === 'pan') {
     if (Math.hypot(sx - drag.origin[0], sy - drag.origin[1]) > 4) drag.moved = true;
@@ -337,9 +454,25 @@ canvas.addEventListener('pointermove', (e) => {
   }
 });
 
+function endTouch(e) {
+  touches.delete(e.pointerId);
+  // A pinça só termina quando todos os dedos saem (nada é construído).
+  if (pinch) {
+    if (touches.size === 0) pinch = null;
+    drag = null;
+    return true;
+  }
+  return false;
+}
+canvas.addEventListener('pointercancel', (e) => {
+  endTouch(e);
+  drag = null;
+});
+
 canvas.addEventListener('pointerup', (e) => {
   const [sx, sy] = pointerPos(e);
   canvas.classList.remove('panning');
+  if (endTouch(e)) return;
   if (drag?.kind === 'tool') {
     const cmd = toolCommand();
     if (cmd) {
