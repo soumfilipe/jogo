@@ -144,6 +144,7 @@ export function setJob(rt, citizen, jobId, departWork = 0, departHome = 0) {
   citizen.job = jobId;
   citizen.departWork = jobId === null ? null : departWork;
   citizen.departHome = jobId === null ? null : departHome;
+  if (jobId === null) citizen.shift = null;
   if (jobId !== null) {
     rt.workers.get(jobId).add(citizen.id);
     addDeparture(rt, departWork, citizen.id);

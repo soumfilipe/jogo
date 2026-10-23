@@ -115,5 +115,16 @@ export const ECONOMY = {
 // Um prédio só cresce se houver estrada a até esta distância (em tiles).
 export const ROAD_ACCESS_RADIUS = 2;
 
+// Turnos de trabalho. Cada contratação sorteia um turno pela fração `share`;
+// os horários de saída (de casa e do trabalho) são sorteados dentro das
+// faixas, em minutos do dia. O turno da noite volta para casa no dia seguinte.
+const hm = (h, m = 0) => h * 60 + m;
+export const SHIFTS = {
+  diurno: { name: 'Diurno', share: 0.83, leave: [hm(6, 30), hm(8, 30)], back: [hm(16, 30), hm(18, 30)] },
+  noturno: { name: 'Noturno', share: 0.07, leave: [hm(21), hm(23)], back: [hm(6), hm(7, 30)] },
+  manha: { name: 'Meio período (manhã)', share: 0.05, leave: [hm(7), hm(9)], back: [hm(12), hm(13, 30)] },
+  tarde: { name: 'Meio período (tarde)', share: 0.05, leave: [hm(12, 30), hm(14)], back: [hm(17, 30), hm(19, 30)] },
+};
+
 // Velocidade dos cidadãos, em tiles por minuto de jogo.
 export const CITIZEN_SPEED = 0.5;

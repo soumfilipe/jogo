@@ -89,6 +89,20 @@ casa: casa vazia fica apagada. As luzes ficam numa camada própria, redesenhada 
 cada 15 minutos de jogo, em que cada prédio esconde as luzes dos que estão atrás.
 À noite os cidadãos andando aparecem por cima da escuridão, como faróis.
 
+## Turnos de trabalho
+
+Cada contratação sorteia um turno (`SHIFTS` em `src/world/catalog.js`):
+
+| Turno | Parcela | Sai de casa | Volta |
+| --- | --- | --- | --- |
+| Diurno | 83% | 6h30 a 8h30 | 16h30 a 18h30 |
+| Noturno | 7% | 21h a 23h | 6h a 7h30 (do dia seguinte) |
+| Meio período, manhã | 5% | 7h a 9h | 12h a 13h30 |
+| Meio período, tarde | 5% | 12h30 a 14h | 17h30 a 19h30 |
+
+Assim há carros na rua também no horário de almoço e à noite. O turno aparece
+no painel do cidadão.
+
 ## Cidadãos nas ruas
 
 Cada cidadão em viagem aparece como um carrinho com cor própria, alinhado à rua
