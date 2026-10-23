@@ -9,6 +9,7 @@ import { createWorld } from '../src/world/world.js';
 import { TERRAIN, ZONE, COSTS } from '../src/world/catalog.js';
 import { createSave, readSave, checksum, encodeState } from '../src/save/format.js';
 import { testCity } from './helpers.js';
+import * as SHIFT_HELPERS from '../src/agents/citizens.js';
 
 const at = (state, hour, minute = 0) => {
   const day = Math.floor(state.time.tick / TICKS_PER_DAY);
@@ -91,13 +92,47 @@ test('cidade cresce e cidadãos fazem a rotina casa -> trabalho -> casa', () => 
   const employed = state.citizens.filter((c) => c.job !== null);
   assert.ok(employed.length > state.citizens.length * 0.5, 'maioria empregada');
 
-  advance(state, rt, at(state, 12));
-  const atWork = employed.filter((c) => c.state === 'trabalho').length;
-  assert.ok(atWork > employed.length * 0.8, `ao meio-dia no trabalho: ${atWork}/${employed.length}`);
+  advance(state, rt, at(state, 11));
+  const dayShift = employed.filter((c) => c.shift === 'diurno');
+  const atWork = dayShift.filter((c) => c.state === 'trabalho').length;
+  assert.ok(atWork > dayShift.length * 0.9, `às 11h, turno diurno no trabalho: ${atWork}/${dayShift.length}`);
 
-  advance(state, rt, at(state, 23));
-  const home = state.citizens.filter((c) => c.state === 'casa').length;
-  assert.equal(home, state.citizens.length, 'todos em casa às 23h');
+  advance(state, rt, at(state, 23, 59));
+  const notNight = state.citizens.filter((c) => c.shift !== 'noturno');
+  assert.ok(notNight.every((c) => c.state === 'casa'), 'fora do turno da noite, todos em casa à meia-noite');
+});
+
+test('turnos: 7% à noite, 3% de madrugada, 10% meio período, e a cidade se move em todos os horários', () => {
+  const { pickShift } = SHIFT_HELPERS;
+  // Distribuição exata das frações do catálogo.
+  const counts = {};
+  for (let i = 0; i < 1000; i++) counts[pickShift((i + 0.5) / 1000)] = (counts[pickShift((i + 0.5) / 1000)] || 0) + 1;
+  assert.deepEqual(counts, { diurno: 800, noturno: 70, madrugada: 30, manha: 50, tarde: 50 });
+
+  const { state, rt } = testCity({ size: 48, seed: 21 });
+  advance(state, rt, TICKS_PER_DAY * 4);
+  const employed = state.citizens.filter((c) => c.job !== null);
+  const share = (s) => employed.filter((c) => c.shift === s).length / employed.length;
+  assert.ok(share('noturno') > 0.03 && share('noturno') < 0.12, `noturno: ${share('noturno')}`);
+  assert.ok(share('manha') + share('tarde') > 0.05 && share('manha') + share('tarde') < 0.16, 'meio período');
+
+  // Madrugada: o turno da noite está trabalhando.
+  advance(state, rt, at(state, 3));
+  const night = employed.filter((c) => c.shift === 'noturno');
+  assert.ok(night.filter((c) => c.state === 'trabalho').length > night.length * 0.9, 'turno da noite no trabalho às 3h');
+
+  // Madrugada: jornada de 8 a 9 horas a partir da saída de cada um.
+  for (const c of employed.filter((x) => x.shift === 'madrugada')) {
+    assert.ok(c.departWork <= 4.5 * 60, 'sai até 4h30');
+    const hours = (c.departHome - c.departWork + 1440) % 1440;
+    assert.ok(hours >= 8 * 60 && hours <= 9 * 60, `jornada de ${hours} min`);
+  }
+
+  // Há gente na rua de manhã, na hora do almoço, à tarde, à noite e de madrugada.
+  for (const [hour, minute] of [[7, 30], [12, 45], [17, 30], [22, 0], [1, 30], [3, 45], [6, 45]]) {
+    advance(state, rt, at(state, hour, minute));
+    assert.ok(rt.movers.size > 0, `ninguém na rua às ${hour}h${minute}`);
+  }
 });
 
 test('demolir prédio e estrada atualiza moradores, empregos e viagens', () => {

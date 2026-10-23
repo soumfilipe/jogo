@@ -1,7 +1,7 @@
 // Painel de inspeção: mostra um prédio (com moradores/funcionários) ou um
 // cidadão individual (casa, emprego, rotina e o que está fazendo agora).
 
-import { BUILDINGS, MAX_LEVEL } from '../world/catalog.js';
+import { BUILDINGS, MAX_LEVEL, SHIFTS } from '../world/catalog.js';
 import { formatClock } from '../core/time.js';
 import { upgradeBlockers } from '../systems/growth.js';
 
@@ -70,7 +70,8 @@ function renderCitizen(el, c, rt, following) {
       <dt>Trabalho</dt><dd>${job
         ? `<button class="link" data-building="${job.id}">${esc(BUILDINGS[job.type].name)} #${job.id}</button>`
         : c.age > 64 ? 'Aposentado(a)' : 'Desempregado(a)'}</dd>
-      ${job ? `<dt>Rotina</dt><dd>sai ${formatClock(c.departWork)}, volta ${formatClock(c.departHome)}</dd>` : ''}
+      ${job ? `<dt>Turno</dt><dd>${esc(SHIFTS[c.shift ?? 'diurno'].name)}</dd>
+      <dt>Rotina</dt><dd>sai ${formatClock(c.departWork)}, volta ${formatClock(c.departHome)}</dd>` : ''}
     </dl>
     <button data-follow>${following ? 'Parar de seguir' : 'Seguir com a câmera'}</button>`;
 }

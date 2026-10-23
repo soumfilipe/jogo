@@ -7,15 +7,16 @@
 //   id, name, age,
 //   home: id do prédio,      job: id do prédio | null,
 //   departWork / departHome: minuto do dia em que sai (null sem emprego),
+//   shift: turno ('diurno', 'noturno', 'madrugada', 'manha', 'tarde'; null sem emprego),
 //   state: 'casa' | 'trabalho' | 'aguardando' (rota sendo calculada) | 'viajando',
 //   dest:  'trabalho' | 'casa' | null,
 //   x, y:  posição em tiles (contínua),
 //   path:  tiles da viagem atual | null,   step: índice no path
 // }
 
-import { CITIZEN_SPEED } from '../world/catalog.js';
+import { CITIZEN_SPEED, SHIFTS } from '../world/catalog.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
-import { pick, randomInt } from '../core/rng.js';
+import { pick, random, randomInt } from '../core/rng.js';
 import {
   addCitizen,
   openJobs,
@@ -42,6 +43,7 @@ export function createCitizen(state, rt, home) {
     job: null,
     departWork: null,
     departHome: null,
+    shift: null,
     state: 'casa',
     dest: null,
     x,
@@ -55,11 +57,26 @@ export function canWork(citizen) {
   return citizen.age >= WORKING_AGE[0] && citizen.age <= WORKING_AGE[1];
 }
 
-/** Contrata: escolhe horários de saída aleatórios em torno das 7h30 e 17h30. */
+/** Contrata: sorteia o turno e os horários de saída dentro das faixas dele. */
 export function hire(state, rt, citizen, workplace) {
-  const departWork = 6 * 60 + 30 + randomInt(state.rng, 0, 120);
-  const departHome = 16 * 60 + 30 + randomInt(state.rng, 0, 120);
+  const shift = pickShift(random(state.rng));
+  const { leave, back, hours } = SHIFTS[shift];
+  const departWork = randomInt(state.rng, leave[0], leave[1]);
+  const departHome = back
+    ? randomInt(state.rng, back[0], back[1])
+    : (departWork + randomInt(state.rng, hours[0], hours[1])) % MINUTES_PER_DAY;
   setJob(rt, citizen, workplace.id, departWork, departHome);
+  citizen.shift = shift;
+}
+
+/** Turno para um sorteio `roll` em [0, 1), pelas frações do catálogo. */
+export function pickShift(roll) {
+  let acc = 0;
+  for (const [id, shift] of Object.entries(SHIFTS)) {
+    acc += shift.share;
+    if (roll < acc) return id;
+  }
+  return 'diurno';
 }
 
 /** Roda a cada tick: saídas do minuto, fila de rotas e movimento. */

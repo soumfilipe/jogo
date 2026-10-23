@@ -15,120 +15,65 @@ export const ZONE_INFO = {
 //   size:      lado do terreno ocupado, em tiles (1 ou 2)
 //   residents: quantos cidadãos moram
 //   jobs:      quantas vagas de emprego
-//   style:     como desenhar (ver src/render/buildings.js)
-//     height:   altura em "andares" (1 = altura de meio tile)
-//     roof:     'hip' (telhado de quatro águas) | 'flat'
-//     windows, chimney, stripes: detalhes opcionais
-//     palettes: variações de cor; cada prédio sorteia uma pelo id
+//   style.height: altura de referência em "andares" (1 = altura de meio tile);
+//                 a aparência de cada prédio vem dos projetos em
+//                 src/render/designs.js (20 por tipo)
 //
 // Os ids 'casa', 'loja' e 'fabrica' existem desde o formato de save 2 e não
 // podem ser renomeados (saves antigos guardam o id do tipo).
-const WALLS = {
-  creme: { left: '#d9c39a', right: '#bfa57a' },
-  tijolo: { left: '#c98262', right: '#ab6a4d' },
-  branco: { left: '#e6e2da', right: '#c9c4ba' },
-  azul: { left: '#9fb7cf', right: '#8299b2' },
-  verde: { left: '#a9c4a0', right: '#8ea886' },
-  vidro: { left: '#7fa6d6', right: '#5f86b8' },
-  vidroEscuro: { left: '#5b7fa8', right: '#486889' },
-  concreto: { left: '#b5b0a6', right: '#98938a' },
-  galpao: { left: '#a89f8a', right: '#8a826f' },
-  ferrugem: { left: '#b08260', right: '#94694b' },
-};
-const p = (walls, top, extra = {}) => ({ ...WALLS[walls], top, ...extra });
-
 export const BUILDINGS = {
-  // --- Residencial --------------------------------------------------------
+  // --- Residencial -----------------------------------------------------------
   casa: {
     name: 'Casa', zone: ZONE.RESIDENTIAL, level: 1, size: 1, residents: 4, jobs: 0,
-    style: {
-      height: 0.6, roof: 'hip',
-      palettes: [p('creme', '#e9d8b4', { roof: '#b5523b' }), p('branco', '#f0ece4', { roof: '#7a4b3a' }),
-        p('azul', '#dce6ef', { roof: '#9c4a3a' }), p('verde', '#e1ebdc', { roof: '#6f5b4b' })],
-    },
+    style: { height: 0.6 },
   },
   sobrado: {
     name: 'Sobrado', zone: ZONE.RESIDENTIAL, level: 2, size: 1, residents: 8, jobs: 0,
-    style: {
-      height: 1.2, roof: 'hip', windows: true,
-      palettes: [p('tijolo', '#e2c4b2', { roof: '#7c3b2c' }), p('branco', '#f0ece4', { roof: '#a04a36' }),
-        p('creme', '#efe2c4', { roof: '#5d4a3e' })],
-    },
+    style: { height: 1.2 },
   },
   apartamentos: {
     name: 'Prédio de apartamentos', zone: ZONE.RESIDENTIAL, level: 3, size: 1, residents: 16, jobs: 0,
-    style: {
-      height: 3, roof: 'flat', windows: true,
-      palettes: [p('branco', '#d8d4cc'), p('tijolo', '#c9a796'), p('azul', '#c6d3df')],
-    },
+    style: { height: 3 },
   },
   condominio: {
     name: 'Condomínio', zone: ZONE.RESIDENTIAL, level: 3, size: 2, residents: 48, jobs: 0,
-    style: {
-      height: 5, roof: 'flat', windows: true,
-      palettes: [p('branco', '#d8d4cc'), p('azul', '#c6d3df')],
-    },
+    style: { height: 5 },
   },
 
-  // --- Comercial ----------------------------------------------------------
+  // --- Comercial -------------------------------------------------------------
   loja: {
     name: 'Loja', zone: ZONE.COMMERCIAL, level: 1, size: 1, residents: 0, jobs: 5,
-    style: {
-      height: 0.8, roof: 'flat', windows: true, awning: true,
-      palettes: [p('vidro', '#cfe0f5', { awning: '#e05a47' }), p('branco', '#e9edf2', { awning: '#3d8f5a' }),
-        p('creme', '#f1e6cf', { awning: '#3f6fc0' })],
-    },
+    style: { height: 0.8 },
   },
   mercado: {
     name: 'Mercado', zone: ZONE.COMMERCIAL, level: 2, size: 1, residents: 0, jobs: 12,
-    style: {
-      height: 1.3, roof: 'flat', windows: true, awning: true,
-      palettes: [p('branco', '#e9edf2', { awning: '#d9822b' }), p('vidro', '#cfe0f5', { awning: '#c23b3b' })],
-    },
+    style: { height: 1.3 },
   },
   escritorios: {
     name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 30,
-    style: {
-      height: 4, roof: 'flat', windows: true,
-      palettes: [p('vidro', '#b9d0ec'), p('vidroEscuro', '#9fb6d2')],
-    },
+    style: { height: 4 },
   },
   shopping: {
     name: 'Shopping', zone: ZONE.COMMERCIAL, level: 3, size: 2, residents: 0, jobs: 80,
-    style: {
-      height: 1.6, roof: 'flat', windows: true, stripes: true,
-      palettes: [p('branco', '#dfe6ee', { stripe: '#4f8ff7' }), p('vidro', '#cfe0f5', { stripe: '#e8b931' })],
-    },
+    style: { height: 1.6 },
   },
 
-  // --- Industrial ---------------------------------------------------------
+  // --- Industrial ------------------------------------------------------------
   fabrica: {
     name: 'Fábrica', zone: ZONE.INDUSTRIAL, level: 1, size: 1, residents: 0, jobs: 10,
-    style: {
-      height: 1.1, roof: 'flat', chimney: true,
-      palettes: [p('galpao', '#d8d2c4'), p('ferrugem', '#d2b9a3')],
-    },
+    style: { height: 1.1 },
   },
   industria: {
     name: 'Indústria', zone: ZONE.INDUSTRIAL, level: 2, size: 1, residents: 0, jobs: 18,
-    style: {
-      height: 1.6, roof: 'flat', chimney: true, stripes: true,
-      palettes: [p('concreto', '#d6d2ca', { stripe: '#e8b931' }), p('ferrugem', '#d2b9a3', { stripe: '#5c5f68' })],
-    },
+    style: { height: 1.6 },
   },
   complexo: {
     name: 'Complexo industrial', zone: ZONE.INDUSTRIAL, level: 3, size: 1, residents: 0, jobs: 30,
-    style: {
-      height: 2.2, roof: 'flat', chimney: true, windows: true,
-      palettes: [p('concreto', '#d6d2ca'), p('galpao', '#d8d2c4')],
-    },
+    style: { height: 2.2 },
   },
   galpao: {
     name: 'Galpão logístico', zone: ZONE.INDUSTRIAL, level: 3, size: 2, residents: 0, jobs: 70,
-    style: {
-      height: 1.4, roof: 'flat', stripes: true,
-      palettes: [p('concreto', '#cfcbc2', { stripe: '#3f6fc0' }), p('galpao', '#d8d2c4', { stripe: '#c23b3b' })],
-    },
+    style: { height: 1.4 },
   },
 };
 
@@ -169,6 +114,20 @@ export const ECONOMY = {
 
 // Um prédio só cresce se houver estrada a até esta distância (em tiles).
 export const ROAD_ACCESS_RADIUS = 2;
+
+// Turnos de trabalho. Cada contratação sorteia um turno pela fração `share`;
+// os horários de saída de casa (`leave`) e do trabalho (`back`) são sorteados
+// dentro das faixas, em minutos do dia. Em vez de `back`, `hours` dá a
+// duração da jornada (a volta é calculada a partir da saída de cada um).
+// Turnos que passam da meia-noite voltam para casa no dia seguinte.
+const hm = (h, m = 0) => h * 60 + m;
+export const SHIFTS = {
+  diurno: { name: 'Diurno', share: 0.8, leave: [hm(6, 30), hm(8, 30)], back: [hm(16, 30), hm(18, 30)] },
+  noturno: { name: 'Noturno', share: 0.07, leave: [hm(21), hm(23)], back: [hm(6), hm(7, 30)] },
+  madrugada: { name: 'Madrugada', share: 0.03, leave: [hm(0), hm(4, 30)], hours: [hm(8), hm(9)] },
+  manha: { name: 'Meio período (manhã)', share: 0.05, leave: [hm(7), hm(9)], back: [hm(12), hm(13, 30)] },
+  tarde: { name: 'Meio período (tarde)', share: 0.05, leave: [hm(12, 30), hm(14)], back: [hm(17, 30), hm(19, 30)] },
+};
 
 // Velocidade dos cidadãos, em tiles por minuto de jogo.
 export const CITIZEN_SPEED = 0.5;

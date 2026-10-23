@@ -59,8 +59,73 @@ andando e seguir com a câmera.
   e cai com a **poluição** das indústrias. É recalculado a cada hora de jogo.
 - O painel "Inspecionar" mostra o nível, o valor do terreno, a poluição e o que
   falta para o prédio subir.
-- Tipos, capacidades, exigências e aparência ficam em `src/world/catalog.js`; o
-  desenho de cada estilo em `src/render/buildings.js`.
+- Tipos, capacidades e exigências ficam em `src/world/catalog.js`.
+
+### Aparência: 20 projetos por tipo
+
+Cada tipo (zona + nível + tamanho) tem **20 projetos diferentes**, gerados em
+`src/render/designs.js` combinando forma (bloco, escalonado, pódio com torre,
+torres gêmeas, lâmina, anexos), telhado (quatro águas, duas águas, plano, dente
+de serra), fachada (grade de janelas, faixas de vidro, vitrine, sacadas),
+detalhes (caixa d'água, ar-condicionado, painel solar, jardim, heliponto, antena,
+chaminés, silos, portas de carga, letreiro, toldo, estacionamento) e cores. Cada
+prédio usa um dos 20, sorteado pelo id — sempre o mesmo, e nada disso vai para
+o save. `src/render/buildings.js` desenha as partes de cada projeto.
+
+## Noite e luzes
+
+Entre 17h30 e 6h30 a cidade escurece e as janelas acendem e apagam sozinhas
+(`src/render/lights.js`). Cada janela tem seu próprio horário, sorteado de forma
+fixa pelo id do prédio, então nada pisca:
+
+| Tipo | Acende | Apaga |
+| --- | --- | --- |
+| Residências | 17h30 a 20h; parte também acende cedo, antes do trabalho (5h30 a 7h) | 22h a 1h30 (alguns ficam acordados até 2h a 4h) |
+| Comércio | 17h a 18h30 | 20h a 23h (alguns escritórios até de madrugada) |
+| Indústria | turno da noite, cerca de 30% das janelas | 6h |
+
+Nas residências, a fração de janelas acesas acompanha quantos moradores estão em
+casa: casa vazia fica apagada. As luzes ficam numa camada própria, redesenhada a
+cada 15 minutos de jogo, em que cada prédio esconde as luzes dos que estão atrás.
+À noite os cidadãos andando aparecem por cima da escuridão, como faróis.
+
+## Turnos de trabalho
+
+Cada contratação sorteia um turno (`SHIFTS` em `src/world/catalog.js`):
+
+| Turno | Parcela | Sai de casa | Volta |
+| --- | --- | --- | --- |
+| Diurno | 80% | 6h30 a 8h30 | 16h30 a 18h30 |
+| Noturno | 7% | 21h a 23h | 6h a 7h30 (do dia seguinte) |
+| Madrugada | 3% | 0h a 4h30 | 8 a 9 horas depois de sair |
+| Meio período, manhã | 5% | 7h a 9h | 12h a 13h30 |
+| Meio período, tarde | 5% | 12h30 a 14h | 17h30 a 19h30 |
+
+Assim há carros na rua também no horário de almoço, à noite e de madrugada. O turno aparece
+no painel do cidadão.
+
+## Cidadãos nas ruas
+
+Cada cidadão em viagem aparece como um carrinho com cor própria, alinhado à rua
+e andando pela **mão direita** (`src/render/movers.js`; é só desenho, a posição
+simulada continua no meio da rua). Os carros ficam numa camada desenhada de trás
+para frente em que os prédios recortam o que está atrás deles, então não
+aparecem por cima das construções. Quem está saindo de casa ou chegando ao
+trabalho, ainda dentro do lote, não aparece.
+
+## Desempenho da renderização
+
+- O mapa (chão, ruas, prédios) é desenhado num cache um pouco maior que a tela.
+  Ao arrastar, a imagem pronta é só deslocada; no zoom, é escalada e redesenhada
+  quando a roda para.
+- Mudanças feitas pelo jogador aparecem na hora; as da simulação (prédios
+  crescendo) são redesenhadas no máximo a cada 0,4 s.
+- As luzes das janelas são refeitas a cada 15 minutos de jogo, no máximo a cada
+  0,3 s de tempo real.
+- Caminhos com muitos contornos não usam `closePath` (o `fill` fecha sozinho):
+  no Chromium isso deixava o redesenho de mapas grandes até 30 vezes mais lento.
+- No console do navegador, `jogo.state`, `jogo.rt`, `jogo.cam`, `jogo.renderer`,
+  `jogo.advance(ticks)` e `jogo.applyCommand(cmd)` ajudam a depurar.
 
 ## Como a simulação funciona
 

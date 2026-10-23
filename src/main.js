@@ -5,6 +5,7 @@ import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
 import { MAP_MODES, Renderer } from './render/renderer.js';
+import { moverPose } from './render/movers.js';
 import { Minimap } from './render/minimap.js';
 import {
   centerOn, createCamera, panBy, screenToTile, worldToScreen, zoomAt,
@@ -60,6 +61,7 @@ $('storage-mode').textContent = `Saves: ${saves.backend.label}`;
 function setWorld(next) {
   state = next;
   rt = prepare(state);
+  renderer.invalidate();
   cam = createCamera(state.map.width, state.map.height);
   renderer.resize(cam);
   selection = null;
@@ -104,8 +106,12 @@ window.jogo = {
   get state() { return state; },
   get rt() { return rt; },
   get cam() { return cam; },
-  applyCommand: (cmd) => applyCommand(state, rt, cmd),
+  applyCommand: (cmd) => {
+    renderer.invalidate();
+    return applyCommand(state, rt, cmd);
+  },
   advance: (ticks) => advance(state, rt, ticks),
+  renderer,
   setSpeed,
 };
 
@@ -254,7 +260,10 @@ canvas.addEventListener('pointerup', (e) => {
     const cmd = toolCommand();
     if (cmd) {
       const result = applyCommand(state, rt, cmd);
-      if (result.ok) dirty = true;
+      if (result.ok) {
+        dirty = true;
+        renderer.invalidate();
+      }
       else status(result.reason);
     }
   } else if (drag?.kind === 'pan' && drag.click && !drag.moved) {
@@ -279,8 +288,10 @@ function pick(sx, sy) {
   let bestDist = 12;
   for (const id of rt.movers) {
     const c = rt.citizenById.get(id);
-    const [cx, cy] = worldToScreen(cam, c.x, c.y);
-    const d = Math.hypot(cx - sx, cy - 4 * cam.zoom - sy);
+    const pose = moverPose(state, c);
+    if (!pose) continue;
+    const [cx, cy] = worldToScreen(cam, pose.x, pose.y);
+    const d = Math.hypot(cx - sx, cy - 2 * cam.zoom - sy);
     if (d < bestDist) {
       best = c;
       bestDist = d;

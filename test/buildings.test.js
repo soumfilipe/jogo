@@ -32,7 +32,7 @@ test('catálogo: cada zona tem os três níveis e um prédio grande', () => {
   for (const id of ['casa', 'loja', 'fabrica']) assert.equal(BUILDINGS[id].level, 1);
   for (const [id, info] of Object.entries(BUILDINGS)) {
     assert.ok(info.residents > 0 !== info.jobs > 0, `${id}: mora ou trabalha`);
-    for (const p of info.style.palettes) assert.ok(p.left && p.right && p.top, `${id}: paleta incompleta`);
+    assert.ok(info.style.height > 0, `${id}: altura`);
   }
 });
 
@@ -131,4 +131,26 @@ test('numa cidade rodando, os níveis aparecem sozinhos', () => {
   advance(state, rt, TICKS_PER_DAY * 25);
   const levels = new Set(state.buildings.map((b) => BUILDINGS[b.type].level));
   assert.ok(levels.has(2), `níveis: ${[...levels]}`);
+});
+
+test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () => {
+  const { design, designFor, VARIANTS } = await import('../src/render/designs.js');
+  assert.equal(VARIANTS, 20);
+  for (const type of Object.keys(BUILDINGS)) {
+    const seen = new Set();
+    for (let i = 0; i < VARIANTS; i++) {
+      const d = design(type, i);
+      assert.ok(d.parts.length > 0, `${type} #${i} sem partes`);
+      for (const part of d.parts) {
+        if (part.kind !== 'block') continue;
+        const [x0, y0, x1, y1] = part.box;
+        const size = BUILDINGS[type].size;
+        assert.ok(x0 >= 0 && y0 >= 0 && x1 <= size && y1 <= size && x0 < x1 && y0 < y1, `${type} #${i}: parte fora do lote`);
+      }
+      seen.add(JSON.stringify(d));
+    }
+    assert.equal(seen.size, VARIANTS, `${type}: projetos repetidos`);
+  }
+  // O mesmo prédio sempre usa o mesmo projeto.
+  assert.equal(designFor({ id: 77, type: 'casa' }), designFor({ id: 77, type: 'casa' }));
 });
