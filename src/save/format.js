@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  2,                 // versão do FORMATO (para migrações)
+//   "version":  3,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -15,8 +15,8 @@
 import { calendar } from '../core/time.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 2;
-export const GAME_VERSION = '0.3.0';
+export const SAVE_VERSION = 3;
+export const GAME_VERSION = '0.4.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -67,6 +67,13 @@ const MIGRATIONS = {
       nextId: 1,
     });
     save.version = 2;
+    return save;
+  },
+  // v2 -> v3: energia e água. Cidades antigas não têm usinas: recebem energia
+  // e água importadas até o jogador construir as próprias.
+  2: (save) => {
+    save.data.utilities = { imported: { power: true, water: true } };
+    save.version = 3;
     return save;
   },
 };

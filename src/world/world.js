@@ -30,6 +30,9 @@ export function createWorld({
     buildings: [], // { id, type, tile, builtAt }
     citizens: [], //  ver src/agents/citizens.js
     pathQueue: [], // ids de cidadãos esperando o cálculo de rota
+    // Energia e água importadas da região (só em saves anteriores aos serviços
+    // públicos; acaba quando o jogador constrói a primeira usina/bomba).
+    utilities: { imported: { power: false, water: false } },
     nextId: 1,
   };
 }

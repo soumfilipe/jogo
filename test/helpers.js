@@ -1,13 +1,17 @@
 // Cidade de teste: mapa pequeno, só grama, com ruas em grade e zonas misturadas.
+// Por padrão a energia e a água vêm "importadas" (sem usinas), para os testes
+// que não são sobre serviços públicos; com utilities: false, a cidade começa
+// sem nada (como um jogo novo).
 
 import { createWorld } from '../src/world/world.js';
 import { TERRAIN, ZONE } from '../src/world/catalog.js';
 import { applyCommand, lineTiles, rectTiles } from '../src/world/commands.js';
 import { prepare } from '../src/systems/simulation.js';
 
-export function testCity({ size = 48, seed = 1234 } = {}) {
+export function testCity({ size = 48, seed = 1234, utilities = true } = {}) {
   const state = createWorld({ name: 'Teste', width: size, height: size, seed });
   state.map.terrain.fill(TERRAIN.GRASS);
+  if (utilities) state.utilities.imported = { power: true, water: true };
   state.economy.money = 1_000_000;
   const rt = prepare(state);
   const W = size;

@@ -32,6 +32,8 @@ body {
 .toolbar { gap: 6px; border-top: 1px solid #23262d; }
 
 .spacer { flex: 1; }
+.hint { color: #ffcf6e; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
+.short { color: #ff8a80; }
 .muted { color: var(--muted); }
 .mono { font-variant-numeric: tabular-nums; }
 

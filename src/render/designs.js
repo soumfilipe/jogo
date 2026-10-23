@@ -66,7 +66,7 @@ export function design(type, index) {
     const info = BUILDINGS[type];
     const rng = createRng(hashString(key) ^ 0x9e3779b9);
     const r = makeRandom(rng);
-    const parts = GENERATORS[info.zone](info, r);
+    const parts = info.utility ? UTILITY_GENERATORS[type](r) : GENERATORS[info.zone](info, r);
     d = { parts, color: parts.find((p) => p.wall)?.wall.left ?? '#999999' };
     cache.set(key, d);
   }
@@ -350,6 +350,66 @@ const GENERATORS = {
       const ob = alongX ? [1.45, 1.4, 1.85, 1.85] : [1.4, 1.45, 1.85, 1.85];
       parts.push(block(ob, 0, h * 0.8, r.pick(IND_WALLS), { windows: { cols: 2, style: 'grid' } }));
     }
+    return parts;
+  },
+};
+
+// Serviços públicos: um desenho por tipo, com pequenas variações.
+const UTILITY_GENERATORS = {
+  usina_carvao(r) {
+    const w = r.pick([wall('#b5b0a6', '#98938a'), wall('#a89f8a', '#8a826f'), wall('#c98262', '#ab6a4d')]);
+    const h = r.range(1.1, 1.4);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5f5d58', lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.15, 1.88], 0, h, w, {
+      windows: { cols: 4, style: 'grid' },
+      bands: [{ at: h * 0.85, thick: 0.08, color: r.pick(STRIPES) }],
+      doors: { count: 2, color: '#3e4145' },
+    }));
+    // Chaminé alta, listrada de vermelho e branco.
+    const ch = r.range(3.2, 4);
+    for (let k = 0; k < 4; k++) {
+      parts.push(block([0.3, 0.3, 0.5, 0.5], h + (ch * k) / 4, ch / 4, k % 2 ? wall('#e8e8e8', '#cfcfcf') : wall('#c0392b', '#a03024'), { top: '#3d3330' }));
+    }
+    // Torres de resfriamento.
+    for (const cy of [0.55, 1.4]) {
+      parts.push({ kind: 'cylinder', cx: 1.55, cy, r: 0.32, lift: 0, h: r.range(1.8, 2.3), color: '#cfd2d6', top: '#8d949b' });
+    }
+    // Pilha de carvão na frente.
+    parts.push(block([0.3, 1.55, 0.9, 1.9], 0, 0.12, wall('#2b2b2b', '#1f1f1f'), { top: '#383838' }));
+    return parts;
+  },
+
+  usina_solar(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: r.pick(['#a39f8e', '#9a9a8a', '#b0a98f']), lift: 0 }];
+    const rows = r.pick([4, 5]);
+    const panel = wall('#24365f', '#1c2b4d');
+    for (let k = 0; k < rows; k++) {
+      const y0 = 0.15 + (k * 1.45) / rows;
+      parts.push(block([0.15, y0, 1.85, y0 + 1.45 / rows - 0.1], 0.05, 0.08, panel, { top: '#3d5c9e' }));
+    }
+    parts.push(block([1.45, 1.55, 1.88, 1.9], 0, 0.5, wall('#e6e2da', '#c9c4ba'), { windows: { cols: 2, style: 'grid' }, doors: { count: 1, color: '#5a5d63' } }));
+    return parts;
+  },
+
+  bomba_agua(r) {
+    const w = r.pick([wall('#9fb7cf', '#8299b2'), wall('#b5b0a6', '#98938a'), wall('#e6e2da', '#c9c4ba')]);
+    const parts = [];
+    parts.push(block([0.12, 0.12, 0.62, 0.7], 0, r.range(0.6, 0.8), w, {
+      windows: { cols: 2, style: 'grid' },
+      doors: { count: 1, color: '#3f6fc0' },
+      bands: [{ at: 0.5, thick: 0.05, color: '#3f6fc0' }],
+    }));
+    parts.push({ kind: 'cylinder', cx: 0.72, cy: 0.72, r: 0.2, lift: 0, h: 0.35, color: '#c8ccd2', top: '#4f97c4' });
+    return parts;
+  },
+
+  poco(r) {
+    const legs = wall('#8a8f96', '#6f747a');
+    const parts = [{ kind: 'slab', box: [0.15, 0.15, 0.85, 0.85], color: '#9a9a8a', lift: 0 }];
+    for (const [x, y] of [[0.3, 0.3], [0.62, 0.3], [0.3, 0.62], [0.62, 0.62]]) {
+      parts.push(block([x, y, x + 0.08, y + 0.08], 0, 0.95, legs, { top: '#9aa0a6' }));
+    }
+    parts.push({ kind: 'cylinder', cx: 0.5, cy: 0.5, r: 0.26, lift: 0.95, h: r.range(0.4, 0.55), color: r.pick(['#d9dde2', '#e3c66b', '#9fc3e0']), top: '#aeb4bb' });
     return parts;
   },
 };

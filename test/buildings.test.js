@@ -10,12 +10,14 @@ import { advance, prepare } from '../src/systems/simulation.js';
 import { computeLandValue } from '../src/systems/landvalue.js';
 import { growBuildings, upgradeBuildings, upgradeBlockers } from '../src/systems/growth.js';
 import { createCitizen } from '../src/agents/citizens.js';
+import { computeUtilities } from '../src/systems/utilities.js';
 import { TICKS_PER_DAY } from '../src/core/time.js';
 import { testCity } from './helpers.js';
 
 function flatWorld(size = 24) {
   const state = createWorld({ width: size, height: size, seed: 9 });
   state.map.terrain.fill(TERRAIN.GRASS);
+  state.utilities.imported = { power: true, water: true };
   state.economy.money = 1_000_000;
   const rt = prepare(state);
   return { state, rt };
@@ -31,6 +33,7 @@ test('catálogo: cada zona tem os três níveis e um prédio grande', () => {
   // Ids do formato de save 2 continuam existindo como nível 1.
   for (const id of ['casa', 'loja', 'fabrica']) assert.equal(BUILDINGS[id].level, 1);
   for (const [id, info] of Object.entries(BUILDINGS)) {
+    if (info.utility) continue;
     assert.ok(info.residents > 0 !== info.jobs > 0, `${id}: mora ou trabalha`);
     assert.ok(info.style.height > 0, `${id}: altura`);
   }
@@ -59,6 +62,7 @@ function fullHouse() {
   while (rt.residents.get(house.id).size < BUILDINGS.casa.residents) createCitizen(state, rt, house);
   state.time.tick += TICKS_PER_DAY * 10;
   rt.demand.residential = 10;
+  computeUtilities(state, rt);
   return { state, rt, house };
 }
 
@@ -136,7 +140,7 @@ test('numa cidade rodando, os níveis aparecem sozinhos', () => {
 test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () => {
   const { design, designFor, VARIANTS } = await import('../src/render/designs.js');
   assert.equal(VARIANTS, 20);
-  for (const type of Object.keys(BUILDINGS)) {
+  for (const type of Object.keys(BUILDINGS).filter((t) => !BUILDINGS[t].utility)) {
     const seen = new Set();
     for (let i = 0; i < VARIANTS; i++) {
       const d = design(type, i);

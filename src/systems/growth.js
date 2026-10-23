@@ -6,6 +6,7 @@ import {
   BUILDINGS, DAYS_BETWEEN_UPGRADES, LAND_VALUE_FOR_LEVEL, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, ZONE,
 } from '../world/catalog.js';
 import { addBuilding, findAccessRoad, vacancies } from '../world/runtime.js';
+import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { createCitizen } from '../agents/citizens.js';
@@ -46,7 +47,10 @@ export function growBuildings(state, rt) {
     if (!isFreeLot(state, rt, tile)) continue;
     const key = DEMAND_KEY[z];
     if (remaining[key] <= 0) continue;
-    if (findAccessRoad(state, rt, tile) < 0) continue;
+    const access = findAccessRoad(state, rt, tile);
+    if (access < 0) continue;
+    // Só cresce onde a rede tem energia e água sobrando para o prédio novo.
+    if (!fits(state, rt, access, consumption(BUILDINGS[LEVELS[z][1][0]]))) continue;
     if (!chance(state.rng, GROW_CHANCE)) continue;
 
     let type = pick(state.rng, LEVELS[z][1]);
@@ -56,11 +60,13 @@ export function growBuildings(state, rt) {
       remaining[key] >= Math.min(capacity(BUILDINGS[large]) / 4, 8) &&
       rt.landValue[tile] >= largeLandValue(z) &&
       isFreeBlock(state, rt, tile, BUILDINGS[large].size, z) &&
+      fits(state, rt, access, consumption(BUILDINGS[large])) &&
       chance(state.rng, LARGE_CHANCE)
     ) {
       type = large;
     }
     addBuilding(state, rt, type, tile);
+    reserve(state, rt, access, consumption(BUILDINGS[type]));
     remaining[key] -= capacity(BUILDINGS[type]);
   }
 }
@@ -75,16 +81,24 @@ export function upgradeBuildings(state, rt) {
 
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
-    if (info.size !== 1 || info.level >= MAX_LEVEL) continue;
+    if (info.utility || info.size !== 1 || info.level >= MAX_LEVEL) continue;
     if (tick - (b.upgradedAt ?? b.builtAt) < DAYS_BETWEEN_UPGRADES * TICKS_PER_DAY) continue;
     if (rt.demand[DEMAND_KEY[info.zone]] < 0) continue;
 
+    if (b.abandoned !== undefined || !isServed(rt, b)) continue;
     const occupied = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
     if (occupied < capacity(info)) continue;
     const next = info.level + 1;
     if (rt.landValue[b.tile] < LAND_VALUE_FOR_LEVEL[info.zone][next]) continue;
+    // O nível seguinte consome mais: precisa caber na rede.
+    const access = rt.access.get(b.id);
+    const nextNeed = consumption(BUILDINGS[LEVELS[info.zone][next][0]]);
+    const now = consumption(info);
+    const extra = { power: nextNeed.power - now.power, water: nextNeed.water - now.water };
+    if (!fits(state, rt, access, extra)) continue;
     if (!chance(state.rng, UPGRADE_CHANCE)) continue;
 
+    reserve(state, rt, access, extra);
     b.type = pick(state.rng, LEVELS[info.zone][next]);
     b.upgradedAt = tick;
     rt.mapVersion++;
@@ -94,11 +108,14 @@ export function upgradeBuildings(state, rt) {
 /** O que falta para o prédio subir de nível (para o painel de inspeção). */
 export function upgradeBlockers(state, rt, b) {
   const info = BUILDINGS[b.type];
-  if (info.size !== 1 || info.level >= MAX_LEVEL) return null;
+  if (info.utility || info.size !== 1 || info.level >= MAX_LEVEL) return null;
   const next = info.level + 1;
   const needed = LAND_VALUE_FOR_LEVEL[info.zone][next];
   const occupied = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
   const blockers = [];
+  const service = rt.service?.get(b.id);
+  if (service && !service.power) blockers.push('energia');
+  if (service && !service.water) blockers.push('água');
   if (occupied < capacity(info)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
   if (rt.landValue[b.tile] < needed) {
     blockers.push(`valor do terreno ${pct(needed)} (agora ${pct(rt.landValue[b.tile])})`);
@@ -108,6 +125,10 @@ export function upgradeBlockers(state, rt, b) {
 }
 
 const pct = (v) => `${Math.round(v * 100)}%`;
+
+function fits(state, rt, access, need) {
+  return RESOURCES.every((res) => need[res] <= 0 || spare(state, rt, access, res) >= need[res]);
+}
 
 function isFreeLot(state, rt, tile, z = state.map.zone[tile]) {
   return (
@@ -137,7 +158,7 @@ export function moveIn(state, rt) {
   if (arrivals <= 0) return;
   for (const b of state.buildings) {
     if (arrivals <= 0) break;
-    if (vacancies(rt, b) <= 0 || rt.access.get(b.id) < 0) continue;
+    if (vacancies(rt, b) <= 0 || rt.access.get(b.id) < 0 || !isServed(rt, b)) continue;
     createCitizen(state, rt, b);
     arrivals--;
   }

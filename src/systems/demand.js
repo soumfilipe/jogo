@@ -8,11 +8,14 @@ export function computeDemand(state, rt) {
   let housing = 0;
   let commercialJobs = 0;
   let industrialJobs = 0;
+  let otherJobs = 0; // serviços públicos
   for (const b of state.buildings) {
+    if (b.abandoned !== undefined) continue; // abandonado não tem casa nem vaga
     const info = BUILDINGS[b.type];
     housing += info.residents;
     if (info.zone === ZONE.COMMERCIAL) commercialJobs += info.jobs;
-    if (info.zone === ZONE.INDUSTRIAL) industrialJobs += info.jobs;
+    else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += info.jobs;
+    else otherJobs += info.jobs;
   }
 
   const population = state.citizens.length;
@@ -23,7 +26,7 @@ export function computeDemand(state, rt) {
     else if (canWork(c)) unemployed++;
   }
   const workforce = employed + unemployed;
-  const openJobs = commercialJobs + industrialJobs - employed;
+  const openJobs = commercialJobs + industrialJobs + otherJobs - employed;
 
   // Quanta gente quer vir morar aqui: vagas sobrando atraem, desemprego afasta.
   // A constante garante que uma cidade vazia comece a crescer.
@@ -36,6 +39,6 @@ export function computeDemand(state, rt) {
     commercial: Math.round(workforce * 0.4) - commercialJobs + 5,
     industrial: Math.round(workforce * 0.6) - industrialJobs + 10,
   };
-  rt.stats = { population, housing, employed, unemployed, jobs: commercialJobs + industrialJobs };
+  rt.stats = { population, housing, employed, unemployed, jobs: commercialJobs + industrialJobs + otherJobs };
   return rt.demand;
 }

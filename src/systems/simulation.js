@@ -8,6 +8,7 @@ import { computeDemand } from './demand.js';
 import { growBuildings, moveIn, upgradeBuildings } from './growth.js';
 import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
+import { applyUtilityEffects, computeUtilities } from './utilities.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -21,8 +22,12 @@ export function tick(state, rt) {
     // assim o resultado não depende de quando o save foi carregado.
     computeLandValue(state, rt);
     rt.landValueVersion = (rt.landValueVersion || 0) + 1;
-    // Uma vez por dia, prédios lotados têm prioridade sobre lotes novos.
+    computeUtilities(state, rt);
+    // Uma vez por dia: efeitos da falta de energia/água e, depois, prédios
+    // lotados sobem de nível (têm prioridade sobre lotes novos).
     if (t % TICKS_PER_DAY === 0) {
+      applyUtilityEffects(state, rt);
+      computeUtilities(state, rt);
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
     }
@@ -44,6 +49,7 @@ export function advance(state, rt, ticks) {
 export function prepare(state) {
   const rt = buildRuntime(state);
   computeDemand(state, rt);
+  computeUtilities(state, rt);
   computeLandValue(state, rt); // para os mapas e o painel; a simulação recalcula antes de usar
   return rt;
 }
