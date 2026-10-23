@@ -1,10 +1,11 @@
 // Renderizador isométrico em Canvas 2D.
 //
-// Duas camadas:
+// Camadas, de baixo para cima:
 // - estática (terreno, estradas, zonas, árvores, prédios): desenhada num
 //   canvas fora da tela e só refeita quando a câmera ou o mapa mudam;
-// - dinâmica (cidadãos andando, cursor, prévia da ferramenta, noite):
-//   desenhada a cada quadro por cima da estática.
+// - animações de ambiente a cada quadro: ondas e brilhos na água, smog;
+// - noite e luzes das janelas;
+// - cidadãos andando, cursor e prévia da ferramenta.
 //
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
@@ -16,6 +17,8 @@ import { visibleRange, worldToScreen } from './camera.js';
 import { addSilhouette, buildingGeometry, drawBuilding, windowSize } from './buildings.js';
 import { addCar, carColor, moverPose } from './movers.js';
 import { LIGHT_COLORS, darkness, isWindowLit } from './lights.js';
+import { TRUNK, forestDensity, treesFor, waterDepth } from './nature.js';
+import { Smog } from './smog.js';
 
 // As luzes são redesenhadas a cada tantos minutos de jogo (e quando a câmera
 // ou o mapa mudam), não a cada quadro.
@@ -35,11 +38,21 @@ const ZOOM_SETTLE_MS = 160;
 // Mudanças no mapa feitas pela simulação (prédios crescendo) são mostradas
 // com no máximo este atraso; as do jogador, na hora (ver invalidate()).
 const MAP_REDRAW_MIN_MS = 400;
+// Ondas, brilhos e smog mudam devagar: a camada de ambiente é refeita só a
+// cada tanto tempo, e entre uma e outra a imagem pronta é reaproveitada.
+const AMBIENT_INTERVAL_MS = 80;
+// ...e em resolução menor (smog e ondas são suaves; poupa muito preenchimento).
+const AMBIENT_SCALE = 0.5;
 
 const GRASS = ['#7db460', '#7ab15d', '#80b763'];
-const WATER = ['#3f7fc4', '#3b79bd'];
+// Da margem (claro, esverdeado) para o fundo (escuro).
+const WATER = ['#4f97c4', '#4387c0', '#3a78b8', '#336caf', '#2d61a3'];
+const FOAM = 'rgba(255, 255, 255, 0.45)';
+// Faixas de onda: grupos de tiles de água que clareiam em sequência.
+const WAVE_GROUPS = 4;
+// Chão da mata, de rala a fechada.
+const FOREST_GROUNDS = ['#6aa452', '#609b4b', '#578f45', '#4e843f'];
 const SAND = '#d9c98f';
-const FOREST_GROUND = '#5f9a4c';
 const ROAD = '#5c5f68';
 const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
 const ZONE_TINT = {
@@ -60,7 +73,8 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.staticCanvas = document.createElement('canvas');
-    this.staticCtx = this.staticCanvas.getContext('2d');
+    // Opaco: colar uma imagem sem transparência na tela é bem mais rápido.
+    this.staticCtx = this.staticCanvas.getContext('2d', { alpha: false });
     this.staticKey = '';
     // Camada de luzes das janelas, por cima da escuridão da noite.
     this.lightsCanvas = document.createElement('canvas');
@@ -69,9 +83,17 @@ export class Renderer {
     // Camada dos cidadãos andando, refeita a cada quadro.
     this.moversCanvas = document.createElement('canvas');
     this.moversCtx = this.moversCanvas.getContext('2d');
-    // Contornos dos prédios visíveis, agrupados pela diagonal (x+y) do tile da
-    // frente. Montados junto com a camada estática.
-    this.occluders = new Map();
+    // Contornos dos prédios visíveis (para esconder carros atrás deles),
+    // indexados por posição na tela. Montados junto com a camada estática.
+    this.occluders = new OccluderGrid();
+    // Água vista no cache: faixas de onda (Path2D) e posições para os brilhos.
+    this.water = { waves: [], glints: [] };
+    this.smog = new Smog();
+    // Camada de ambiente (ondas, brilhos, smog), no mesmo espaço do cache.
+    this.ambientCanvas = document.createElement('canvas');
+    this.ambientCtx = this.ambientCanvas.getContext('2d');
+    this.ambientKey = '';
+    this.ambientAt = 0;
     // Câmera com que a camada estática foi desenhada (ver #cacheTransform).
     this.cacheCam = null;
     this.margin = 0;
@@ -97,6 +119,8 @@ export class Renderer {
       c.width = Math.round((w + 2 * this.margin) * this.dpr);
       c.height = Math.round((h + 2 * this.margin) * this.dpr);
     }
+    this.ambientCanvas.width = Math.round((w + 2 * this.margin) * AMBIENT_SCALE);
+    this.ambientCanvas.height = Math.round((h + 2 * this.margin) * AMBIENT_SCALE);
     this.cacheCam = null;
     cam.viewW = w;
     cam.viewH = h;
@@ -138,18 +162,45 @@ export class Renderer {
     const ctx = this.ctx;
     const d = this.dpr;
     // Imagem pronta na posição (e escala) da câmera atual.
-    const placeCache = () => ctx.setTransform(view.k, 0, 0, view.k, view.tx * d, view.ty * d);
+    // Sem zoom em andamento, desloca em pixels inteiros: evita reamostrar a imagem.
+    const ox = view.k === 1 ? Math.round(view.tx * d) : view.tx * d;
+    const oy = view.k === 1 ? Math.round(view.ty * d) : view.ty * d;
+    const placeCache = () => ctx.setTransform(view.k, 0, 0, view.k, ox, oy);
+    // Cola só o pedaço da camada (do tamanho do cache) que aparece na tela.
+    const blit = (layer) => {
+      const k = view.k;
+      const full = this.staticCanvas;
+      const r = layer.width / full.width;
+      const qx0 = Math.max(0, Math.floor(-ox / k));
+      const qy0 = Math.max(0, Math.floor(-oy / k));
+      const qx1 = Math.min(full.width, Math.ceil((this.canvas.width - ox) / k));
+      const qy1 = Math.min(full.height, Math.ceil((this.canvas.height - oy) / k));
+      if (qx1 <= qx0 || qy1 <= qy0) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(layer, qx0 * r, qy0 * r, (qx1 - qx0) * r, (qy1 - qy0) * r,
+        qx0 * k + ox, qy0 * k + oy, (qx1 - qx0) * k, (qy1 - qy0) * k);
+    };
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#1b2a3a';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    placeCache();
-    ctx.drawImage(this.staticCanvas, 0, 0);
+    if (view.k < 1) {
+      // Zoom afastando: o cache não cobre a tela toda até ser redesenhado.
+      ctx.fillStyle = '#1b2a3a';
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    blit(this.staticCanvas);
+
+    // Ambiente animado (em tempo real, mesmo com o jogo pausado).
+    const minute = state.time.tick % MINUTES_PER_DAY;
+    const dark = mode ? 0 : darkness(minute);
+    if (this.ambientKey !== this.staticKey || now - this.ambientAt >= AMBIENT_INTERVAL_MS) {
+      this.ambientKey = this.staticKey;
+      this.ambientAt = now;
+      this.#drawAmbient(state, rt, now / 1000, dark, !mode);
+    }
+    blit(this.ambientCanvas);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Noite: escurece tudo e acende as janelas por cima. Os cidadãos andando
     // vêm depois, então à noite parecem faróis nas ruas.
-    const minute = state.time.tick % MINUTES_PER_DAY;
-    const dark = mode ? 0 : darkness(minute);
     if (dark > 0) {
       ctx.globalAlpha = dark;
       ctx.fillStyle = NIGHT_TINT;
@@ -164,8 +215,7 @@ export class Renderer {
           this.#drawLights(state, rt, this.cacheCam, minute);
         }
         ctx.globalAlpha = Math.min(1, dark * 1.6);
-        placeCache();
-        ctx.drawImage(this.lightsCanvas, 0, 0);
+        blit(this.lightsCanvas);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
       }
       ctx.globalAlpha = 1;
@@ -262,11 +312,16 @@ export class Renderer {
     ctx.fillRect(0, 0, this.staticCanvas.width, this.staticCanvas.height);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    const { width, terrain, road, zone } = state.map;
+    const { width, height, terrain, road, zone } = state.map;
     const range = visibleRange(cam);
     const paths = new Map();
     this.occluders.clear();
     const roadLines = new Path2D();
+    const foam = new Path2D();
+    const depth = waterDepth(state);
+    const isWater = (tx, ty) => tx < 0 || ty < 0 || tx >= width || ty >= height || terrain[ty * width + tx] === TERRAIN.WATER;
+    const waves = Array.from({ length: WAVE_GROUPS }, () => new Path2D());
+    const glints = [];
     const z = cam.zoom;
     // Pequena sobreposição evita frestas entre losangos vizinhos.
     const pad = 0.5;
@@ -278,9 +333,12 @@ export class Renderer {
         if (road[tile]) color = ROAD;
         else if (mode && terrain[tile] !== TERRAIN.WATER) color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
         else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]];
-        else if (terrain[tile] === TERRAIN.WATER) color = WATER[hash2(x, y) < 0.5 ? 0 : 1];
-        else if (terrain[tile] === TERRAIN.SAND) color = SAND;
-        else if (terrain[tile] === TERRAIN.FOREST) color = FOREST_GROUND;
+        else if (terrain[tile] === TERRAIN.WATER) {
+          color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
+        } else if (terrain[tile] === TERRAIN.SAND) color = SAND;
+        else if (terrain[tile] === TERRAIN.FOREST) {
+          color = FOREST_GROUNDS[Math.min(3, Math.floor(forestDensity(x, y, state.seed) * 4))];
+        }
         else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
 
         let path = paths.get(color);
@@ -296,12 +354,37 @@ export class Renderer {
         // closePath fica lento no Chromium; o fill fecha cada contorno sozinho.
 
         if (road[tile] && z >= 0.5) addRoadMarkings(roadLines, state, cam, x, y);
+
+        if (terrain[tile] === TERRAIN.WATER && !road[tile]) {
+          // Espuma nas bordas que encostam em terra.
+          const T = [tx, ty];
+          const R = [tx + 32 * z, ty + 16 * z];
+          const B = [tx, ty + 32 * z];
+          const L = [tx - 32 * z, ty + 16 * z];
+          for (const [nx, ny, a, b] of [[x, y - 1, T, R], [x + 1, y, R, B], [x, y + 1, B, L], [x - 1, y, L, T]]) {
+            if (isWater(nx, ny)) continue;
+            foam.moveTo(a[0], a[1]);
+            foam.lineTo(b[0], b[1]);
+          }
+          // Ondas: faixas diagonais que clareiam em sequência (ver #drawWater).
+          const group = Math.floor((x + y * 0.6) / 3 + hash2(x, y, 5) * 0.8) % WAVE_GROUPS;
+          const wave = waves[group];
+          wave.moveTo(tx, ty);
+          wave.lineTo(tx + 32 * z, ty + 16 * z);
+          wave.lineTo(tx, ty + 32 * z);
+          wave.lineTo(tx - 32 * z, ty + 16 * z);
+          if (glints.length < 6000) glints.push([tx, ty + 16 * z, hash2(x, y, 6), hash2(x, y, 7)]);
+        }
       }
     }
+    this.water = { waves, glints, zoom: z };
     for (const [color, path] of paths) {
       ctx.fillStyle = color;
       ctx.fill(path);
     }
+    ctx.strokeStyle = FOAM;
+    ctx.lineWidth = Math.max(1, 2 * z);
+    ctx.stroke(foam);
     if (z >= 0.5) {
       ctx.strokeStyle = ROAD_LINE;
       ctx.lineWidth = Math.max(1, z);
@@ -314,9 +397,12 @@ export class Renderer {
     // grandes são desenhados quando o laço chega no tile da frente deles.
     // Nos mapas, ficam translúcidos para o mapa aparecer por baixo.
     ctx.globalAlpha = mode ? 0.3 : 1;
+    const treesVisible = z >= 0.25 && !mode;
     for (let d = range.x0 + range.y0; d <= range.x1 + range.y1; d++) {
       const xStart = Math.max(range.x0, d - range.y1);
       const xEnd = Math.min(range.x1, d - range.y0);
+      // Árvores da diagonal agrupadas por cor e desenhadas no fim dela.
+      const trees = treesVisible ? new TreeBatch() : null;
       for (let x = xStart; x <= xEnd; x++) {
         const y = d - x;
         const tile = y * width + x;
@@ -327,16 +413,52 @@ export class Renderer {
             const bx = b.tile % width;
             const by = Math.floor(b.tile / width);
             const g = drawBuilding(ctx, cam, bx, by, b);
-            let outline = this.occluders.get(d);
-            if (!outline) this.occluders.set(d, (outline = new Path2D()));
-            addSilhouette(outline, g);
+            this.occluders.add(d, g);
           }
-        } else if (terrain[tile] === TERRAIN.FOREST && z >= 0.3 && !mode) {
-          drawTree(ctx, cam, x, y);
+        } else if (trees && !road[tile] && terrain[tile] !== TERRAIN.WATER) {
+          for (const tree of treesFor(state, x, y)) trees.add(cam, x, y, tree);
         }
       }
+      if (trees) trees.flush(ctx);
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Camada de ambiente, nas coordenadas do cache: ondas e brilhos na água
+  // (geometria guardada no último desenho do cache) e smog.
+  #drawAmbient(state, rt, time, dark, withSmog) {
+    const ctx = this.ambientCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.ambientCanvas.width, this.ambientCanvas.height);
+    ctx.setTransform(AMBIENT_SCALE, 0, 0, AMBIENT_SCALE, 0, 0);
+    this.#drawWater(ctx, time, dark);
+    if (withSmog) {
+      this.smog.update(state, rt);
+      this.smog.draw(ctx, this.cacheCam, AMBIENT_SCALE, time);
+    }
+  }
+
+  // Ondas que atravessam a água e brilhos que piscam.
+  #drawWater(ctx, time, dark) {
+    const { waves, glints, zoom } = this.water;
+    for (let g = 0; g < waves.length; g++) {
+      const a = 0.08 * (1 + Math.sin(time * 1.3 - (g * Math.PI * 2) / waves.length));
+      ctx.fillStyle = `rgba(210, 235, 255, ${a * (1 - dark * 0.6)})`;
+      ctx.fill(waves[g]);
+    }
+    if (zoom < 0.35 || glints.length === 0) return;
+    const sparkle = new Path2D();
+    const len = 6 * zoom;
+    for (const [sx, sy, h1, h2] of glints) {
+      if (Math.sin(time * (1.2 + h1) + h2 * 40) < 0.82) continue;
+      const ox = (h1 - 0.5) * 36 * zoom;
+      const oy = (h2 - 0.5) * 18 * zoom;
+      sparkle.moveTo(sx + ox - len / 2, sy + oy);
+      sparkle.lineTo(sx + ox + len / 2, sy + oy);
+    }
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.75 * (1 - dark * 0.5)})`;
+    ctx.lineWidth = Math.max(1, 1.5 * zoom);
+    ctx.stroke(sparkle);
   }
 
   #drawTiles(ctx, state, cam, tiles, color) {
@@ -362,6 +484,7 @@ export class Renderer {
   // deles. Assim um carro atrás de um prédio fica escondido.
   #drawMovers(ctx, state, rt, cam, selected, occlude) {
     const byDepth = new Map();
+    const carBoxes = []; // [x, y, profundidade] de cada carro, na tela
     const margin = 20;
     for (const id of rt.movers) {
       const c = rt.citizenById.get(id);
@@ -369,6 +492,7 @@ export class Renderer {
       if (!pose) continue;
       const [sx, sy] = worldToScreen(cam, pose.x, pose.y);
       if (sx < -margin || sy < -margin || sx > cam.viewW + margin || sy > cam.viewH + margin) continue;
+      carBoxes.push([sx, sy, pose.depth]);
       let cars = byDepth.get(pose.depth);
       if (!cars) byDepth.set(pose.depth, (cars = new Map()));
       const color = carColor(c);
@@ -384,16 +508,17 @@ export class Renderer {
       mctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       mctx.fillStyle = '#000';
 
-      const depths = new Set(byDepth.keys());
-      if (occlude) for (const d of this.occluders.keys()) depths.add(d);
-      const firstCar = Math.min(...byDepth.keys());
+      // Só os prédios que encostam num carro que está atrás deles precisam
+      // recortar a camada (os contornos estão nas coordenadas do cache).
+      const { k, tx, ty } = this.view;
+      const hiding = occlude ? this.occluders.hiding(carBoxes, (x) => (x - tx) / k, (y) => (y - ty) / k, 14 * cam.zoom / k) : new Map();
+      const depths = new Set([...byDepth.keys(), ...hiding.keys()]);
       for (const d of [...depths].sort((a, b) => a - b)) {
-        if (occlude && d > firstCar && this.occluders.has(d)) {
-          // Os contornos estão nas coordenadas do cache: aplica o mesmo deslocamento.
-          const { k, tx, ty } = this.view;
+        const outlines = hiding.get(d);
+        if (outlines) {
           mctx.setTransform(k * this.dpr, 0, 0, k * this.dpr, tx * this.dpr, ty * this.dpr);
           mctx.globalCompositeOperation = 'destination-out';
-          mctx.fill(this.occluders.get(d));
+          for (const outline of outlines) mctx.fill(outline);
           mctx.globalCompositeOperation = 'source-over';
           mctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
         }
@@ -463,20 +588,129 @@ function addRoadMarkings(path, state, cam, x, y) {
   }
 }
 
-function drawTree(ctx, cam, x, y) {
-  const r = hash2(x, y, 3);
-  const [cx, cy] = worldToScreen(cam, x + 0.3 + r * 0.4, y + 0.3 + hash2(x, y, 4) * 0.4);
-  const z = cam.zoom;
-  const h = (18 + r * 10) * z;
-  ctx.fillStyle = '#6b4a2b';
-  ctx.fillRect(cx - 1.5 * z, cy - 5 * z, 3 * z, 5 * z);
-  ctx.fillStyle = r < 0.5 ? '#2f6b34' : '#377a3b';
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - h);
-  ctx.lineTo(cx + 8 * z, cy - 4 * z);
-  ctx.lineTo(cx - 8 * z, cy - 4 * z);
-  ctx.closePath();
-  ctx.fill();
+// Contornos dos prédios desenhados no cache, numa grade de células da tela
+// para achar rápido quais encostam em cada carro.
+const OCCLUDER_CELL = 64;
+
+class OccluderGrid {
+  constructor() {
+    this.cells = new Map();
+  }
+
+  clear() {
+    this.cells.clear();
+  }
+
+  /** Guarda o prédio de geometria `g`, desenhado na diagonal `depth`. */
+  add(depth, g) {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const p of g.parts) {
+      if (!p.hull) continue;
+      for (const [x, y] of p.hull) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    if (x0 === Infinity) return;
+    const path = new Path2D();
+    addSilhouette(path, g);
+    const entry = { depth, path, x0, y0, x1, y1 };
+    for (let cx = Math.floor(x0 / OCCLUDER_CELL); cx <= Math.floor(x1 / OCCLUDER_CELL); cx++) {
+      for (let cy = Math.floor(y0 / OCCLUDER_CELL); cy <= Math.floor(y1 / OCCLUDER_CELL); cy++) {
+        const key = cx * 65536 + cy;
+        let list = this.cells.get(key);
+        if (!list) this.cells.set(key, (list = []));
+        list.push(entry);
+      }
+    }
+  }
+
+  /**
+   * Prédios que encostam em algum carro que está atrás deles, agrupados pela
+   * diagonal: Map(profundidade -> [Path2D]). `toX`/`toY` levam a posição do
+   * carro na tela para as coordenadas do cache; `r` é o raio do carro.
+   */
+  hiding(cars, toX, toY, r) {
+    const found = new Set();
+    for (const [sx, sy, depth] of cars) {
+      const x = toX(sx);
+      const y = toY(sy);
+      // Todas as células que o carro toca.
+      for (let cx = Math.floor((x - r) / OCCLUDER_CELL); cx <= Math.floor((x + r) / OCCLUDER_CELL); cx++) {
+        for (let cy = Math.floor((y - r) / OCCLUDER_CELL); cy <= Math.floor((y + r) / OCCLUDER_CELL); cy++) {
+          const list = this.cells.get(cx * 65536 + cy);
+          if (!list) continue;
+          for (const e of list) {
+            if (e.depth > depth && x + r > e.x0 && x - r < e.x1 && y + r > e.y0 && y - r < e.y1) found.add(e);
+          }
+        }
+      }
+    }
+    const byDepth = new Map();
+    for (const e of found) {
+      if (!byDepth.has(e.depth)) byDepth.set(e.depth, []);
+      byDepth.get(e.depth).push(e.path);
+    }
+    return byDepth;
+  }
+}
+
+// Árvores de uma diagonal do mapa, agrupadas por cor (troncos primeiro).
+class TreeBatch {
+  constructor() {
+    this.trunks = new Path2D();
+    this.byColor = new Map();
+    this.any = false;
+  }
+
+  add(cam, x, y, tree) {
+    const [cx, cy] = worldToScreen(cam, x + tree.u, y + tree.v);
+    const z = cam.zoom * tree.size;
+    let path = this.byColor.get(tree.color);
+    if (!path) this.byColor.set(tree.color, (path = { body: new Path2D(), light: new Path2D(), base: tree.color }));
+    this.any = true;
+    if (tree.kind === 'pinheiro') {
+      this.trunks.rect(cx - 1.2 * z, cy - 5 * z, 2.4 * z, 5 * z);
+      // Dois andares de copa triangular.
+      path.body.moveTo(cx, cy - 26 * z);
+      path.body.lineTo(cx + 6 * z, cy - 13 * z);
+      path.body.lineTo(cx - 6 * z, cy - 13 * z);
+      path.body.moveTo(cx, cy - 19 * z);
+      path.body.lineTo(cx + 8 * z, cy - 4 * z);
+      path.body.lineTo(cx - 8 * z, cy - 4 * z);
+      path.light.moveTo(cx, cy - 26 * z);
+      path.light.lineTo(cx - 6 * z, cy - 13 * z);
+      path.light.lineTo(cx - 1 * z, cy - 13 * z);
+    } else if (tree.kind === 'copa') {
+      this.trunks.rect(cx - 1.5 * z, cy - 8 * z, 3 * z, 8 * z);
+      const r = 7 * z;
+      path.body.moveTo(cx + r, cy - 13 * z);
+      path.body.arc(cx, cy - 13 * z, r, 0, Math.PI * 2);
+      path.light.moveTo(cx - 1.5 * z + r * 0.45, cy - 15.5 * z);
+      path.light.arc(cx - 1.5 * z, cy - 15.5 * z, r * 0.45, 0, Math.PI * 2);
+    } else {
+      const r = 4.5 * z;
+      path.body.moveTo(cx + r, cy - 3 * z);
+      path.body.ellipse(cx, cy - 3 * z, r, r * 0.75, 0, 0, Math.PI * 2);
+    }
+  }
+
+  flush(ctx) {
+    if (!this.any) return;
+    ctx.fillStyle = TRUNK;
+    ctx.fill(this.trunks);
+    for (const { body, light, base } of this.byColor.values()) {
+      ctx.fillStyle = base;
+      ctx.fill(body);
+      ctx.fillStyle = mix(base, '#ffffff', 0.18);
+      ctx.fill(light);
+    }
+  }
 }
 
 function mix(a, b, t) {

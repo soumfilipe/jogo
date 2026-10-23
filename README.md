@@ -104,6 +104,24 @@ Cada contratação sorteia um turno (`SHIFTS` em `src/world/catalog.js`):
 Assim há carros na rua também no horário de almoço, à noite e de madrugada. O turno aparece
 no painel do cidadão.
 
+## Ambiente
+
+Efeitos só visuais (nada vai para o save), animados em tempo real mesmo com o
+jogo pausado:
+
+- **Smog** (`src/render/smog.js`): névoa marrom sobre as áreas poluídas, em duas
+  camadas de alturas diferentes que derivam devagar em sentidos opostos. Segue o
+  mapa de poluição e escurece à noite.
+- **Florestas** (`src/render/nature.js`): a densidade da mata varia pelo mapa
+  (de 1 a 6 árvores por tile, com clareiras e trechos fechados), com pinheiros,
+  árvores de copa redonda (algumas em tons de outono) e arbustos. Há árvores
+  soltas na borda da mata e, raramente, no campo aberto.
+- **Água**: mais clara perto da margem e mais escura no fundo, espuma na beira,
+  faixas de onda que clareiam em sequência e brilhos que piscam.
+
+Ondas, brilhos e smog ficam numa camada de meia resolução refeita a cada 80 ms;
+entre uma e outra, a imagem pronta é reaproveitada.
+
 ## Cidadãos nas ruas
 
 Cada cidadão em viagem aparece como um carrinho com cor própria, alinhado à rua
@@ -122,6 +140,8 @@ trabalho, ainda dentro do lote, não aparece.
   crescendo) são redesenhadas no máximo a cada 0,4 s.
 - As luzes das janelas são refeitas a cada 15 minutos de jogo, no máximo a cada
   0,3 s de tempo real.
+- Para esconder carros atrás dos prédios, só são recortados os prédios que
+  encostam num carro que está atrás deles (busca numa grade da tela).
 - Caminhos com muitos contornos não usam `closePath` (o `fill` fecha sozinho):
   no Chromium isso deixava o redesenho de mapas grandes até 30 vezes mais lento.
 - No console do navegador, `jogo.state`, `jogo.rt`, `jogo.cam`, `jogo.renderer`,
