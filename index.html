@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jogo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <strong id="city-name">—</strong>
+    <span id="date"></span>
+    <span>👥 <span id="population">0</span></span>
+    <span>💰 <span id="money">0</span></span>
+    <span class="spacer"></span>
+    <button id="btn-pause" title="Espaço">⏸</button>
+  </header>
+
+  <nav class="toolbar" id="tools"></nav>
+
+  <main>
+    <canvas id="map"></canvas>
+  </main>
+
+  <aside class="savebar">
+    <button id="btn-new">Nova cidade</button>
+    <button id="btn-save" title="Ctrl+S">Salvar</button>
+    <button id="btn-save-as">Salvar como…</button>
+    <button id="btn-load">Carregar…</button>
+    <button id="btn-export">Exportar arquivo</button>
+    <button id="btn-import">Importar arquivo</button>
+    <button id="btn-code">Código de save</button>
+    <input type="file" id="file-input" accept=".json,application/json" hidden>
+    <span class="spacer"></span>
+    <span id="storage-mode" class="muted"></span>
+    <span id="status" class="muted"></span>
+  </aside>
+
+  <dialog id="load-dialog">
+    <h2>Carregar cidade</h2>
+    <ul id="save-list"></ul>
+    <form method="dialog"><button>Fechar</button></form>
+  </dialog>
+
+  <dialog id="code-dialog">
+    <h2>Código de save</h2>
+    <p class="muted">Copie para fazer backup ou cole um código para carregar.</p>
+    <textarea id="code-text" rows="8"></textarea>
+    <div class="row">
+      <button id="btn-code-copy">Copiar</button>
+      <button id="btn-code-load">Carregar código colado</button>
+      <form method="dialog"><button>Fechar</button></form>
+    </div>
+  </dialog>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

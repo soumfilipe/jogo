@@ -1,0 +1,14 @@
+{
+  "name": "jogo",
+  "version": "0.1.0",
+  "description": "Jogo de construção de cidades que roda no navegador, localmente, com salvamento em arquivos.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
