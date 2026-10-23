@@ -65,5 +65,4 @@ export function addCar(path, cam, pose) {
   const lift = 2 * cam.zoom;
   path.moveTo(corners[0][0], corners[0][1] - lift);
   for (let i = 1; i < 4; i++) path.lineTo(corners[i][0], corners[i][1] - lift);
-  path.closePath();
 }

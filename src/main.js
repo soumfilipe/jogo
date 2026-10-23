@@ -61,6 +61,7 @@ $('storage-mode').textContent = `Saves: ${saves.backend.label}`;
 function setWorld(next) {
   state = next;
   rt = prepare(state);
+  renderer.invalidate();
   cam = createCamera(state.map.width, state.map.height);
   renderer.resize(cam);
   selection = null;
@@ -105,8 +106,12 @@ window.jogo = {
   get state() { return state; },
   get rt() { return rt; },
   get cam() { return cam; },
-  applyCommand: (cmd) => applyCommand(state, rt, cmd),
+  applyCommand: (cmd) => {
+    renderer.invalidate();
+    return applyCommand(state, rt, cmd);
+  },
   advance: (ticks) => advance(state, rt, ticks),
+  renderer,
   setSpeed,
 };
 
@@ -255,7 +260,10 @@ canvas.addEventListener('pointerup', (e) => {
     const cmd = toolCommand();
     if (cmd) {
       const result = applyCommand(state, rt, cmd);
-      if (result.ok) dirty = true;
+      if (result.ok) {
+        dirty = true;
+        renderer.invalidate();
+      }
       else status(result.reason);
     }
   } else if (drag?.kind === 'pan' && drag.click && !drag.moved) {

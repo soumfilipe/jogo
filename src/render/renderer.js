@@ -20,8 +20,21 @@ import { LIGHT_COLORS, darkness, isWindowLit } from './lights.js';
 // As luzes são redesenhadas a cada tantos minutos de jogo (e quando a câmera
 // ou o mapa mudam), não a cada quadro.
 const LIGHTS_EVERY_MINUTES = 15;
+// ...mas no máximo uma vez a cada tanto tempo real, nas velocidades altas.
+const LIGHTS_MIN_INTERVAL_MS = 300;
 const LIGHTS_MIN_ZOOM = 0.15;
 const NIGHT_TINT = 'rgba(10, 18, 48, 0.55)';
+
+// As camadas estática e de luzes são desenhadas maiores que a tela, com esta
+// margem (fração do maior lado) em volta. Ao arrastar a câmera, a imagem
+// pronta só é deslocada; ela é redesenhada quando a margem acaba.
+const CACHE_MARGIN = 0.3;
+// Durante o zoom, a imagem pronta é escalada e só é redesenhada quando a
+// roda do mouse para por este tempo.
+const ZOOM_SETTLE_MS = 160;
+// Mudanças no mapa feitas pela simulação (prédios crescendo) são mostradas
+// com no máximo este atraso; as do jogador, na hora (ver invalidate()).
+const MAP_REDRAW_MIN_MS = 400;
 
 const GRASS = ['#7db460', '#7ab15d', '#80b763'];
 const WATER = ['#3f7fc4', '#3b79bd'];
@@ -59,6 +72,15 @@ export class Renderer {
     // Contornos dos prédios visíveis, agrupados pela diagonal (x+y) do tile da
     // frente. Montados junto com a camada estática.
     this.occluders = new Map();
+    // Câmera com que a camada estática foi desenhada (ver #cacheTransform).
+    this.cacheCam = null;
+    this.margin = 0;
+    this.lastZoom = 0;
+    this.lightsDrawnAt = 0;
+    this.staticDrawnAt = 0;
+    this.drawnMapVersion = -1;
+    this.forceRedraw = false;
+    this.zoomChangedAt = 0;
     this.dpr = 1;
   }
 
@@ -66,10 +88,16 @@ export class Renderer {
     this.dpr = window.devicePixelRatio || 1;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
-    for (const c of [this.canvas, this.staticCanvas, this.lightsCanvas, this.moversCanvas]) {
+    this.margin = Math.round(Math.max(w, h) * CACHE_MARGIN);
+    for (const c of [this.canvas, this.moversCanvas]) {
       c.width = Math.round(w * this.dpr);
       c.height = Math.round(h * this.dpr);
     }
+    for (const c of [this.staticCanvas, this.lightsCanvas]) {
+      c.width = Math.round((w + 2 * this.margin) * this.dpr);
+      c.height = Math.round((h + 2 * this.margin) * this.dpr);
+    }
+    this.cacheCam = null;
     cam.viewW = w;
     cam.viewH = h;
     cam.version++;
@@ -82,18 +110,41 @@ export class Renderer {
    */
   render(state, rt, cam, overlay = {}) {
     const mode = overlay.mapMode ? MAP_MODES[overlay.mapMode] : null;
-    const key = [
-      cam.version, rt.mapVersion, this.canvas.width, this.canvas.height,
-      overlay.mapMode, mode ? rt.landValueVersion : 0,
-    ].join(':');
-    if (key !== this.staticKey) {
-      this.staticKey = key;
-      this.#drawStatic(state, rt, cam, mode);
+    const now = performance.now();
+    if (cam.zoom !== this.lastZoom) {
+      this.lastZoom = cam.zoom;
+      this.zoomChangedAt = now;
     }
+    const key = [this.canvas.width, this.canvas.height, overlay.mapMode, mode ? rt.landValueVersion : 0].join(':');
+    let view = this.cacheCam && this.#cacheTransform(cam);
+    const zooming = now - this.zoomChangedAt < ZOOM_SETTLE_MS;
+    const outOfCache = view && (view.k !== 1 ? !zooming : Math.abs(view.tx + this.margin) > this.margin || Math.abs(view.ty + this.margin) > this.margin);
+    const mapChanged = rt.mapVersion !== this.drawnMapVersion &&
+      (this.forceRedraw || now - this.staticDrawnAt >= MAP_REDRAW_MIN_MS);
+    if (key !== this.staticBaseKey || !view || outOfCache || mapChanged) {
+      this.staticBaseKey = key;
+      // Identifica o desenho atual do cache (as luzes dependem dele).
+      this.staticKey = `${key}:${rt.mapVersion}:${now}`;
+      this.drawnMapVersion = rt.mapVersion;
+      this.staticDrawnAt = now;
+      this.forceRedraw = false;
+      this.cacheCam = { ...cam, viewW: cam.viewW + 2 * this.margin, viewH: cam.viewH + 2 * this.margin };
+      this.#drawStatic(state, rt, this.cacheCam, mode);
+      this.lightsKey = '';
+      view = this.#cacheTransform(cam);
+    }
+    this.view = view;
 
     const ctx = this.ctx;
+    const d = this.dpr;
+    // Imagem pronta na posição (e escala) da câmera atual.
+    const placeCache = () => ctx.setTransform(view.k, 0, 0, view.k, view.tx * d, view.ty * d);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#1b2a3a';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    placeCache();
     ctx.drawImage(this.staticCanvas, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Noite: escurece tudo e acende as janelas por cima. Os cidadãos andando
     // vêm depois, então à noite parecem faróis nas ruas.
@@ -104,16 +155,18 @@ export class Renderer {
       ctx.fillStyle = NIGHT_TINT;
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       if (cam.zoom >= LIGHTS_MIN_ZOOM) {
-        const lightsKey = [
-          cam.version, rt.mapVersion, this.canvas.width, this.canvas.height,
-          Math.floor(state.time.tick / LIGHTS_EVERY_MINUTES),
-        ].join(':');
-        if (lightsKey !== this.lightsKey) {
+        const lightsKey = [this.staticKey, Math.floor(state.time.tick / LIGHTS_EVERY_MINUTES)].join(':');
+        // Cache novo: redesenha já. Só o horário mudou: respeita o intervalo mínimo.
+        const cacheChanged = !this.lightsKey.startsWith(`${this.staticKey}:`);
+        if (lightsKey !== this.lightsKey && (cacheChanged || now - this.lightsDrawnAt >= LIGHTS_MIN_INTERVAL_MS)) {
           this.lightsKey = lightsKey;
-          this.#drawLights(state, rt, cam, minute);
+          this.lightsDrawnAt = now;
+          this.#drawLights(state, rt, this.cacheCam, minute);
         }
         ctx.globalAlpha = Math.min(1, dark * 1.6);
+        placeCache();
         ctx.drawImage(this.lightsCanvas, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
       }
       ctx.globalAlpha = 1;
     }
@@ -129,6 +182,26 @@ export class Renderer {
     if (overlay.hover) {
       this.#outlineTile(ctx, state, cam, overlay.hover.y * state.map.width + overlay.hover.x, 'rgba(255,255,255,0.8)', 1.5);
     }
+  }
+
+  /** Redesenha o mapa no próximo quadro (depois de uma ação do jogador). */
+  invalidate() {
+    this.forceRedraw = true;
+  }
+
+  /**
+   * Como levar a imagem em cache (desenhada com this.cacheCam) para a câmera
+   * atual: ponto na tela = ponto no cache * k + (tx, ty), em pixels CSS.
+   */
+  #cacheTransform(cam) {
+    const c = this.cacheCam;
+    if (!c) return null;
+    const k = cam.zoom / c.zoom;
+    return {
+      k,
+      tx: ((-c.viewW / 2) / c.zoom + c.cx - cam.cx) * cam.zoom + cam.viewW / 2,
+      ty: ((-c.viewH / 2) / c.zoom + c.cy - cam.cy) * cam.zoom + cam.viewH / 2,
+    };
   }
 
   // Desenha as janelas acesas, prédio a prédio de trás para frente. Antes das
@@ -219,7 +292,8 @@ export class Renderer {
         path.lineTo(tx + hw, ty + hh);
         path.lineTo(tx, ty + 2 * hh);
         path.lineTo(tx - hw, ty + hh);
-        path.closePath();
+        // Sem closePath: com dezenas de milhares de losangos no mesmo caminho,
+        // closePath fica lento no Chromium; o fill fecha cada contorno sozinho.
 
         if (road[tile] && z >= 0.5) addRoadMarkings(roadLines, state, cam, x, y);
       }
@@ -252,10 +326,10 @@ export class Renderer {
           if (tile === frontTile(state, b)) {
             const bx = b.tile % width;
             const by = Math.floor(b.tile / width);
-            drawBuilding(ctx, cam, bx, by, b);
+            const g = drawBuilding(ctx, cam, bx, by, b);
             let outline = this.occluders.get(d);
             if (!outline) this.occluders.set(d, (outline = new Path2D()));
-            addSilhouette(outline, buildingGeometry(cam, bx, by, b));
+            addSilhouette(outline, g);
           }
         } else if (terrain[tile] === TERRAIN.FOREST && z >= 0.3 && !mode) {
           drawTree(ctx, cam, x, y);
@@ -276,6 +350,7 @@ export class Renderer {
   #outlineTile(ctx, state, cam, tile, color, lineWidth, size = 1) {
     const path = new Path2D();
     diamond(path, cam, tile % state.map.width, Math.floor(tile / state.map.width), 0, size);
+    path.closePath(); // contorno: o traço precisa do lado final
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.stroke(path);
@@ -314,9 +389,13 @@ export class Renderer {
       const firstCar = Math.min(...byDepth.keys());
       for (const d of [...depths].sort((a, b) => a - b)) {
         if (occlude && d > firstCar && this.occluders.has(d)) {
+          // Os contornos estão nas coordenadas do cache: aplica o mesmo deslocamento.
+          const { k, tx, ty } = this.view;
+          mctx.setTransform(k * this.dpr, 0, 0, k * this.dpr, tx * this.dpr, ty * this.dpr);
           mctx.globalCompositeOperation = 'destination-out';
           mctx.fill(this.occluders.get(d));
           mctx.globalCompositeOperation = 'source-over';
+          mctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
         }
         const cars = byDepth.get(d);
         if (!cars) continue;
@@ -367,7 +446,6 @@ function diamond(path, cam, x, y, inset, size = 1) {
   path.lineTo(rx, ry);
   path.lineTo(bx, by);
   path.lineTo(lx, ly);
-  path.closePath();
 }
 
 // Faixa tracejada no meio da estrada, ligando aos vizinhos que também são estrada.
