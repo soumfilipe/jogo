@@ -1,5 +1,5 @@
 import { createWorld } from './world/world.js';
-import { ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, ZONE, ZONE_INFO } from './world/catalog.js';
 import { applyCommand, lineTiles, planCommand, rectTiles } from './world/commands.js';
 import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
@@ -29,6 +29,14 @@ const TOOLS = [
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
   })),
   { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)' },
+  // Serviços públicos: um clique coloca (precisa encostar numa rua).
+  ...[
+    ['usina_carvao', 'Carvão', '#5f5d58'], ['usina_solar', 'Solar', '#3d5c9e'],
+    ['bomba_agua', 'Bomba', '#4f97c4'], ['poco', 'Poço', '#9fc3e0'],
+  ].map(([building, label, swatch], i) => ({
+    id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch,
+    separatorBefore: i === 0,
+  })),
 ];
 
 let state;
@@ -99,7 +107,9 @@ startLoop({
   },
 });
 
-window.addEventListener('resize', () => renderer.resize(cam));
+// O canvas muda de tamanho com a janela e também quando a barra de
+// ferramentas quebra de linha: acompanha o tamanho real dele.
+new ResizeObserver(() => renderer.resize(cam)).observe(canvas);
 
 // Acesso pelo console do navegador, para depurar: jogo.state, jogo.rt, ...
 window.jogo = {
@@ -143,6 +153,37 @@ function renderHud() {
     bar.style.opacity = value >= 0 ? '1' : '0.45';
   }
   for (const b of $('speeds').children) b.classList.toggle('active', Number(b.dataset.speed) === speed);
+  renderUtilities();
+}
+
+// Energia e água no topo: consumo / produção, em vermelho quando falta.
+function renderUtilities() {
+  const totals = rt.utilityTotals;
+  const imported = state.utilities.imported;
+  const missing = [];
+  let anyZone = false;
+  for (const z of state.map.zone) if (z) { anyZone = true; break; }
+  for (const [res, id, label] of [['power', 'power', 'energia'], ['water', 'water', 'água']]) {
+    const el = $(id);
+    const t = totals[res];
+    if (imported[res]) {
+      el.lastElementChild.textContent = 'importada';
+      el.classList.remove('short');
+      continue;
+    }
+    el.lastElementChild.textContent = `${t.used.toLocaleString('pt-BR')} / ${t.supply.toLocaleString('pt-BR')}`;
+    const unserved = [...rt.service.values()].some((s) => !s[res]);
+    el.classList.toggle('short', unserved || (t.supply === 0 && anyZone));
+    if (t.supply === 0 && anyZone) missing.push(label);
+  }
+  const hint = $('utility-hint');
+  hint.hidden = missing.length === 0;
+  if (missing.length) {
+    const build = [];
+    if (missing.includes('energia')) build.push('usina');
+    if (missing.includes('água')) build.push('bomba ou poço');
+    hint.textContent = `Sem ${missing.join(' e ')}: construa ${build.join(' e ')} junto a uma rua`;
+  }
 }
 
 function setSpeed(value) {
@@ -156,11 +197,25 @@ for (const b of $('speeds').children) b.onclick = () => setSpeed(Number(b.datase
 // ---------------------------------------------------------------------------
 
 for (const t of TOOLS) {
+  if (t.separatorBefore) {
+    const sep = document.createElement('span');
+    sep.className = 'separator';
+    $('tools').append(sep);
+  }
   const button = document.createElement('button');
-  button.innerHTML = `${t.swatch ? `<span class="swatch" style="background:${t.swatch}"></span>` : ''}${t.name}<kbd>${t.key.toUpperCase()}</kbd>`;
+  const swatch = t.swatch ? `<span class="swatch" style="background:${t.swatch}"></span>` : '';
+  const key = t.key ? `<kbd>${t.key.toUpperCase()}</kbd>` : '';
+  button.innerHTML = `${swatch}${t.label || t.name}${key}`;
+  if (t.building) button.title = `${t.name}: ${utilityTitle(t.building)}`;
   button.dataset.tool = t.id;
   button.onclick = () => selectTool(t);
   $('tools').append(button);
+}
+function utilityTitle(id) {
+  const u = BUILDINGS[id].utility;
+  const makes = u.power ? `${u.power.toLocaleString('pt-BR')} de energia` : `${u.water.toLocaleString('pt-BR')} de água`;
+  const notes = [u.pollution ? 'polui' : null, u.needsWater ? 'na beira de rio ou lago' : null].filter(Boolean);
+  return `Produz ${makes} · $${u.cost.toLocaleString('pt-BR')} + $${u.upkeep}/mês${notes.length ? ' · ' + notes.join(', ') : ''}`;
 }
 function selectTool(t) {
   tool = t;
@@ -170,13 +225,14 @@ function selectTool(t) {
 selectTool(tool);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
-const MAP_KEYS = { valor: 'l', poluicao: 'p' };
+const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h' };
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);
 for (const [id, mode] of Object.entries(MAP_MODES)) {
   const button = document.createElement('button');
-  button.innerHTML = `${mode.name}<kbd>${MAP_KEYS[id].toUpperCase()}</kbd>`;
+  button.innerHTML = `${mode.label || mode.name}${MAP_KEYS[id] ? `<kbd>${MAP_KEYS[id].toUpperCase()}</kbd>` : ''}`;
+  button.title = `Mapa: ${mode.name}`;
   button.dataset.map = id;
   button.onclick = () => toggleMap(id);
   $('tools').append(button);
@@ -187,8 +243,11 @@ function toggleMap(id) {
 }
 
 function toolCommand() {
-  if (!drag || drag.kind !== 'tool' || !tool.shape || !hover) return null;
+  if (!tool.shape || !hover) return null;
   const { width } = state.map;
+  // Colocar serviço público: a prévia aparece só passando o mouse.
+  if (tool.shape === 'single') return { type: 'place', building: tool.building, tile: hover.y * width + hover.x };
+  if (!drag || drag.kind !== 'tool') return null;
   const { start } = drag;
   const tiles = tool.shape === 'line'
     ? lineTiles(width, start.x, start.y, hover.x, hover.y)
@@ -210,6 +269,11 @@ function currentPreview() {
   tooltip.hidden = false;
   tooltip.style.left = `${sx + 16}px`;
   tooltip.style.top = `${sy - 10}px`;
+  if (cmd.type === 'place') {
+    tooltip.textContent = plan.reason || `${tool.name} · $${plan.cost.toLocaleString('pt-BR')}`;
+    tooltip.style.color = plan.reason ? '#ff8a80' : '';
+    return { tiles: plan.tiles, color: plan.reason ? 'rgba(255,80,60,0.5)' : 'rgba(80,220,120,0.5)' };
+  }
   tooltip.textContent = `${plan.tiles.length} tiles · $${plan.cost.toLocaleString('pt-BR')}`;
   tooltip.style.color = plan.cost > state.economy.money ? '#ff8a80' : '';
   return { tiles: plan.tiles, color: tool.color };

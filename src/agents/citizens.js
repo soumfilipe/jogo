@@ -26,6 +26,7 @@ import {
   tileCenter,
 } from '../world/runtime.js';
 import { findRoadPath } from './pathfinding.js';
+import { isServed } from '../systems/utilities.js';
 import { FIRST_NAMES, LAST_NAMES } from './names.js';
 
 // Quantas rotas calcular por tick no máximo (o resto espera na fila).
@@ -181,7 +182,8 @@ function moveCitizens(state, rt) {
 
 /** Contrata desempregados, procurando a vaga alcançável mais próxima. */
 export function assignJobs(state, rt, budget = 200) {
-  const workplaces = state.buildings.filter((b) => openJobs(rt, b) > 0 && rt.access.get(b.id) >= 0);
+  // Prédio sem energia ou água não contrata (ver systems/utilities.js).
+  const workplaces = state.buildings.filter((b) => openJobs(rt, b) > 0 && rt.access.get(b.id) >= 0 && isServed(rt, b));
   if (workplaces.length === 0) return;
   const width = state.map.width;
 

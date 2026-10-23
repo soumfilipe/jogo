@@ -94,11 +94,14 @@ export function frontTile(state, b) {
   return b.tile + (size - 1) * (state.map.width + 1);
 }
 
+// Prédio abandonado não recebe moradores nem contrata.
 export function vacancies(rt, b) {
+  if (b.abandoned !== undefined) return 0;
   return BUILDINGS[b.type].residents - rt.residents.get(b.id).size;
 }
 
 export function openJobs(rt, b) {
+  if (b.abandoned !== undefined) return 0;
   return BUILDINGS[b.type].jobs - rt.workers.get(b.id).size;
 }
 

@@ -37,6 +37,7 @@ export function computeLandValue(state, rt) {
     activity[b.tile] += info.size * info.size;
     if (info.zone === ZONE.COMMERCIAL) commerce[b.tile] += weight;
     if (info.zone === ZONE.INDUSTRIAL) industry[b.tile] += weight;
+    if (info.utility) industry[b.tile] += info.utility.pollution;
   }
 
   const natureSum = boxSum(nature, width, height, NATURE_RADIUS);

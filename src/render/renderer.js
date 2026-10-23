@@ -63,8 +63,12 @@ const ZONE_TINT = {
 // Mapas (sobreposições): cor do chão conforme um valor de 0 a 1 do runtime.
 // O valor é arredondado em faixas para manter o agrupamento por cor.
 export const MAP_MODES = {
-  valor: { name: 'Valor do terreno', layer: 'landValue', from: '#c0392b', mid: '#f1c40f', to: '#27ae60' },
+  valor: { name: 'Valor do terreno', label: 'Valor', layer: 'landValue', from: '#c0392b', mid: '#f1c40f', to: '#27ae60' },
   poluicao: { name: 'Poluição', layer: 'pollution', from: '#7db460', mid: '#c9a227', to: '#5b2a86' },
+  // Energia e água: prédios abastecidos (verde) ou não (vermelho) e as ruas
+  // das redes com ou sem produção. O resto do mapa fica com a cor normal.
+  energia: { name: 'Energia', layer: 'powerMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  agua: { name: 'Água', layer: 'waterMap', from: '#d64541', mid: '#f1c40f', to: '#3498db' },
 };
 const MAP_STEPS = 10;
 
@@ -331,7 +335,9 @@ export class Renderer {
         const tile = y * width + x;
         let color;
         if (road[tile]) color = ROAD;
-        else if (mode && terrain[tile] !== TERRAIN.WATER) color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
+        else if (mode && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
+          color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
+        }
         else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]];
         else if (terrain[tile] === TERRAIN.WATER) {
           color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
@@ -414,6 +420,16 @@ export class Renderer {
             const by = Math.floor(b.tile / width);
             const g = drawBuilding(ctx, cam, bx, by, b);
             this.occluders.add(d, g);
+            if (b.abandoned !== undefined) {
+              // Abandonado: escurecido e sem cor.
+              const outline = new Path2D();
+              addSilhouette(outline, g);
+              ctx.fillStyle = 'rgba(38, 34, 30, 0.6)';
+              ctx.fill(outline);
+            } else if (!mode) {
+              const service = rt.service?.get(b.id);
+              if (service && (!service.power || !service.water)) drawServiceBadges(ctx, g, service, z);
+            }
           }
         } else if (trees && !road[tile] && terrain[tile] !== TERRAIN.WATER) {
           for (const tree of treesFor(state, x, y)) trees.add(cam, x, y, tree);
@@ -586,6 +602,55 @@ function addRoadMarkings(path, state, cam, x, y) {
     path.moveTo(cx, cy);
     path.lineTo(ex, ey);
   }
+}
+
+// Ícones sobre prédios sem energia (raio amarelo) ou sem água (gota azul).
+function drawServiceBadges(ctx, g, service, z) {
+  let top = Infinity;
+  let left = Infinity;
+  let right = -Infinity;
+  for (const p of g.parts) {
+    if (!p.hull) continue;
+    for (const [x, y] of p.hull) {
+      if (y < top) top = y;
+      if (x < left) left = x;
+      if (x > right) right = x;
+    }
+  }
+  if (top === Infinity) return;
+  const r = Math.max(5, 7 * z);
+  const missing = [];
+  if (!service.power) missing.push('power');
+  if (!service.water) missing.push('water');
+  missing.forEach((res, i) => {
+    const cx = (left + right) / 2 + (i - (missing.length - 1) / 2) * r * 2.3;
+    const cy = top - r * 1.4;
+    ctx.fillStyle = res === 'power' ? '#f1c40f' : '#3498db';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.lineWidth = Math.max(1, z);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = res === 'power' ? '#2b2b2b' : '#ffffff';
+    ctx.beginPath();
+    if (res === 'power') {
+      // Raio.
+      ctx.moveTo(cx + r * 0.15, cy - r * 0.75);
+      ctx.lineTo(cx - r * 0.45, cy + r * 0.1);
+      ctx.lineTo(cx - r * 0.02, cy + r * 0.1);
+      ctx.lineTo(cx - r * 0.2, cy + r * 0.75);
+      ctx.lineTo(cx + r * 0.45, cy - r * 0.15);
+      ctx.lineTo(cx + r * 0.02, cy - r * 0.15);
+    } else {
+      // Gota.
+      ctx.moveTo(cx, cy - r * 0.7);
+      ctx.quadraticCurveTo(cx + r * 0.6, cy + r * 0.05, cx + r * 0.45, cy + r * 0.3);
+      ctx.arc(cx, cy + r * 0.25, r * 0.45, 0, Math.PI);
+      ctx.quadraticCurveTo(cx - r * 0.6, cy + r * 0.05, cx, cy - r * 0.7);
+    }
+    ctx.fill();
+  });
 }
 
 // Contornos dos prédios desenhados no cache, numa grade de células da tela

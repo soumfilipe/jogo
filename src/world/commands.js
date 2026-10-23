@@ -7,12 +7,14 @@
 //   { type: 'road',     tiles }
 //   { type: 'zone',     tiles, zone }       (zone = ZONE.NONE remove a zona)
 //   { type: 'bulldoze', tiles }
+//   { type: 'place', building, tile }    (serviço público; tile = canto de cima)
 
 import { BUILDINGS, COSTS, TERRAIN, ZONE } from './catalog.js';
-import { recomputeRoads, removeBuilding } from './runtime.js';
+import { addBuilding, recomputeRoads, removeBuilding } from './runtime.js';
 import { isBuildable } from './world.js';
 
 export function planCommand(state, rt, cmd) {
+  if (cmd.type === 'place') return planPlace(state, rt, cmd);
   const { road, zone, terrain } = state.map;
   const tiles = [];
   const buildings = new Set(); // prédios grandes ocupam vários tiles: conta uma vez
@@ -34,7 +36,7 @@ export function planCommand(state, rt, cmd) {
       if (id) {
         if (buildings.has(id)) continue;
         buildings.add(id);
-        cost += COSTS.demolishBuilding * BUILDINGS[rt.buildingById.get(id).type].level;
+        cost += COSTS.demolishBuilding * Math.max(1, BUILDINGS[rt.buildingById.get(id).type].level);
       } else if (road[tile]) cost += COSTS.demolishRoad;
       else if (forest) cost += COSTS.clearForest;
       else if (!zone[tile]) continue;
@@ -47,10 +49,24 @@ export function planCommand(state, rt, cmd) {
 }
 
 export function applyCommand(state, rt, cmd) {
-  const { tiles, cost } = planCommand(state, rt, cmd);
+  const { tiles, cost, reason } = planCommand(state, rt, cmd);
+  if (reason) return { ok: false, cost, count: 0, reason };
   if (tiles.length === 0) return { ok: false, cost: 0, count: 0, reason: 'Nada a fazer aqui.' };
   if (cost > state.economy.money) {
     return { ok: false, cost, count: 0, reason: `Dinheiro insuficiente (custa $${cost}).` };
+  }
+
+  if (cmd.type === 'place') {
+    for (const t of tiles) state.map.zone[t] = ZONE.NONE;
+    addBuilding(state, rt, cmd.building, cmd.tile);
+    // A primeira usina (ou bomba/poço) própria encerra a importação daquele recurso.
+    const utility = BUILDINGS[cmd.building].utility;
+    const imported = state.utilities.imported;
+    if (utility.power) imported.power = false;
+    if (utility.water) imported.water = false;
+    state.economy.money -= cost;
+    rt.mapVersion++;
+    return { ok: true, cost, count: 1 };
   }
 
   const { road, zone, terrain } = state.map;
@@ -82,6 +98,45 @@ export function applyCommand(state, rt, cmd) {
   if (roadsChanged) recomputeRoads(state, rt);
   rt.mapVersion++;
   return { ok: true, cost, count: tiles.length };
+}
+
+/**
+ * Serviço público: o terreno inteiro precisa estar livre (sem rua, prédio ou
+ * água), encostado numa rua; a bomba d'água também precisa encostar em água.
+ * Devolve { tiles, cost, reason } — reason explica por que não dá.
+ */
+function planPlace(state, rt, cmd) {
+  const info = BUILDINGS[cmd.building];
+  if (!info?.utility) throw new Error(`Não é um serviço público: ${cmd.building}`);
+  const { width, height, road, terrain } = state.map;
+  const x0 = cmd.tile % width;
+  const y0 = Math.floor(cmd.tile / width);
+  const cost = info.utility.cost;
+  const tiles = [];
+  for (let dy = 0; dy < info.size; dy++) {
+    for (let dx = 0; dx < info.size; dx++) tiles.push((y0 + dy) * width + x0 + dx);
+  }
+  const fail = (reason) => ({ tiles, cost, reason });
+  if (x0 + info.size > width || y0 + info.size > height) return fail('Fora do mapa.');
+  for (const t of tiles) {
+    if (terrain[t] === TERRAIN.WATER) return fail('Não dá para construir na água.');
+    if (road[t] || rt.buildingAt[t]) return fail('O terreno precisa estar livre.');
+  }
+  const around = [];
+  for (const t of tiles) {
+    const x = t % width;
+    const y = (t - x) / width;
+    if (x > 0) around.push(t - 1);
+    if (x < width - 1) around.push(t + 1);
+    if (y > 0) around.push(t - width);
+    if (y < height - 1) around.push(t + width);
+  }
+  if (!around.some((t) => road[t])) return fail('Precisa encostar numa rua.');
+  if (info.utility.needsWater && !around.some((t) => terrain[t] === TERRAIN.WATER)) {
+    return fail('A bomba precisa ficar na beira de um rio ou lago.');
+  }
+  if (cost > state.economy.money) return fail(`Dinheiro insuficiente (custa $${cost}).`);
+  return { tiles, cost };
 }
 
 // ---------------------------------------------------------------------------

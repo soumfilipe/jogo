@@ -28,7 +28,8 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `R` / `C` / `I` Zonas | arraste um retângulo de zona residencial, comercial ou industrial ($5 por tile) |
 | `B` Demolir | arraste sobre prédios, estradas, árvores ou zonas |
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
-| `L` / `P` Mapas | mostra o valor do terreno ou a poluição sobre o mapa |
+| Carvão / Solar / Bomba / Poço | coloca um serviço público (um clique; precisa encostar numa rua) |
+| `L` / `P` / `N` / `H` Mapas | valor do terreno, poluição, energia ou água sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
@@ -39,6 +40,33 @@ a demanda (as três barrinhas RCI no topo), e **sobem de nível** com o tempo. C
 tem nome, idade, casa e emprego, sai de casa de manhã, vai pelas estradas até o
 trabalho e volta no fim da tarde. Com "Inspecionar" dá para clicar em alguém
 andando e seguir com a câmera.
+
+## Energia e água
+
+Como no Cities: Skylines, **as ruas distribuem energia e água**: cada rede de ruas
+conectadas é uma rede de abastecimento, e usinas, bombas e poços abastecem a rede
+da rua em que estão encostados (`src/systems/utilities.js`).
+
+| Serviço | Produz | Custo | Manutenção | Observação |
+| --- | --- | --- | --- | --- |
+| Usina a carvão (2×2) | 3.000 de energia | $12.000 | $400/mês | polui bastante |
+| Usina solar (2×2) | 1.200 de energia | $20.000 | $150/mês | limpa |
+| Bomba d'água | 2.500 de água | $6.000 | $200/mês | precisa encostar em rio ou lago |
+| Poço artesiano | 700 de água | $3.500 | $90/mês | funciona em qualquer lugar |
+
+- Cada prédio consome por morador ou vaga: residencial 1 de energia e 1,2 de
+  água; comercial 1,5 e 0,6; industrial 2,2 e 1,4 (`CONSUMPTION` no catálogo).
+- Se a produção não dá para todos, ficam sem primeiro os prédios mais longe das
+  fontes (pelo caminho das ruas).
+- **Sem energia ou água**, um prédio não cresce nem sobe de nível; a cada dia
+  perde 25% dos moradores ou funcionários; vazio por 3 dias fica **abandonado**
+  (escuro, sem luzes) e, abandonado por 15 dias, **desaba** (a zona continua).
+- Lotes novos só crescem se a rede tem energia e água sobrando para eles.
+- Ícones sobre os prédios mostram o que falta (raio = energia, gota = água); o
+  topo da tela mostra consumo / produção.
+- Saves de antes dos serviços públicos recebem energia e água **importadas** da
+  região; a importação de cada recurso acaba quando o jogador constrói a primeira
+  usina (ou bomba/poço) própria.
 
 ## Prédios e níveis
 
@@ -160,8 +188,9 @@ trabalho, ainda dentro do lote, não aparece.
 - **Ações do jogador** passam por `src/world/commands.js`, que valida e cobra.
 - **Sistemas** rodam em ordem fixa a cada tick (`src/systems/simulation.js`):
   cidadãos (saídas, rotas, movimento) a cada minuto; demanda, valor do terreno,
-  crescimento, imigração e contratação a cada hora; subida de nível uma vez por
-  dia; impostos e manutenção a cada mês.
+  energia e água, crescimento, imigração e contratação a cada hora; efeitos da
+  falta de energia/água e subida de nível uma vez por dia; impostos e
+  manutenção a cada mês.
 - **Rotas**: A* sobre as estradas, com cache e no máximo 100 cálculos por tick
   (o resto espera na fila, em estado "Saindo…").
 
@@ -197,13 +226,13 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 2,                 // versão do formato (migrações em src/save/format.js)
+  "version": 3,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
     "name": "Vila Nova",
     "autosave": false,
-    "gameVersion": "0.2.0",
+    "gameVersion": "0.4.0",
     "createdAt": "…", "updatedAt": "…",
     "playTimeSeconds": 120,
     "summary": { "population": 985, "buildings": 342, "money": 38635,
@@ -234,7 +263,7 @@ src/core/               relógio/laço, tempo do jogo, RNG com semente
 src/world/              estado (world.js), catálogo de prédios, terreno,
                         índices derivados (runtime.js), ações do jogador
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes
-src/systems/            demanda, valor do terreno, crescimento e níveis,
+src/systems/            demanda, valor do terreno, energia e água, crescimento e níveis,
                         economia, ordem dos sistemas
 src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa

@@ -75,13 +75,56 @@ export const BUILDINGS = {
     name: 'Galpão logístico', zone: ZONE.INDUSTRIAL, level: 3, size: 2, residents: 0, jobs: 70,
     style: { height: 1.4 },
   },
+
+  // --- Serviços públicos (colocados pelo jogador) ----------------------------
+  //   utility.power / water: quanto produz por hora (mesma unidade do consumo)
+  //   utility.cost: preço para construir; upkeep: manutenção por mês
+  //   utility.pollution: peso na poluição em volta (como a indústria)
+  //   utility.needsWater: precisa encostar em rio ou lago
+  usina_carvao: {
+    name: 'Usina a carvão', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 20,
+    style: { height: 1.4 },
+    utility: { power: 3000, water: 0, cost: 12_000, upkeep: 400, pollution: 14 },
+  },
+  usina_solar: {
+    name: 'Usina solar', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 4,
+    style: { height: 0.4 },
+    utility: { power: 1200, water: 0, cost: 20_000, upkeep: 150, pollution: 0 },
+  },
+  bomba_agua: {
+    name: "Bomba d'água", zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
+    style: { height: 0.8 },
+    utility: { power: 0, water: 2500, cost: 6_000, upkeep: 200, pollution: 0, needsWater: true },
+  },
+  poco: {
+    name: 'Poço artesiano', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 2,
+    style: { height: 1.2 },
+    utility: { power: 0, water: 700, cost: 3_500, upkeep: 90, pollution: 0 },
+  },
 };
+
+export const UTILITY_TYPES = Object.keys(BUILDINGS).filter((id) => BUILDINGS[id].utility);
+
+// Consumo de energia e água por morador ou vaga de emprego, por zona.
+export const CONSUMPTION = {
+  [ZONE.RESIDENTIAL]: { power: 1, water: 1.2 },
+  [ZONE.COMMERCIAL]: { power: 1.5, water: 0.6 },
+  [ZONE.INDUSTRIAL]: { power: 2.2, water: 1.4 },
+};
+
+// Prédio sem energia ou água: a cada dia perde esta fração dos moradores ou
+// funcionários; vazio por ABANDON_AFTER_DAYS dias vira abandonado, e
+// abandonado por COLLAPSE_AFTER_DAYS dias desaba (o lote fica livre).
+export const UNSERVED_LEAVE_SHARE = 0.25;
+export const ABANDON_AFTER_DAYS = 3;
+export const COLLAPSE_AFTER_DAYS = 15;
 
 // Tipos 1x1 de cada nível, por zona: é o caminho de crescimento no lugar.
 export const LEVELS = {};
 // Tipos grandes (2x2) por zona: surgem em lotes vazios bem valorizados.
 export const LARGE_BUILDINGS = {};
 for (const [id, info] of Object.entries(BUILDINGS)) {
+  if (info.utility) continue;
   if (info.size === 1) ((LEVELS[info.zone] ??= {})[info.level] ??= []).push(id);
   else (LARGE_BUILDINGS[info.zone] ??= []).push(id);
 }
