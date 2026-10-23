@@ -7,7 +7,7 @@
 //   id, name, age,
 //   home: id do prédio,      job: id do prédio | null,
 //   departWork / departHome: minuto do dia em que sai (null sem emprego),
-//   shift: turno ('diurno', 'noturno', 'manha', 'tarde'; null sem emprego),
+//   shift: turno ('diurno', 'noturno', 'madrugada', 'manha', 'tarde'; null sem emprego),
 //   state: 'casa' | 'trabalho' | 'aguardando' (rota sendo calculada) | 'viajando',
 //   dest:  'trabalho' | 'casa' | null,
 //   x, y:  posição em tiles (contínua),
@@ -60,9 +60,11 @@ export function canWork(citizen) {
 /** Contrata: sorteia o turno e os horários de saída dentro das faixas dele. */
 export function hire(state, rt, citizen, workplace) {
   const shift = pickShift(random(state.rng));
-  const { leave, back } = SHIFTS[shift];
+  const { leave, back, hours } = SHIFTS[shift];
   const departWork = randomInt(state.rng, leave[0], leave[1]);
-  const departHome = randomInt(state.rng, back[0], back[1]);
+  const departHome = back
+    ? randomInt(state.rng, back[0], back[1])
+    : (departWork + randomInt(state.rng, hours[0], hours[1])) % MINUTES_PER_DAY;
   setJob(rt, citizen, workplace.id, departWork, departHome);
   citizen.shift = shift;
 }

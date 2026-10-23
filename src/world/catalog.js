@@ -116,12 +116,15 @@ export const ECONOMY = {
 export const ROAD_ACCESS_RADIUS = 2;
 
 // Turnos de trabalho. Cada contratação sorteia um turno pela fração `share`;
-// os horários de saída (de casa e do trabalho) são sorteados dentro das
-// faixas, em minutos do dia. O turno da noite volta para casa no dia seguinte.
+// os horários de saída de casa (`leave`) e do trabalho (`back`) são sorteados
+// dentro das faixas, em minutos do dia. Em vez de `back`, `hours` dá a
+// duração da jornada (a volta é calculada a partir da saída de cada um).
+// Turnos que passam da meia-noite voltam para casa no dia seguinte.
 const hm = (h, m = 0) => h * 60 + m;
 export const SHIFTS = {
-  diurno: { name: 'Diurno', share: 0.83, leave: [hm(6, 30), hm(8, 30)], back: [hm(16, 30), hm(18, 30)] },
+  diurno: { name: 'Diurno', share: 0.8, leave: [hm(6, 30), hm(8, 30)], back: [hm(16, 30), hm(18, 30)] },
   noturno: { name: 'Noturno', share: 0.07, leave: [hm(21), hm(23)], back: [hm(6), hm(7, 30)] },
+  madrugada: { name: 'Madrugada', share: 0.03, leave: [hm(0), hm(4, 30)], hours: [hm(8), hm(9)] },
   manha: { name: 'Meio período (manhã)', share: 0.05, leave: [hm(7), hm(9)], back: [hm(12), hm(13, 30)] },
   tarde: { name: 'Meio período (tarde)', share: 0.05, leave: [hm(12, 30), hm(14)], back: [hm(17, 30), hm(19, 30)] },
 };

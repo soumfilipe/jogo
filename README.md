@@ -95,12 +95,13 @@ Cada contratação sorteia um turno (`SHIFTS` em `src/world/catalog.js`):
 
 | Turno | Parcela | Sai de casa | Volta |
 | --- | --- | --- | --- |
-| Diurno | 83% | 6h30 a 8h30 | 16h30 a 18h30 |
+| Diurno | 80% | 6h30 a 8h30 | 16h30 a 18h30 |
 | Noturno | 7% | 21h a 23h | 6h a 7h30 (do dia seguinte) |
+| Madrugada | 3% | 0h a 4h30 | 8 a 9 horas depois de sair |
 | Meio período, manhã | 5% | 7h a 9h | 12h a 13h30 |
 | Meio período, tarde | 5% | 12h30 a 14h | 17h30 a 19h30 |
 
-Assim há carros na rua também no horário de almoço e à noite. O turno aparece
+Assim há carros na rua também no horário de almoço, à noite e de madrugada. O turno aparece
 no painel do cidadão.
 
 ## Cidadãos nas ruas
