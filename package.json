@@ -1,6 +1,6 @@
 {
   "name": "jogo",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Jogo de construção de cidades que roda no navegador, localmente, com salvamento em arquivos.",
   "type": "module",
   "private": true,

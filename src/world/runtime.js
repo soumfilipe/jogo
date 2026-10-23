@@ -9,7 +9,7 @@ export function buildRuntime(state) {
   const rt = {
     buildingById: new Map(),
     citizenById: new Map(),
-    buildingAt: new Int32Array(width * height), // id do prédio no tile (0 = nenhum)
+    buildingAt: new Int32Array(width * height), // id do prédio em cada tile (0 = nenhum)
     residents: new Map(), // id do prédio -> Set de ids de cidadãos
     workers: new Map(), //   id do prédio -> Set de ids de cidadãos
     departures: new Map(), // minuto do dia -> Set de ids de cidadãos
@@ -18,11 +18,13 @@ export function buildRuntime(state) {
     access: new Map(), //    id do prédio -> tile de estrada de acesso (-1 = sem acesso)
     pathCache: new Map(),
     demand: { residential: 0, commercial: 0, industrial: 0 },
+    landValue: new Float32Array(width * height), // 0 a 1, ver systems/landvalue.js
+    pollution: new Float32Array(width * height), // 0 a 1
     // Incrementado a cada mudança visível no mapa (o renderizador usa como cache).
     mapVersion: 0,
   };
 
-  for (const b of state.buildings) indexBuilding(rt, b);
+  for (const b of state.buildings) indexBuilding(state, rt, b);
   for (const c of state.citizens) indexCitizen(rt, c);
   recomputeRoads(state, rt, { reroute: false });
   return rt;
@@ -32,12 +34,15 @@ export function buildRuntime(state) {
 // Prédios
 // ---------------------------------------------------------------------------
 
+/** Cria um prédio com o canto de cima (menor x e y) em `tile`. */
 export function addBuilding(state, rt, type, tile) {
   const building = { id: state.nextId++, type, tile, builtAt: state.time.tick };
   state.buildings.push(building);
-  if (state.map.terrain[tile] === TERRAIN.FOREST) state.map.terrain[tile] = TERRAIN.GRASS;
-  indexBuilding(rt, building);
-  rt.access.set(building.id, findAccessRoad(state, rt, tile));
+  for (const t of footprint(state, building)) {
+    if (state.map.terrain[t] === TERRAIN.FOREST) state.map.terrain[t] = TERRAIN.GRASS;
+  }
+  indexBuilding(state, rt, building);
+  rt.access.set(building.id, findAccessRoad(state, rt, tile, BUILDINGS[type].size));
   rt.mapVersion++;
   return building;
 }
@@ -55,22 +60,38 @@ export function removeBuilding(state, rt, id) {
 
   state.buildings.splice(state.buildings.indexOf(building), 1);
   rt.buildingById.delete(id);
-  rt.buildingAt[building.tile] = 0;
+  for (const t of footprint(state, building)) rt.buildingAt[t] = 0;
   rt.residents.delete(id);
   rt.workers.delete(id);
   rt.access.delete(id);
   rt.mapVersion++;
 }
 
-function indexBuilding(rt, b) {
+function indexBuilding(state, rt, b) {
   rt.buildingById.set(b.id, b);
-  rt.buildingAt[b.tile] = b.id;
+  for (const t of footprint(state, b)) rt.buildingAt[t] = b.id;
   rt.residents.set(b.id, new Set());
   rt.workers.set(b.id, new Set());
 }
 
 export function buildingInfo(b) {
   return BUILDINGS[b.type];
+}
+
+/** Tiles ocupados por um prédio (1 para 1x1, 4 para 2x2). */
+export function footprint(state, b) {
+  const size = BUILDINGS[b.type].size;
+  if (size === 1) return [b.tile];
+  const width = state.map.width;
+  const tiles = [];
+  for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) tiles.push(b.tile + dy * width + dx);
+  return tiles;
+}
+
+/** Tile da frente do prédio (maior x+y): é nele que o renderizador o desenha. */
+export function frontTile(state, b) {
+  const size = BUILDINGS[b.type].size;
+  return b.tile + (size - 1) * (state.map.width + 1);
 }
 
 export function vacancies(rt, b) {
@@ -181,7 +202,7 @@ export function recomputeRoads(state, rt, { reroute = true } = {}) {
     }
   }
 
-  for (const b of state.buildings) rt.access.set(b.id, findAccessRoad(state, rt, b.tile));
+  for (const b of state.buildings) rt.access.set(b.id, findAccessRoad(state, rt, b.tile, BUILDINGS[b.type].size));
   rt.pathCache.clear();
   rt.mapVersion++;
 
@@ -226,18 +247,32 @@ for (let dy = -ROAD_ACCESS_RADIUS; dy <= ROAD_ACCESS_RADIUS; dy++) {
 }
 ACCESS_OFFSETS.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]);
 
-/** Tile de estrada mais próximo (até ROAD_ACCESS_RADIUS), ou -1. */
-export function findAccessRoad(state, rt, tile) {
+/**
+ * Tile de estrada mais próximo (até ROAD_ACCESS_RADIUS) de qualquer tile de
+ * um terreno size x size com canto em `tile`, ou -1.
+ */
+export function findAccessRoad(state, rt, tile, size = 1) {
   const { width, height, road } = state.map;
-  const x = tile % width;
-  const y = (tile - x) / width;
-  for (const [dx, dy] of ACCESS_OFFSETS) {
-    const nx = x + dx;
-    const ny = y + dy;
-    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-    if (road[ny * width + nx]) return ny * width + nx;
+  const x0 = tile % width;
+  const y0 = (tile - x0) / width;
+  let best = -1;
+  let bestDist = Infinity;
+  for (let sy = 0; sy < size; sy++) {
+    for (let sx = 0; sx < size; sx++) {
+      for (const [dx, dy, d] of ACCESS_OFFSETS) {
+        if (d >= bestDist) break;
+        const nx = x0 + sx + dx;
+        const ny = y0 + sy + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (road[ny * width + nx]) {
+          best = ny * width + nx;
+          bestDist = d;
+          break;
+        }
+      }
+    }
   }
-  return -1;
+  return best;
 }
 
 export function tileCenter(state, tile) {

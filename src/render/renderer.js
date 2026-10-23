@@ -11,8 +11,9 @@
 import { BUILDINGS, TERRAIN, ZONE, ZONE_INFO } from '../world/catalog.js';
 import { hash2 } from '../core/rng.js';
 import { calendar } from '../core/time.js';
-import { TILE_H } from './iso.js';
+import { frontTile } from '../world/runtime.js';
 import { visibleRange, worldToScreen } from './camera.js';
+import { drawBuilding } from './buildings.js';
 
 const GRASS = ['#7db460', '#7ab15d', '#80b763'];
 const WATER = ['#3f7fc4', '#3b79bd'];
@@ -26,6 +27,14 @@ const ZONE_TINT = {
   [ZONE.INDUSTRIAL]: mix(GRASS[0], ZONE_INFO[ZONE.INDUSTRIAL].color, 0.45),
 };
 const MOVER_COLORS = { trabalho: '#ffd84d', casa: '#8fe0ff' };
+
+// Mapas (sobreposições): cor do chão conforme um valor de 0 a 1 do runtime.
+// O valor é arredondado em faixas para manter o agrupamento por cor.
+export const MAP_MODES = {
+  valor: { name: 'Valor do terreno', layer: 'landValue', from: '#c0392b', mid: '#f1c40f', to: '#27ae60' },
+  poluicao: { name: 'Poluição', layer: 'pollution', from: '#7db460', mid: '#c9a227', to: '#5b2a86' },
+};
+const MAP_STEPS = 10;
 
 export class Renderer {
   constructor(canvas) {
@@ -52,13 +61,18 @@ export class Renderer {
 
   /**
    * overlay: { hover: {x,y} | null, preview: { tiles, color } | null,
-   *            selected: { citizen } | { building } | null }
+   *            selected: { citizen } | { building } | null,
+   *            mapMode: chave de MAP_MODES | null }
    */
   render(state, rt, cam, overlay = {}) {
-    const key = `${cam.version}:${rt.mapVersion}:${this.canvas.width}x${this.canvas.height}`;
+    const mode = overlay.mapMode ? MAP_MODES[overlay.mapMode] : null;
+    const key = [
+      cam.version, rt.mapVersion, this.canvas.width, this.canvas.height,
+      overlay.mapMode, mode ? rt.landValueVersion : 0,
+    ].join(':');
     if (key !== this.staticKey) {
       this.staticKey = key;
-      this.#drawStatic(state, rt, cam);
+      this.#drawStatic(state, rt, cam, mode);
     }
 
     const ctx = this.ctx;
@@ -67,8 +81,10 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     if (overlay.preview) this.#drawTiles(ctx, state, cam, overlay.preview.tiles, overlay.preview.color);
-    if (overlay.selected?.building) {
-      this.#outlineTile(ctx, state, cam, overlay.selected.building.tile, '#ffffff', 2);
+    const selectedBuilding = overlay.selected?.building;
+    if (selectedBuilding) {
+      const size = BUILDINGS[selectedBuilding.type].size;
+      this.#outlineTile(ctx, state, cam, selectedBuilding.tile, '#ffffff', 2, size);
     }
     this.#drawMovers(ctx, state, rt, cam, overlay.selected?.citizen);
     if (overlay.hover) {
@@ -79,7 +95,7 @@ export class Renderer {
 
   // -------------------------------------------------------------------------
 
-  #drawStatic(state, rt, cam) {
+  #drawStatic(state, rt, cam, mode) {
     const ctx = this.staticCtx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#1b2a3a';
@@ -99,6 +115,7 @@ export class Renderer {
         const tile = y * width + x;
         let color;
         if (road[tile]) color = ROAD;
+        else if (mode && terrain[tile] !== TERRAIN.WATER) color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
         else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]];
         else if (terrain[tile] === TERRAIN.WATER) color = WATER[hash2(x, y) < 0.5 ? 0 : 1];
         else if (terrain[tile] === TERRAIN.SAND) color = SAND;
@@ -131,7 +148,10 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    // Objetos com altura, de trás para frente (soma x+y crescente).
+    // Objetos com altura, de trás para frente (soma x+y crescente). Prédios
+    // grandes são desenhados quando o laço chega no tile da frente deles.
+    // Nos mapas, ficam translúcidos para o mapa aparecer por baixo.
+    ctx.globalAlpha = mode ? 0.3 : 1;
     for (let d = range.x0 + range.y0; d <= range.x1 + range.y1; d++) {
       const xStart = Math.max(range.x0, d - range.y1);
       const xEnd = Math.min(range.x1, d - range.y0);
@@ -139,10 +159,15 @@ export class Renderer {
         const y = d - x;
         const tile = y * width + x;
         const id = rt.buildingAt[tile];
-        if (id) drawBuilding(ctx, cam, x, y, rt.buildingById.get(id));
-        else if (terrain[tile] === TERRAIN.FOREST && z >= 0.3) drawTree(ctx, cam, x, y);
+        if (id) {
+          const b = rt.buildingById.get(id);
+          if (tile === frontTile(state, b)) drawBuilding(ctx, cam, b.tile % width, Math.floor(b.tile / width), b);
+        } else if (terrain[tile] === TERRAIN.FOREST && z >= 0.3 && !mode) {
+          drawTree(ctx, cam, x, y);
+        }
       }
     }
+    ctx.globalAlpha = 1;
   }
 
   #drawTiles(ctx, state, cam, tiles, color) {
@@ -153,9 +178,9 @@ export class Renderer {
     ctx.fill(path);
   }
 
-  #outlineTile(ctx, state, cam, tile, color, lineWidth) {
+  #outlineTile(ctx, state, cam, tile, color, lineWidth, size = 1) {
     const path = new Path2D();
-    diamond(path, cam, tile % state.map.width, Math.floor(tile / state.map.width), 0);
+    diamond(path, cam, tile % state.map.width, Math.floor(tile / state.map.width), 0, size);
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.stroke(path);
@@ -201,11 +226,11 @@ export class Renderer {
 
 // ---------------------------------------------------------------------------
 
-function diamond(path, cam, x, y, inset) {
+function diamond(path, cam, x, y, inset, size = 1) {
   const [tx, ty] = worldToScreen(cam, x + inset, y + inset);
-  const [rx, ry] = worldToScreen(cam, x + 1 - inset, y + inset);
-  const [bx, by] = worldToScreen(cam, x + 1 - inset, y + 1 - inset);
-  const [lx, ly] = worldToScreen(cam, x + inset, y + 1 - inset);
+  const [rx, ry] = worldToScreen(cam, x + size - inset, y + inset);
+  const [bx, by] = worldToScreen(cam, x + size - inset, y + size - inset);
+  const [lx, ly] = worldToScreen(cam, x + inset, y + size - inset);
   path.moveTo(tx, ty);
   path.lineTo(rx, ry);
   path.lineTo(bx, by);
@@ -228,48 +253,6 @@ function addRoadMarkings(path, state, cam, x, y) {
   }
 }
 
-function drawBuilding(ctx, cam, x, y, building) {
-  const info = BUILDINGS[building.type];
-  const inset = 0.12;
-  const [tx, ty] = worldToScreen(cam, x + inset, y + inset);
-  const [rx, ry] = worldToScreen(cam, x + 1 - inset, y + inset);
-  const [bx, by] = worldToScreen(cam, x + 1 - inset, y + 1 - inset);
-  const [lx, ly] = worldToScreen(cam, x + inset, y + 1 - inset);
-  // Pequena variação de altura por prédio, para a cidade não ficar uniforme.
-  const h = info.height * TILE_H * cam.zoom * (0.85 + hash2(building.id, 7) * 0.3);
-  const { colors } = info;
-
-  face(ctx, colors.left, [lx, ly], [bx, by], [bx, by - h], [lx, ly - h]);
-  face(ctx, colors.right, [bx, by], [rx, ry], [rx, ry - h], [bx, by - h]);
-
-  if (colors.roof) {
-    // Telhado de quatro águas: pirâmide sobre o bloco.
-    const [px, py] = worldToScreen(cam, x + 0.5, y + 0.5);
-    const peak = [px, py - h - TILE_H * 0.45 * cam.zoom];
-    face(ctx, shade(colors.roof, 0.85), [lx, ly - h], [bx, by - h], peak);
-    face(ctx, shade(colors.roof, 0.7), [bx, by - h], [rx, ry - h], peak);
-  } else {
-    face(ctx, colors.top, [tx, ty - h], [rx, ry - h], [bx, by - h], [lx, ly - h]);
-    if (cam.zoom >= 0.6) windows(ctx, cam, [lx, ly], [bx, by], [rx, ry], h);
-  }
-}
-
-function windows(ctx, cam, left, bottom, right, h) {
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-  const rows = Math.max(1, Math.floor(h / (10 * cam.zoom)));
-  for (let r = 0; r < rows; r++) {
-    const t = (r + 0.35) / rows;
-    for (const [a, b] of [[left, bottom], [bottom, right]]) {
-      for (let k = 0; k < 3; k++) {
-        const u = (k + 0.3) / 3;
-        const wx = a[0] + (b[0] - a[0]) * u;
-        const wy = a[1] + (b[1] - a[1]) * u - h * t;
-        ctx.fillRect(wx, wy - 2 * cam.zoom, 5 * cam.zoom, 3 * cam.zoom);
-      }
-    }
-  }
-}
-
 function drawTree(ctx, cam, x, y) {
   const r = hash2(x, y, 3);
   const [cx, cy] = worldToScreen(cam, x + 0.3 + r * 0.4, y + 0.3 + hash2(x, y, 4) * 0.4);
@@ -286,24 +269,18 @@ function drawTree(ctx, cam, x, y) {
   ctx.fill();
 }
 
-function face(ctx, color, ...points) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(points[0][0], points[0][1]);
-  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function shade(hex, factor) {
-  const n = parseInt(hex.slice(1), 16);
-  const ch = (s) => Math.round(((n >> s) & 255) * factor);
-  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
-}
-
 function mix(a, b, t) {
   const pa = parseInt(a.slice(1), 16);
   const pb = parseInt(b.slice(1), 16);
   const ch = (s) => Math.round(((pa >> s) & 255) * (1 - t) + ((pb >> s) & 255) * t);
   return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
 }
+
+function gradient(from, mid, to, steps) {
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps;
+    return t < 0.5 ? mix(from, mid, t * 2) : mix(mid, to, (t - 0.5) * 2);
+  });
+}
+
+for (const mode of Object.values(MAP_MODES)) mode.colors = gradient(mode.from, mode.mid, mode.to, MAP_STEPS);

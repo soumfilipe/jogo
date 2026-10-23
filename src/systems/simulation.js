@@ -1,11 +1,12 @@
 // Um tick da simulação (1 minuto de jogo). A ordem dos sistemas é fixa para
 // que a mesma semente sempre produza a mesma cidade.
 
-import { TICKS_PER_MONTH } from '../core/time.js';
+import { TICKS_PER_DAY, TICKS_PER_MONTH } from '../core/time.js';
 import { buildRuntime } from '../world/runtime.js';
 import { updateCitizens, assignJobs } from '../agents/citizens.js';
 import { computeDemand } from './demand.js';
-import { growBuildings, moveIn } from './growth.js';
+import { growBuildings, moveIn, upgradeBuildings } from './growth.js';
+import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
 
 export function tick(state, rt) {
@@ -16,6 +17,15 @@ export function tick(state, rt) {
 
   if (t % 60 === 0) {
     computeDemand(state, rt);
+    // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
+    // assim o resultado não depende de quando o save foi carregado.
+    computeLandValue(state, rt);
+    rt.landValueVersion = (rt.landValueVersion || 0) + 1;
+    // Uma vez por dia, prédios lotados têm prioridade sobre lotes novos.
+    if (t % TICKS_PER_DAY === 0) {
+      upgradeBuildings(state, rt);
+      computeDemand(state, rt);
+    }
     growBuildings(state, rt);
     moveIn(state, rt);
     assignJobs(state, rt);
@@ -34,5 +44,6 @@ export function advance(state, rt, ticks) {
 export function prepare(state) {
   const rt = buildRuntime(state);
   computeDemand(state, rt);
+  computeLandValue(state, rt); // para os mapas e o painel; a simulação recalcula antes de usar
   return rt;
 }

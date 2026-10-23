@@ -79,7 +79,7 @@ export class Minimap {
     for (let i = 0; i < width * height; i++) {
       let rgb = TERRAIN_RGB[terrain[i]];
       if (road[i]) rgb = ROAD_RGB;
-      else if (rt.buildingAt[i]) rgb = hexToRgb(BUILDINGS[rt.buildingById.get(rt.buildingAt[i]).type].colors.left);
+      else if (rt.buildingAt[i]) rgb = hexToRgb(BUILDINGS[rt.buildingById.get(rt.buildingAt[i]).type].style.palettes[0].left);
       else if (zone[i]) rgb = hexToRgb(ZONE_INFO[zone[i]].color).map((v, k) => (v + TERRAIN_RGB[0][k]) / 2);
       px[i * 4] = rgb[0];
       px[i * 4 + 1] = rgb[1];

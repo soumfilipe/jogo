@@ -28,16 +28,39 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `R` / `C` / `I` Zonas | arraste um retângulo de zona residencial, comercial ou industrial ($5 por tile) |
 | `B` Demolir | arraste sobre prédios, estradas, árvores ou zonas |
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
+| `L` / `P` Mapas | mostra o valor do terreno ou a poluição sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
 | Minimapa | clique ou arraste para ir até um ponto |
 
 Prédios surgem sozinhos nas zonas que ficam a até 2 tiles de uma estrada, conforme
-a demanda (as três barrinhas RCI no topo). Cada morador é um **cidadão individual**:
+a demanda (as três barrinhas RCI no topo), e **sobem de nível** com o tempo. Cada morador é um **cidadão individual**:
 tem nome, idade, casa e emprego, sai de casa de manhã, vai pelas estradas até o
 trabalho e volta no fim da tarde. Com "Inspecionar" dá para clicar em alguém
 andando e seguir com a câmera.
+
+## Prédios e níveis
+
+| Nível | Residencial | Comercial | Industrial |
+| --- | --- | --- | --- |
+| 1 | Casa (4 moradores) | Loja (5 vagas) | Fábrica (10 vagas) |
+| 2 | Sobrado (8) | Mercado (12) | Indústria (18) |
+| 3 | Prédio de apartamentos (16) | Escritórios (30) | Complexo industrial (30) |
+| Grande 2×2 | Condomínio (48) | Shopping (80) | Galpão logístico (70) |
+
+- Um prédio 1×1 sobe um nível quando está **lotado**, o **valor do terreno** é
+  suficiente (residencial 45% / 62%, comercial 45% / 60%; indústria não exige) e
+  a demanda da zona não está negativa. Entre um nível e outro passam pelo menos
+  3 dias. Os moradores e funcionários continuam no prédio.
+- Prédios grandes nascem em lotes vazios 2×2 da mesma zona, com valor do terreno
+  de nível 2, depois que a cidade passa de 300 habitantes.
+- O **valor do terreno** sobe com água e floresta por perto, comércio e movimento,
+  e cai com a **poluição** das indústrias. É recalculado a cada hora de jogo.
+- O painel "Inspecionar" mostra o nível, o valor do terreno, a poluição e o que
+  falta para o prédio subir.
+- Tipos, capacidades, exigências e aparência ficam em `src/world/catalog.js`; o
+  desenho de cada estilo em `src/render/buildings.js`.
 
 ## Como a simulação funciona
 
@@ -51,8 +74,9 @@ andando e seguir com a câmera.
   ficam no `runtime` e são reconstruídos ao carregar (`src/world/runtime.js`).
 - **Ações do jogador** passam por `src/world/commands.js`, que valida e cobra.
 - **Sistemas** rodam em ordem fixa a cada tick (`src/systems/simulation.js`):
-  cidadãos (saídas, rotas, movimento) a cada minuto; demanda, crescimento,
-  imigração e contratação a cada hora; impostos e manutenção a cada mês.
+  cidadãos (saídas, rotas, movimento) a cada minuto; demanda, valor do terreno,
+  crescimento, imigração e contratação a cada hora; subida de nível uma vez por
+  dia; impostos e manutenção a cada mês.
 - **Rotas**: A* sobre as estradas, com cache e no máximo 100 cálculos por tick
   (o resto espera na fila, em estado "Saindo…").
 
@@ -125,8 +149,10 @@ src/core/               relógio/laço, tempo do jogo, RNG com semente
 src/world/              estado (world.js), catálogo de prédios, terreno,
                         índices derivados (runtime.js), ações do jogador
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes
-src/systems/            demanda, crescimento, economia, ordem dos sistemas
-src/render/             projeção isométrica, câmera, renderizador, minimapa
+src/systems/            demanda, valor do terreno, crescimento e níveis,
+                        economia, ordem dos sistemas
+src/render/             projeção isométrica, câmera, renderizador, desenho
+                        dos prédios, minimapa
 src/ui/                 painel de inspeção
 src/save/format.js      formato do save: criar, validar, checksum, migrações, RLE
 src/save/backends.js    onde gravar: arquivos (servidor) ou navegador
