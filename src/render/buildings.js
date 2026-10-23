@@ -67,16 +67,14 @@ export function drawBuilding(ctx, cam, x, y, b) {
 }
 
 /**
- * Contorno do prédio (sem chaminés): na camada de luzes ele é "recortado"
- * antes das janelas, para esconder as luzes dos prédios que ficam atrás.
+ * Adiciona ao `path` o contorno do prédio (sem chaminés). As camadas de luzes
+ * e de cidadãos "recortam" esse contorno para esconder o que fica atrás.
  */
-export function silhouette(ctx, g) {
+export function addSilhouette(path, g) {
   const { L, B, R, top } = g.faces;
-  ctx.beginPath();
-  ctx.moveTo(L[0], L[1]);
-  for (const p of [B, R, top.R, g.peak || top.T, top.L]) ctx.lineTo(p[0], p[1]);
-  ctx.closePath();
-  ctx.fill();
+  path.moveTo(L[0], L[1]);
+  for (const p of [B, R, top.R, g.peak || top.T, top.L]) path.lineTo(p[0], p[1]);
+  path.closePath();
 }
 
 export function windowSize(z) {

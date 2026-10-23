@@ -13,7 +13,8 @@ import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
 import { visibleRange, worldToScreen } from './camera.js';
-import { buildingGeometry, drawBuilding, silhouette, windowSize } from './buildings.js';
+import { addSilhouette, buildingGeometry, drawBuilding, windowSize } from './buildings.js';
+import { addCar, carColor, moverPose } from './movers.js';
 import { LIGHT_COLORS, darkness, isWindowLit } from './lights.js';
 
 // As luzes são redesenhadas a cada tantos minutos de jogo (e quando a câmera
@@ -33,8 +34,6 @@ const ZONE_TINT = {
   [ZONE.COMMERCIAL]: mix(GRASS[0], ZONE_INFO[ZONE.COMMERCIAL].color, 0.45),
   [ZONE.INDUSTRIAL]: mix(GRASS[0], ZONE_INFO[ZONE.INDUSTRIAL].color, 0.45),
 };
-const MOVER_COLORS = { trabalho: '#ffd84d', casa: '#8fe0ff' };
-
 // Mapas (sobreposições): cor do chão conforme um valor de 0 a 1 do runtime.
 // O valor é arredondado em faixas para manter o agrupamento por cor.
 export const MAP_MODES = {
@@ -54,6 +53,12 @@ export class Renderer {
     this.lightsCanvas = document.createElement('canvas');
     this.lightsCtx = this.lightsCanvas.getContext('2d');
     this.lightsKey = '';
+    // Camada dos cidadãos andando, refeita a cada quadro.
+    this.moversCanvas = document.createElement('canvas');
+    this.moversCtx = this.moversCanvas.getContext('2d');
+    // Contornos dos prédios visíveis, agrupados pela diagonal (x+y) do tile da
+    // frente. Montados junto com a camada estática.
+    this.occluders = new Map();
     this.dpr = 1;
   }
 
@@ -61,7 +66,7 @@ export class Renderer {
     this.dpr = window.devicePixelRatio || 1;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
-    for (const c of [this.canvas, this.staticCanvas, this.lightsCanvas]) {
+    for (const c of [this.canvas, this.staticCanvas, this.lightsCanvas, this.moversCanvas]) {
       c.width = Math.round(w * this.dpr);
       c.height = Math.round(h * this.dpr);
     }
@@ -120,7 +125,7 @@ export class Renderer {
       const size = BUILDINGS[selectedBuilding.type].size;
       this.#outlineTile(ctx, state, cam, selectedBuilding.tile, '#ffffff', 2, size);
     }
-    this.#drawMovers(ctx, state, rt, cam, overlay.selected?.citizen);
+    this.#drawMovers(ctx, state, rt, cam, overlay.selected?.citizen, !mode);
     if (overlay.hover) {
       this.#outlineTile(ctx, state, cam, overlay.hover.y * state.map.width + overlay.hover.x, 'rgba(255,255,255,0.8)', 1.5);
     }
@@ -149,9 +154,11 @@ export class Renderer {
         if (tile !== frontTile(state, b)) continue;
 
         const g = buildingGeometry(cam, b.tile % width, Math.floor(b.tile / width), b);
+        const outline = new Path2D();
+        addSilhouette(outline, g);
         ctx.globalCompositeOperation = 'destination-out';
         ctx.fillStyle = '#000';
-        silhouette(ctx, g);
+        ctx.fill(outline);
         ctx.globalCompositeOperation = 'source-over';
         if (g.windows.length === 0) continue;
 
@@ -185,6 +192,7 @@ export class Renderer {
     const { width, terrain, road, zone } = state.map;
     const range = visibleRange(cam);
     const paths = new Map();
+    this.occluders.clear();
     const roadLines = new Path2D();
     const z = cam.zoom;
     // Pequena sobreposição evita frestas entre losangos vizinhos.
@@ -241,7 +249,14 @@ export class Renderer {
         const id = rt.buildingAt[tile];
         if (id) {
           const b = rt.buildingById.get(id);
-          if (tile === frontTile(state, b)) drawBuilding(ctx, cam, b.tile % width, Math.floor(b.tile / width), b);
+          if (tile === frontTile(state, b)) {
+            const bx = b.tile % width;
+            const by = Math.floor(b.tile / width);
+            drawBuilding(ctx, cam, bx, by, b);
+            let outline = this.occluders.get(d);
+            if (!outline) this.occluders.set(d, (outline = new Path2D()));
+            addSilhouette(outline, buildingGeometry(cam, bx, by, b));
+          }
         } else if (terrain[tile] === TERRAIN.FOREST && z >= 0.3 && !mode) {
           drawTree(ctx, cam, x, y);
         }
@@ -266,30 +281,69 @@ export class Renderer {
     ctx.stroke(path);
   }
 
-  #drawMovers(ctx, state, rt, cam, selected) {
-    const size = Math.max(2, 5 * cam.zoom);
-    const lift = 4 * cam.zoom;
-    const batches = { trabalho: new Path2D(), casa: new Path2D() };
+  // Cidadãos andando, como carrinhos coloridos na mão direita da rua. São
+  // desenhados de trás para frente numa camada própria: ao passar por cada
+  // diagonal do mapa, os prédios dela recortam os carros já desenhados atrás
+  // deles. Assim um carro atrás de um prédio fica escondido.
+  #drawMovers(ctx, state, rt, cam, selected, occlude) {
+    const byDepth = new Map();
+    const margin = 20;
     for (const id of rt.movers) {
       const c = rt.citizenById.get(id);
-      const [sx, sy] = worldToScreen(cam, c.x, c.y);
-      if (sx < -10 || sy < -10 || sx > cam.viewW + 10 || sy > cam.viewH + 10) continue;
-      batches[c.dest].rect(sx - size / 2, sy - size / 2 - lift, size, size);
-    }
-    for (const [dest, path] of Object.entries(batches)) {
-      ctx.fillStyle = MOVER_COLORS[dest];
-      ctx.fill(path);
+      const pose = moverPose(state, c);
+      if (!pose) continue;
+      const [sx, sy] = worldToScreen(cam, pose.x, pose.y);
+      if (sx < -margin || sy < -margin || sx > cam.viewW + margin || sy > cam.viewH + margin) continue;
+      let cars = byDepth.get(pose.depth);
+      if (!cars) byDepth.set(pose.depth, (cars = new Map()));
+      const color = carColor(c);
+      let path = cars.get(color);
+      if (!path) cars.set(color, (path = new Path2D()));
+      addCar(path, cam, pose);
     }
 
-    if (selected && rt.citizenById.has(selected.id)) {
-      const [sx, sy] = worldToScreen(cam, selected.x, selected.y);
+    if (byDepth.size > 0) {
+      const mctx = this.moversCtx;
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      mctx.clearRect(0, 0, this.moversCanvas.width, this.moversCanvas.height);
+      mctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      mctx.fillStyle = '#000';
+
+      const depths = new Set(byDepth.keys());
+      if (occlude) for (const d of this.occluders.keys()) depths.add(d);
+      const firstCar = Math.min(...byDepth.keys());
+      for (const d of [...depths].sort((a, b) => a - b)) {
+        if (occlude && d > firstCar && this.occluders.has(d)) {
+          mctx.globalCompositeOperation = 'destination-out';
+          mctx.fill(this.occluders.get(d));
+          mctx.globalCompositeOperation = 'source-over';
+        }
+        const cars = byDepth.get(d);
+        if (!cars) continue;
+        for (const [color, path] of cars) {
+          mctx.fillStyle = color;
+          mctx.fill(path);
+        }
+      }
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(this.moversCanvas, 0, 0);
+      ctx.restore();
+    }
+
+    const pose = selected && rt.citizenById.has(selected.id) && selected.state === 'viajando'
+      ? moverPose(state, selected)
+      : null;
+    if (pose) {
+      const [sx, sy] = worldToScreen(cam, pose.x, pose.y);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(sx, sy - lift, size + 6, 0, Math.PI * 2);
+      ctx.arc(sx, sy - 2 * cam.zoom, Math.max(8, 14 * cam.zoom), 0, Math.PI * 2);
       ctx.stroke();
     }
   }
+
 }
 
 // ---------------------------------------------------------------------------

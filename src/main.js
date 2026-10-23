@@ -5,6 +5,7 @@ import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
 import { MAP_MODES, Renderer } from './render/renderer.js';
+import { moverPose } from './render/movers.js';
 import { Minimap } from './render/minimap.js';
 import {
   centerOn, createCamera, panBy, screenToTile, worldToScreen, zoomAt,
@@ -279,8 +280,10 @@ function pick(sx, sy) {
   let bestDist = 12;
   for (const id of rt.movers) {
     const c = rt.citizenById.get(id);
-    const [cx, cy] = worldToScreen(cam, c.x, c.y);
-    const d = Math.hypot(cx - sx, cy - 4 * cam.zoom - sy);
+    const pose = moverPose(state, c);
+    if (!pose) continue;
+    const [cx, cy] = worldToScreen(cam, pose.x, pose.y);
+    const d = Math.hypot(cx - sx, cy - 2 * cam.zoom - sy);
     if (d < bestDist) {
       best = c;
       bestDist = d;
