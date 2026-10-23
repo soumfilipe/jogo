@@ -3,6 +3,7 @@
 
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { canWork } from '../agents/citizens.js';
+import { taxDemandShift } from './economy.js';
 
 export function computeDemand(state, rt) {
   let housing = 0;
@@ -28,16 +29,17 @@ export function computeDemand(state, rt) {
   const workforce = employed + unemployed;
   const openJobs = commercialJobs + industrialJobs + otherJobs - employed;
 
-  // Quanta gente quer vir morar aqui: vagas sobrando atraem, desemprego afasta.
-  // A constante garante que uma cidade vazia comece a crescer.
-  const attraction = openJobs - unemployed + 12;
+  // Quanta gente quer vir morar aqui: vagas sobrando atraem, desemprego afasta,
+  // imposto residencial alto afasta. A constante faz uma cidade vazia crescer.
+  const attraction = openJobs - unemployed + 12 + taxDemandShift(state, 'residential');
 
   rt.demand = {
     attraction,
     residential: attraction - (housing - population),
-    // Empregos acompanham a força de trabalho, com folga para atrair gente nova.
-    commercial: Math.round(workforce * 0.4) - commercialJobs + 5,
-    industrial: Math.round(workforce * 0.6) - industrialJobs + 10,
+    // Empregos acompanham a força de trabalho, com folga para atrair gente nova;
+    // imposto alto na zona espanta empresas, baixo atrai.
+    commercial: Math.round(workforce * 0.4) - commercialJobs + 5 + taxDemandShift(state, 'commercial'),
+    industrial: Math.round(workforce * 0.6) - industrialJobs + 10 + taxDemandShift(state, 'industrial'),
   };
   rt.stats = { population, housing, employed, unemployed, jobs: commercialJobs + industrialJobs + otherJobs };
   return rt.demand;

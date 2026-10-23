@@ -29,6 +29,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `B` Demolir | arraste sobre prédios, estradas, árvores ou zonas |
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
 | Carvão / Solar / Bomba / Poço | coloca um serviço público (um clique; precisa encostar numa rua) |
+| `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `L` / `P` / `N` / `H` Mapas | valor do terreno, poluição, energia ou água sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
@@ -40,6 +41,23 @@ a demanda (as três barrinhas RCI no topo), e **sobem de nível** com o tempo. C
 tem nome, idade, casa e emprego, sai de casa de manhã, vai pelas estradas até o
 trabalho e volta no fim da tarde. Com "Inspecionar" dá para clicar em alguém
 andando e seguir com a câmera.
+
+## Orçamento
+
+Painel aberto pela tecla `O` ou clicando no dinheiro no topo
+(`src/ui/budget.js`; regras em `src/systems/economy.js` e `ECONOMY` no catálogo).
+
+- **Impostos por zona**, de 0% a 20% (padrão 9%). Cada ponto acima do padrão tira
+  demanda da zona (residencial também afasta moradores novos); abaixo, soma.
+- **Receitas** a cada ponto de imposto: $1,20 por morador empregado
+  (residencial) e $0,60 por vaga ocupada (comercial e industrial).
+- **Despesas**: manutenção das ruas ($2 por tile por mês), dos serviços
+  públicos e parcelas de empréstimos.
+- **Empréstimos** de $25 mil, $50 mil ou $100 mil, com juros de 10% ao ano em 24
+  parcelas fixas; até 3 ao mesmo tempo, e dá para quitar antes.
+- O painel mostra a previsão do mês e um gráfico de receita e despesa dos últimos
+  24 meses (com dica ao passar o mouse e a mesma informação em tabela); o
+  histórico de 36 meses fica no save.
 
 ## Energia e água
 
@@ -189,8 +207,8 @@ trabalho, ainda dentro do lote, não aparece.
 - **Sistemas** rodam em ordem fixa a cada tick (`src/systems/simulation.js`):
   cidadãos (saídas, rotas, movimento) a cada minuto; demanda, valor do terreno,
   energia e água, crescimento, imigração e contratação a cada hora; efeitos da
-  falta de energia/água e subida de nível uma vez por dia; impostos e
-  manutenção a cada mês.
+  falta de energia/água e subida de nível uma vez por dia; orçamento
+  (impostos, manutenção, parcelas) a cada mês.
 - **Rotas**: A* sobre as estradas, com cache e no máximo 100 cálculos por tick
   (o resto espera na fila, em estado "Saindo…").
 
@@ -226,13 +244,13 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 3,                 // versão do formato (migrações em src/save/format.js)
+  "version": 4,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
     "name": "Vila Nova",
     "autosave": false,
-    "gameVersion": "0.4.0",
+    "gameVersion": "0.5.0",
     "createdAt": "…", "updatedAt": "…",
     "playTimeSeconds": 120,
     "summary": { "population": 985, "buildings": 342, "money": 38635,
@@ -267,7 +285,7 @@ src/systems/            demanda, valor do terreno, energia e água, crescimento 
                         economia, ordem dos sistemas
 src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa
-src/ui/                 painel de inspeção
+src/ui/                 painel de inspeção e painel de orçamento
 src/save/format.js      formato do save: criar, validar, checksum, migrações, RLE
 src/save/backends.js    onde gravar: arquivos (servidor) ou navegador
 src/save/SaveManager.js salvar, carregar, automático, exportar/importar

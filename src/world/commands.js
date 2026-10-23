@@ -8,10 +8,14 @@
 //   { type: 'zone',     tiles, zone }       (zone = ZONE.NONE remove a zona)
 //   { type: 'bulldoze', tiles }
 //   { type: 'place', building, tile }    (serviço público; tile = canto de cima)
+//   { type: 'tax', zone, percent }       (zone: residential | commercial | industrial)
+//   { type: 'loan', amount }             (um dos valores de ECONOMY.loanOptions)
+//   { type: 'repay', id }                (quita o empréstimo de uma vez)
 
 import { BUILDINGS, COSTS, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, recomputeRoads, removeBuilding } from './runtime.js';
 import { isBuildable } from './world.js';
+import { repayLoan, setTax, takeLoan } from '../systems/economy.js';
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
@@ -49,6 +53,11 @@ export function planCommand(state, rt, cmd) {
 }
 
 export function applyCommand(state, rt, cmd) {
+  // Ações do orçamento (não mexem no mapa).
+  if (cmd.type === 'tax') return setTax(state, cmd.zone, cmd.percent);
+  if (cmd.type === 'loan') return takeLoan(state, cmd.amount);
+  if (cmd.type === 'repay') return repayLoan(state, cmd.id);
+
   const { tiles, cost, reason } = planCommand(state, rt, cmd);
   if (reason) return { ok: false, cost, count: 0, reason };
   if (tiles.length === 0) return { ok: false, cost: 0, count: 0, reason: 'Nada a fazer aqui.' };

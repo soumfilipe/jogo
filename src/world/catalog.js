@@ -151,9 +151,29 @@ export const COSTS = {
 
 export const ECONOMY = {
   startMoney: 50_000,
-  taxRate: 0.09,
-  roadUpkeepPerMonth: 0.5,
+  roadUpkeepPerMonth: 2,
+  // Impostos por zona, em % (inteiros). O padrão é neutro para a demanda.
+  taxDefault: 9,
+  taxMin: 0,
+  taxMax: 20,
+  // Arrecadação por mês a cada 1% de imposto: por morador empregado
+  // (residencial) e por vaga ocupada (comercial e industrial).
+  incomePerWorker: 1.2,
+  incomePerJob: 0.6,
+  // Cada ponto percentual acima do padrão tira esta demanda da zona (e
+  // abaixo do padrão, soma).
+  taxDemandEffect: { residential: 4, commercial: 3, industrial: 3 },
+  // Empréstimos: valores oferecidos, juros ao ano, número de parcelas mensais
+  // e quantos podem estar abertos ao mesmo tempo.
+  loanOptions: [25_000, 50_000, 100_000],
+  loanAnnualRate: 0.1,
+  loanMonths: 24,
+  maxLoans: 3,
+  // Meses guardados no histórico do orçamento.
+  historyMonths: 36,
 };
+
+export const TAX_ZONES = ['residential', 'commercial', 'industrial'];
 
 // Um prédio só cresce se houver estrada a até esta distância (em tiles).
 export const ROAD_ACCESS_RADIUS = 2;
