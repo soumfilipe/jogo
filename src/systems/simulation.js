@@ -10,12 +10,14 @@ import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
 import { applyUtilityEffects, computeUtilities } from './utilities.js';
 import { convertLegacyJobs, openCompanies, reviewCompanies } from './companies.js';
+import { growForests } from './forest.js';
 
 export function tick(state, rt) {
   state.time.tick++;
   const t = state.time.tick;
 
   updateCitizens(state, rt);
+  growForests(state, rt);
 
   if (t % 60 === 0) {
     computeDemand(state, rt);

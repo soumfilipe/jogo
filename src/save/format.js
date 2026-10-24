@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  7,                 // versão do FORMATO (para migrações)
+//   "version":  8,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -14,9 +14,10 @@
 
 import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
+import { generateForest } from '../world/terrain.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 export const GAME_VERSION = '0.8.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -100,23 +101,32 @@ const MIGRATIONS = {
     save.version = 5;
     return save;
   },
-  // v5 -> v6: densidade das zonas. Tudo o que já estava zoneado vira densidade
-  // média, que é como as zonas se comportavam antes.
+  // v5 -> v6: florestas crescem. A densidade da mata, antes só visual
+  // (derivada da semente), vira uma camada do mapa salva no estado.
   5: (save) => {
-    const { width, height } = save.data.map;
-    // 1 = DENSITY.MEDIUM (este módulo não depende do catálogo).
-    save.data.map.density = { $typed: 'Uint8Array', length: width * height, rle: [width * height, 1] };
+    const map = save.data.map;
+    const terrain = decodeState(map.terrain);
+    map.forest = encodeState(generateForest(terrain, map.width, map.height, save.data.seed));
     save.version = 6;
     return save;
   },
-  // v6 -> v7: empresas. O save ganha a lista (vazia) e a marca legacyJobs: ao
+  // v6 -> v7: densidade das zonas. Tudo o que já estava zoneado vira densidade
+  // média, que é como as zonas se comportavam antes.
+  6: (save) => {
+    const { width, height } = save.data.map;
+    // 1 = DENSITY.MEDIUM (este módulo não depende do catálogo).
+    save.data.map.density = { $typed: 'Uint8Array', length: width * height, rle: [width * height, 1] };
+    save.version = 7;
+    return save;
+  },
+  // v7 -> v8: empresas. O save ganha a lista (vazia) e a marca legacyJobs: ao
   // carregar, a simulação cria empresas em todos os andares dos prédios
   // comerciais e industriais e põe quem já trabalhava lá nelas (ver
   // convertLegacyJobs em systems/companies.js). A cidade continua igual.
-  6: (save) => {
+  7: (save) => {
     save.data.companies = encodeTable([]);
     save.data.legacyJobs = true;
-    save.version = 7;
+    save.version = 8;
     return save;
   },
 };

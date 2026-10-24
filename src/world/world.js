@@ -3,7 +3,7 @@
 
 import { createRng } from '../core/rng.js';
 import { DENSITY, ECONOMY, TERRAIN } from './catalog.js';
-import { generateTerrain } from './terrain.js';
+import { generateForest, generateTerrain } from './terrain.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -13,6 +13,7 @@ export function createWorld({
   height = DEFAULT_MAP_SIZE,
   seed = (Math.random() * 2 ** 32) >>> 0,
 } = {}) {
+  const terrain = generateTerrain(width, height, seed);
   return {
     city: { name },
     seed,
@@ -31,7 +32,8 @@ export function createWorld({
     map: {
       width,
       height,
-      terrain: generateTerrain(width, height, seed),
+      terrain,
+      forest: generateForest(terrain, width, height, seed), // densidade da mata (0 = sem)
       zone: new Uint8Array(width * height),
       // Densidade de cada tile zoneado (DENSITY no catálogo).
       density: new Uint8Array(width * height).fill(DENSITY.MEDIUM),

@@ -67,13 +67,13 @@ test('prédio novo nasce alugado: empresas cobrem os andares e dão as vagas', (
 test('contratação: cada funcionário entra numa empresa, com o turno do setor dela', () => {
   const { state, rt, b, home } = staffed('loja');
   const [co] = rt.companiesIn.get(b.id);
-  co.sector = 'bar'; // bar: só tarde e noite
+  co.sector = 'advocacia'; // advocacia: só turno diurno
   for (let i = 0; i < companyJobs(rt, co) + 2; i++) hire(state, rt, createCitizen(state, rt, home), b);
   const workers = [...rt.workers.get(b.id)].map((id) => rt.citizenById.get(id));
   assert.equal(workers.length, companyJobs(rt, co), 'não contrata além das vagas');
   for (const c of workers) {
     assert.equal(c.company, co.id);
-    assert.ok(['tarde', 'noturno'].includes(c.shift), c.shift);
+    assert.equal(c.shift, 'diurno');
   }
   assert.equal(openJobs(rt, b), 0);
 });
@@ -153,15 +153,15 @@ test('save com empresas; save antigo ganha empresas e ninguém perde o emprego',
   assert.deepEqual(loaded.companies, state.companies);
   assert.deepEqual(loaded.citizens, state.citizens);
 
-  // Save do formato 6: sem empresas, e cidadãos sem o campo company.
-  const v6 = JSON.parse(JSON.stringify(save));
-  delete v6.data.companies;
+  // Save do formato 7: sem empresas, e cidadãos sem o campo company.
+  const v7 = JSON.parse(JSON.stringify(save));
+  delete v7.data.companies;
   const old = readSave(JSON.stringify(save)).state; // cópia para montar as colunas
   for (const c of old.citizens) delete c.company;
-  v6.data.citizens = createSave({ ...old, companies: [] }, { id: 'x' }).data.citizens;
-  v6.version = 6;
-  v6.checksum = checksum(v6.data);
-  const { save: migrated, state: converted } = readSave(JSON.stringify(v6));
+  v7.data.citizens = createSave({ ...old, companies: [] }, { id: 'x' }).data.citizens;
+  v7.version = 7;
+  v7.checksum = checksum(v7.data);
+  const { save: migrated, state: converted } = readSave(JSON.stringify(v7));
   assert.equal(migrated.version, SAVE_VERSION);
   assert.equal(converted.legacyJobs, true);
   assert.equal(converted.companies.length, 0);

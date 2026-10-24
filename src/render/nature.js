@@ -1,5 +1,6 @@
 // Natureza na tela: árvores (densidade e tipos) e profundidade da água.
-// Tudo derivado da semente do mapa e das coordenadas, sem tocar no estado.
+// A densidade da mata vem do estado (state.map.forest, que cresce com o
+// tempo); o resto é derivado da semente do mapa e das coordenadas.
 
 import { hash2 } from '../core/rng.js';
 import { TERRAIN } from '../world/catalog.js';
@@ -12,24 +13,18 @@ const AUTUMN = ['#c98a2e', '#b5652b', '#d4a93a'];
 const BUSHES = ['#4d8a3c', '#5b9645', '#447d36'];
 export const TRUNK = '#6b4a2b';
 
-/** Densidade da mata (0 a 1), suave no espaço: clareiras e trechos fechados. */
-export function forestDensity(x, y, seed) {
-  return smoothNoise(x / 7, y / 7, seed + 31) * 0.7 + smoothNoise(x / 2.5, y / 2.5, seed + 57) * 0.3;
-}
-
 /**
  * Árvores de um tile, de trás para frente: { u, v, kind, size, color }.
  * (u, v) é a posição dentro do tile (0 a 1); size é a escala (1 = normal).
  */
 export function treesFor(state, x, y) {
-  const { width, height, terrain, road, zone } = state.map;
+  const { width, height, terrain, forest, road, zone } = state.map;
   const tile = y * width + x;
   const seed = state.seed;
   let count = 0;
 
   if (terrain[tile] === TERRAIN.FOREST) {
-    const d = forestDensity(x, y, seed);
-    count = 1 + Math.floor(d * 5.5); // 1 a 6 árvores
+    count = Math.max(1, forest[tile]); // 1 a 6 árvores
   } else if (terrain[tile] === TERRAIN.GRASS && !road[tile] && !zone[tile]) {
     // Árvores soltas: mais comuns na borda da mata, raras no campo aberto.
     const nearForest =

@@ -183,6 +183,16 @@ export const LAND_VALUE_FOR_LEVEL = {
 // Dias mínimos entre uma mudança de nível e a próxima.
 export const DAYS_BETWEEN_UPGRADES = 3;
 
+// Florestas: densidade de 1 a `maxDensity` (árvores por tile). A cada tick,
+// com `growChance`, até `tilesPerTick` tiles sorteados crescem: mata fica mais
+// densa, e grama livre ao lado de mata com pelo menos `spreadDensity` vira mata.
+export const FOREST = {
+  maxDensity: 6,
+  growChance: 0.05,
+  tilesPerTick: 5,
+  spreadDensity: 3,
+};
+
 export const COSTS = {
   road: 10,
   zone: 5,
@@ -242,12 +252,12 @@ export const SHIFTS = {
 //   kind: 'varejo' (térreos e lojas), 'escritorio' (andares de escritórios)
 //         ou 'industria' (uma empresa ocupa o prédio industrial inteiro)
 export const SECTORS = {
-  padaria: { name: 'Padaria', kind: 'varejo', label: 'Padaria {L}', shifts: { madrugada: 0.2, diurno: 0.5, manha: 0.15, tarde: 0.15 } },
-  mercadinho: { name: 'Mercadinho', kind: 'varejo', label: 'Mercadinho {L}', shifts: { diurno: 0.7, manha: 0.15, tarde: 0.15 } },
-  farmacia: { name: 'Farmácia', kind: 'varejo', label: 'Farmácia {L}', shifts: { diurno: 0.75, noturno: 0.1, tarde: 0.15 } },
-  restaurante: { name: 'Restaurante', kind: 'varejo', label: 'Restaurante {L}', shifts: { diurno: 0.6, tarde: 0.3, noturno: 0.1 } },
-  bar: { name: 'Bar', kind: 'varejo', label: 'Bar {L}', shifts: { tarde: 0.5, noturno: 0.5 } },
-  roupas: { name: 'Loja de roupas', kind: 'varejo', label: '{L} Modas', shifts: { diurno: 0.8, manha: 0.1, tarde: 0.1 } },
+  padaria: { name: 'Padaria', kind: 'varejo', label: 'Padaria {L}', shifts: { madrugada: 0.2, diurno: 0.65, manha: 0.1, tarde: 0.05 } },
+  mercadinho: { name: 'Mercadinho', kind: 'varejo', label: 'Mercadinho {L}', shifts: { diurno: 0.85, manha: 0.05, tarde: 0.1 } },
+  farmacia: { name: 'Farmácia', kind: 'varejo', label: 'Farmácia {L}', shifts: { diurno: 0.8, noturno: 0.1, tarde: 0.1 } },
+  restaurante: { name: 'Restaurante', kind: 'varejo', label: 'Restaurante {L}', shifts: { diurno: 0.75, tarde: 0.15, noturno: 0.1 } },
+  bar: { name: 'Bar', kind: 'varejo', label: 'Bar {L}', shifts: { diurno: 0.3, tarde: 0.35, noturno: 0.35 } },
+  roupas: { name: 'Loja de roupas', kind: 'varejo', label: '{L} Modas', shifts: { diurno: 0.9, manha: 0.05, tarde: 0.05 } },
   contabilidade: { name: 'Contabilidade', kind: 'escritorio', label: 'Contabilidade {L}', shifts: { diurno: 0.9, manha: 0.05, tarde: 0.05 } },
   advocacia: { name: 'Advocacia', kind: 'escritorio', label: '{L} & {M} Advogados', shifts: { diurno: 1 } },
   tecnologia: { name: 'Tecnologia', kind: 'escritorio', label: '{L} Tecnologia', shifts: { diurno: 0.85, tarde: 0.15 } },
@@ -256,7 +266,7 @@ export const SECTORS = {
   metalurgica: { name: 'Metalúrgica', kind: 'industria', label: 'Metalúrgica {L}', shifts: { diurno: 0.8, noturno: 0.12, madrugada: 0.08 } },
   alimentos: { name: 'Alimentos', kind: 'industria', label: '{L} Alimentos', shifts: { diurno: 0.75, noturno: 0.1, madrugada: 0.1, manha: 0.05 } },
   textil: { name: 'Têxtil', kind: 'industria', label: 'Têxtil {L}', shifts: { diurno: 0.8, tarde: 0.1, noturno: 0.1 } },
-  logistica: { name: 'Logística', kind: 'industria', label: '{L} Logística', shifts: { diurno: 0.6, noturno: 0.2, madrugada: 0.1, manha: 0.05, tarde: 0.05 } },
+  logistica: { name: 'Logística', kind: 'industria', label: '{L} Logística', shifts: { diurno: 0.7, noturno: 0.15, madrugada: 0.1, manha: 0.025, tarde: 0.025 } },
   quimica: { name: 'Química', kind: 'industria', label: 'Química {L}', shifts: { diurno: 0.8, noturno: 0.1, madrugada: 0.1 } },
 };
 

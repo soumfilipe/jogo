@@ -149,11 +149,12 @@ test('andares e densidade vão para o save; saves antigos ganham densidade médi
   assert.equal(loaded.buildings.find((x) => x.id === b.id).floors, 7);
   assert.equal(loaded.map.density[b.tile], DENSITY.HIGH);
 
-  const v5 = JSON.parse(JSON.stringify(save));
-  delete v5.data.map.density;
-  v5.version = 5;
-  v5.checksum = checksum(v5.data);
-  const { save: migrated, state: old } = readSave(JSON.stringify(v5));
+  // Save do formato 6: sem a camada de densidade.
+  const v6 = JSON.parse(JSON.stringify(save));
+  delete v6.data.map.density;
+  v6.version = 6;
+  v6.checksum = checksum(v6.data);
+  const { save: migrated, state: old } = readSave(JSON.stringify(v6));
   assert.equal(migrated.version, SAVE_VERSION);
   assert.ok(old.map.density.every((d) => d === DENSITY.MEDIUM));
 });

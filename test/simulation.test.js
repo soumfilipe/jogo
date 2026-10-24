@@ -114,7 +114,8 @@ test('turnos: poucos à noite e de madrugada, alguns de meio período, e a cidad
   advance(state, rt, TICKS_PER_DAY * 4);
   const employed = state.citizens.filter((c) => c.job !== null);
   const share = (s) => employed.filter((c) => c.shift === s).length / employed.length;
-  assert.ok(share('noturno') > 0.03 && share('noturno') < 0.12, `noturno: ${share('noturno')}`);
+  // Na cidade, a fração depende dos setores das empresas que surgiram.
+  assert.ok(share('noturno') > 0.03 && share('noturno') < 0.15, `noturno: ${share('noturno')}`);
   assert.ok(share('manha') + share('tarde') > 0.05 && share('manha') + share('tarde') < 0.16, 'meio período');
 
   // Madrugada: o turno da noite está trabalhando.
