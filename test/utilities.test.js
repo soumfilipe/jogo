@@ -62,11 +62,13 @@ test('regras para colocar serviços públicos', () => {
   // Bomba na beira d'água e encostada numa rua.
   applyCommand(state, rt, { type: 'road', tiles: lineTiles(w, 8, 6, 8, 11) });
   assert.ok(place('bomba_agua', 9, 11).ok);
+  // A usina solar depende de pesquisa: no primeiro marco ainda não dá.
+  assert.match(place('usina_solar', 12, 6).reason, /Precisa da tecnologia Usina solar/);
   // Usina 2x2 ocupa os 4 tiles e tira a zona deles.
   applyCommand(state, rt, { type: 'zone', zone: ZONE.RESIDENTIAL, tiles: rectTiles(w, 12, 6, 13, 7) });
   const before = state.economy.money;
-  assert.ok(place('usina_solar', 12, 6).ok);
-  assert.equal(state.economy.money, before - BUILDINGS.usina_solar.utility.cost);
+  assert.ok(place('usina_carvao', 12, 6).ok);
+  assert.equal(state.economy.money, before - BUILDINGS.usina_carvao.utility.cost);
   for (const t of [6 * w + 12, 6 * w + 13, 7 * w + 12, 7 * w + 13]) {
     assert.ok(rt.buildingAt[t]);
     assert.equal(state.map.zone[t], ZONE.NONE);

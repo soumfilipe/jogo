@@ -6,6 +6,7 @@
 // e movimento (prédios em volta), e cai com a poluição das indústrias.
 
 import { BUILDINGS, TERRAIN, ZONE } from '../world/catalog.js';
+import { mod, utilityPollution } from './mods.js';
 
 const NATURE_RADIUS = 4;
 const COMMERCE_RADIUS = 8;
@@ -30,15 +31,20 @@ export function computeLandValue(state, rt) {
     if (terrain[i] === TERRAIN.WATER || terrain[i] === TERRAIN.FOREST) nature[i] = 1;
     else if (terrain[i] === TERRAIN.SAND) nature[i] = 0.5;
   }
+  const industryPollution = mod(rt, 'pollution.industry');
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
     // Prédios grandes contam no tile de origem com o peso da área inteira.
     const weight = info.level * info.size * info.size;
     activity[b.tile] += info.size * info.size;
     if (info.zone === ZONE.COMMERCIAL) commerce[b.tile] += weight;
-    if (info.zone === ZONE.INDUSTRIAL) industry[b.tile] += weight;
-    if (info.utility) industry[b.tile] += info.utility.pollution;
+    if (info.zone === ZONE.INDUSTRIAL) industry[b.tile] += weight * industryPollution;
+    if (info.utility) industry[b.tile] += utilityPollution(rt, b.type);
   }
+  // Tecnologias que valorizam o terreno (em toda a cidade ou numa zona).
+  const bonusAll = mod(rt, 'landValue.all', 0);
+  const bonusCommercial = mod(rt, 'landValue.commercial', 0);
+  const zone = state.map.zone;
 
   const natureSum = boxSum(nature, width, height, NATURE_RADIUS);
   const commerceSum = boxSum(commerce, width, height, COMMERCE_RADIUS);
@@ -53,7 +59,9 @@ export function computeLandValue(state, rt) {
       + 0.3 * Math.min(1, natureSum[i] / NATURE_FULL)
       + 0.25 * Math.min(1, commerceSum[i] / COMMERCE_FULL)
       + 0.3 * Math.min(1, activitySum[i] / ACTIVITY_FULL)
-      - 0.55 * p;
+      - 0.55 * p
+      + bonusAll
+      + (zone[i] === ZONE.COMMERCIAL ? bonusCommercial : 0);
     landValue[i] = Math.min(1, Math.max(0, value));
   }
 }

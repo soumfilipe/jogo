@@ -8,6 +8,8 @@ import { computeDemand } from './demand.js';
 import { growBuildings, moveIn, upgradeBuildings } from './growth.js';
 import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
+import { computeMods } from './mods.js';
+import { closeResearchMonth } from './research.js';
 import { applyUtilityEffects, computeUtilities } from './utilities.js';
 
 export function tick(state, rt) {
@@ -17,6 +19,7 @@ export function tick(state, rt) {
   updateCitizens(state, rt);
 
   if (t % 60 === 0) {
+    computeMods(state, rt);
     computeDemand(state, rt);
     // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
     // assim o resultado não depende de quando o save foi carregado.
@@ -37,7 +40,10 @@ export function tick(state, rt) {
     computeDemand(state, rt);
   }
 
-  if (t % TICKS_PER_MONTH === 0) closeMonth(state, rt);
+  if (t % TICKS_PER_MONTH === 0) {
+    closeMonth(state, rt);
+    closeResearchMonth(state, rt);
+  }
 }
 
 /** Avança vários ticks de uma vez (testes e ferramentas). */
@@ -48,6 +54,7 @@ export function advance(state, rt, ticks) {
 /** Monta os índices derivados de um estado (novo ou recém-carregado). */
 export function prepare(state) {
   const rt = buildRuntime(state);
+  computeMods(state, rt);
   computeDemand(state, rt);
   computeUtilities(state, rt);
   computeLandValue(state, rt); // para os mapas e o painel; a simulação recalcula antes de usar

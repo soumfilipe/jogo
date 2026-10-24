@@ -3,6 +3,7 @@
 // mudança em prédios, cidadãos ou estradas deve passar por aqui.
 
 import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN } from './catalog.js';
+import { jobsOf } from '../systems/mods.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -102,7 +103,7 @@ export function vacancies(rt, b) {
 
 export function openJobs(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return BUILDINGS[b.type].jobs - rt.workers.get(b.id).size;
+  return jobsOf(rt, b.type) - rt.workers.get(b.id).size;
 }
 
 // ---------------------------------------------------------------------------

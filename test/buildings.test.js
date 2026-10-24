@@ -14,8 +14,8 @@ import { computeUtilities } from '../src/systems/utilities.js';
 import { TICKS_PER_DAY } from '../src/core/time.js';
 import { testCity } from './helpers.js';
 
-function flatWorld(size = 24) {
-  const state = createWorld({ width: size, height: size, seed: 9 });
+function flatWorld(size = 24, startMarco = 1) {
+  const state = createWorld({ width: size, height: size, seed: 9, startMarco });
   state.map.terrain.fill(TERRAIN.GRASS);
   state.utilities.imported = { power: true, water: true };
   state.economy.money = 1_000_000;
@@ -117,8 +117,18 @@ test('prédio grande ocupa 2x2, é demolido inteiro e cobrado uma vez', () => {
   }
 });
 
-test('lotes vazios valorizados recebem prédios grandes', () => {
-  const { state, rt } = flatWorld(40);
+test('lotes vazios valorizados recebem prédios grandes (depois do zoneamento)', () => {
+  // No primeiro marco, condomínios (nível 3) ainda não existem.
+  const early = flatWorld(40);
+  for (const y of [4, 10, 16, 22]) applyCommand(early.state, early.rt, { type: 'road', tiles: lineTiles(40, 0, y, 39, y) });
+  applyCommand(early.state, early.rt, { type: 'zone', zone: ZONE.RESIDENTIAL, tiles: rectTiles(40, 0, 5, 39, 21) });
+  early.rt.landValue.fill(0.9);
+  early.rt.stats.population = 1000;
+  early.rt.demand.residential = 10_000;
+  for (let i = 0; i < 5; i++) growBuildings(early.state, early.rt);
+  assert.ok(!early.state.buildings.some((b) => b.type === 'condominio'));
+
+  const { state, rt } = flatWorld(40, 2);
   for (const y of [4, 10, 16, 22]) applyCommand(state, rt, { type: 'road', tiles: lineTiles(40, 0, y, 39, y) });
   applyCommand(state, rt, { type: 'zone', zone: ZONE.RESIDENTIAL, tiles: rectTiles(40, 0, 5, 39, 21) });
   rt.landValue.fill(0.9);

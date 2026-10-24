@@ -6,17 +6,18 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  4,                 // versão do FORMATO (para migrações)
+//   "version":  5,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
 // }
 
 import { calendar } from '../core/time.js';
+import { createResearch } from '../systems/research.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 4;
-export const GAME_VERSION = '0.5.0';
+export const SAVE_VERSION = 5;
+export const GAME_VERSION = '0.6.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -90,6 +91,14 @@ const MIGRATIONS = {
       lastMonth: null,
     };
     save.version = 4;
+    return save;
+  },
+  // v4 -> v5: pesquisa. A cidade começa no primeiro marco, só com as
+  // tecnologias iniciais. Prédios que hoje dependem de pesquisa (como a usina
+  // solar) continuam funcionando; só não dá para construir novos.
+  4: (save) => {
+    save.data.research = createResearch(1);
+    save.version = 5;
     return save;
   },
 };

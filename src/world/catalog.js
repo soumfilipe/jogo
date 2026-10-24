@@ -76,30 +76,84 @@ export const BUILDINGS = {
     style: { height: 1.4 },
   },
 
-  // --- Serviços públicos (colocados pelo jogador) ----------------------------
+  // --- Prédios colocados pelo jogador (serviços públicos e estatais) ----------
   //   utility.power / water: quanto produz por hora (mesma unidade do consumo)
   //   utility.cost: preço para construir; upkeep: manutenção por mês
   //   utility.pollution: peso na poluição em volta (como a indústria)
   //   utility.needsWater: precisa encostar em rio ou lago
+  //   utility.income: receita por mês com todas as vagas preenchidas (estatais)
+  //   utility.area: área do conhecimento em que atua (gera um pouco de pesquisa)
+  //   utility.institute: instituição de pesquisa (transforma verba em pesquisa)
+  //   utility.privateResearch: P&D privado dos escritórios em volta
+  //   utility.mods: modificadores ativos enquanto o prédio funciona
+  //   (a tecnologia que libera cada um está em techs.js)
   usina_carvao: {
     name: 'Usina a carvão', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 20,
     style: { height: 1.4 },
-    utility: { power: 3000, water: 0, cost: 12_000, upkeep: 400, pollution: 14 },
+    utility: { power: 3000, water: 0, cost: 12_000, upkeep: 400, pollution: 14, area: 'energia' },
   },
   usina_solar: {
     name: 'Usina solar', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 4,
     style: { height: 0.4 },
-    utility: { power: 1200, water: 0, cost: 20_000, upkeep: 150, pollution: 0 },
+    utility: { power: 1200, water: 0, cost: 20_000, upkeep: 150, pollution: 0, area: 'energia' },
   },
   bomba_agua: {
     name: "Bomba d'água", zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
     style: { height: 0.8 },
-    utility: { power: 0, water: 2500, cost: 6_000, upkeep: 200, pollution: 0, needsWater: true },
+    utility: { power: 0, water: 2500, cost: 6_000, upkeep: 200, pollution: 0, needsWater: true, area: 'saude' },
   },
   poco: {
     name: 'Poço artesiano', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 2,
     style: { height: 1.2 },
-    utility: { power: 0, water: 700, cost: 3_500, upkeep: 90, pollution: 0 },
+    utility: { power: 0, water: 700, cost: 3_500, upkeep: 90, pollution: 0, area: 'saude' },
+  },
+  usina_gas: {
+    name: 'Usina a gás', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 14,
+    style: { height: 1.2 },
+    utility: { power: 2500, water: 0, cost: 16_000, upkeep: 350, pollution: 7, area: 'energia' },
+  },
+  hidreletrica: {
+    name: 'Hidrelétrica', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 16,
+    style: { height: 1.3 },
+    utility: { power: 5000, water: 0, cost: 45_000, upkeep: 300, pollution: 0, needsWater: true, area: 'energia' },
+  },
+  usina_eolica: {
+    name: 'Parque eólico', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 3,
+    style: { height: 2.5 },
+    utility: { power: 900, water: 0, cost: 14_000, upkeep: 120, pollution: 0, area: 'energia' },
+  },
+  usina_hidrogenio: {
+    name: 'Usina a hidrogênio', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 12,
+    style: { height: 1.1 },
+    utility: { power: 2000, water: 0, cost: 60_000, upkeep: 1_200, pollution: 0, area: 'energia' },
+  },
+  refinaria: {
+    name: 'Refinaria', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 60,
+    style: { height: 1.8 },
+    utility: { power: 0, water: 0, cost: 40_000, upkeep: 300, pollution: 18, income: 1_500, area: 'quimica' },
+  },
+  fabrica_cimento: {
+    name: 'Fábrica de cimento', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 25,
+    style: { height: 1.6 },
+    utility: {
+      power: 0, water: 0, cost: 15_000, upkeep: 100, pollution: 12, income: 500, area: 'quimica',
+      mods: [{ mod: 'buildCost', mul: 0.9 }],
+    },
+  },
+  usina_etanol: {
+    name: 'Usina de etanol', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
+    style: { height: 1.3 },
+    utility: { power: 600, water: 0, cost: 20_000, upkeep: 150, pollution: 6, income: 700, area: 'quimica' },
+  },
+  instituto_pesquisa: {
+    name: 'Instituto de pesquisa', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 30,
+    style: { height: 1.6 },
+    utility: { power: 0, water: 0, cost: 25_000, upkeep: 600, pollution: 0, institute: true },
+  },
+  parque_tecnologico: {
+    name: 'Parque tecnológico', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
+    style: { height: 2 },
+    utility: { power: 0, water: 0, cost: 35_000, upkeep: 400, pollution: 0, privateResearch: ['computacao', 'social'] },
   },
 };
 
@@ -174,6 +228,26 @@ export const ECONOMY = {
 };
 
 export const TAX_ZONES = ['residential', 'commercial', 'industrial'];
+
+// Pesquisa (ver systems/research.js e world/techs.js).
+export const RESEARCH = {
+  // Quantos anos o mundo avança a cada ano de jogo.
+  worldPace: 3,
+  // Antes de o mundo chegar a uma tecnologia, ela custa este tanto a mais.
+  pioneerMultiplier: 3,
+  // Pontos por mês, numa área, de um instituto lotado recebendo fundingRef.
+  pointsPerInstitute: 20,
+  fundingRef: 1_000,
+  // Verba por área: $ por mês, de 0 até fundingMax, em passos de fundingStep.
+  fundingMax: 10_000,
+  fundingStep: 250,
+  // Prédios que atuam numa área pesquisam 15× mais devagar que um instituto.
+  fieldShare: 1 / 15,
+  // P&D privado: pontos por mês por vaga ocupada de escritório (comércio
+  // nível 3) perto de um parque tecnológico.
+  privatePerJob: 0.05,
+  privateRadius: 10,
+};
 
 // Um prédio só cresce se houver estrada a até esta distância (em tiles).
 export const ROAD_ACCESS_RADIUS = 2;

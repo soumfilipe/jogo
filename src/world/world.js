@@ -4,6 +4,7 @@
 import { createRng } from '../core/rng.js';
 import { ECONOMY, TERRAIN } from './catalog.js';
 import { generateTerrain } from './terrain.js';
+import { createResearch } from '../systems/research.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -12,6 +13,7 @@ export function createWorld({
   width = DEFAULT_MAP_SIZE,
   height = DEFAULT_MAP_SIZE,
   seed = (Math.random() * 2 ** 32) >>> 0,
+  startMarco = 1,
 } = {}) {
   return {
     city: { name },
@@ -41,6 +43,8 @@ export function createWorld({
     // Energia e água importadas da região (só em saves anteriores aos serviços
     // públicos; acaba quando o jogador constrói a primeira usina/bomba).
     utilities: { imported: { power: false, water: false } },
+    // Pesquisa e tecnologias (ver systems/research.js).
+    research: createResearch(startMarco),
     nextId: 1,
   };
 }

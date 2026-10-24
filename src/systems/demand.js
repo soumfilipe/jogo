@@ -4,6 +4,7 @@
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { canWork } from '../agents/citizens.js';
 import { taxDemandShift } from './economy.js';
+import { jobsOf, mod } from './mods.js';
 
 export function computeDemand(state, rt) {
   let housing = 0;
@@ -13,10 +14,11 @@ export function computeDemand(state, rt) {
   for (const b of state.buildings) {
     if (b.abandoned !== undefined) continue; // abandonado não tem casa nem vaga
     const info = BUILDINGS[b.type];
+    const jobs = jobsOf(rt, b.type);
     housing += info.residents;
-    if (info.zone === ZONE.COMMERCIAL) commercialJobs += info.jobs;
-    else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += info.jobs;
-    else otherJobs += info.jobs;
+    if (info.zone === ZONE.COMMERCIAL) commercialJobs += jobs;
+    else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += jobs;
+    else otherJobs += jobs;
   }
 
   const population = state.citizens.length;
@@ -38,8 +40,10 @@ export function computeDemand(state, rt) {
     residential: attraction - (housing - population),
     // Empregos acompanham a força de trabalho, com folga para atrair gente nova;
     // imposto alto na zona espanta empresas, baixo atrai.
-    commercial: Math.round(workforce * 0.4) - commercialJobs + 5 + taxDemandShift(state, 'commercial'),
-    industrial: Math.round(workforce * 0.6) - industrialJobs + 10 + taxDemandShift(state, 'industrial'),
+    commercial: Math.round(workforce * 0.4) - commercialJobs + 5 + taxDemandShift(state, 'commercial')
+      + mod(rt, 'demand.commercial', 0),
+    industrial: Math.round(workforce * 0.6) - industrialJobs + 10 + taxDemandShift(state, 'industrial')
+      + mod(rt, 'demand.industrial', 0),
   };
   rt.stats = { population, housing, employed, unemployed, jobs: commercialJobs + industrialJobs + otherJobs };
   return rt.demand;

@@ -11,6 +11,8 @@ import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { createCitizen } from '../agents/citizens.js';
 import { isBuildable } from '../world/world.js';
+import { jobsOf, levelUnlocked, mod } from './mods.js';
+import { TECHS } from '../world/techs.js';
 
 const DEMAND_KEY = {
   [ZONE.RESIDENTIAL]: 'residential',
@@ -24,13 +26,14 @@ const LARGE_MIN_POPULATION = 300;
 const UPGRADE_CHANCE = 0.15;
 const MAX_MOVE_IN_PER_HOUR = 12;
 
-export function capacity(info) {
-  return info.residents || info.jobs;
+/** Moradores ou vagas de um tipo de prédio (com os modificadores). */
+export function capacity(rt, type) {
+  return BUILDINGS[type].residents || jobsOf(rt, type);
 }
 
 /** Valor do terreno exigido para um prédio grande: o mesmo do nível 2. */
-function largeLandValue(zone) {
-  return LAND_VALUE_FOR_LEVEL[zone][2];
+function largeLandValue(rt, zone) {
+  return LAND_VALUE_FOR_LEVEL[zone][2] * mod(rt, 'largeLandValue');
 }
 
 export function growBuildings(state, rt) {
@@ -38,6 +41,7 @@ export function growBuildings(state, rt) {
   const { zone, road } = state.map;
   const total = zone.length;
   const allowLarge = rt.stats.population >= LARGE_MIN_POPULATION;
+  const largeAllowed = (z) => allowLarge && levelUnlocked(rt, z, BUILDINGS[LARGE_BUILDINGS[z][0]].level);
   // Começa num ponto aleatório para não favorecer o canto do mapa.
   const start = randomInt(state.rng, 0, total - 1);
 
@@ -50,24 +54,24 @@ export function growBuildings(state, rt) {
     const access = findAccessRoad(state, rt, tile);
     if (access < 0) continue;
     // Só cresce onde a rede tem energia e água sobrando para o prédio novo.
-    if (!fits(state, rt, access, consumption(BUILDINGS[LEVELS[z][1][0]]))) continue;
+    if (!fits(state, rt, access, consumption(BUILDINGS[LEVELS[z][1][0]], rt))) continue;
     if (!chance(state.rng, GROW_CHANCE)) continue;
 
     let type = pick(state.rng, LEVELS[z][1]);
     const large = pick(state.rng, LARGE_BUILDINGS[z]);
     if (
-      allowLarge &&
-      remaining[key] >= Math.min(capacity(BUILDINGS[large]) / 4, 8) &&
-      rt.landValue[tile] >= largeLandValue(z) &&
+      largeAllowed(z) &&
+      remaining[key] >= Math.min(capacity(rt, large) / 4, 8) &&
+      rt.landValue[tile] >= largeLandValue(rt, z) &&
       isFreeBlock(state, rt, tile, BUILDINGS[large].size, z) &&
-      fits(state, rt, access, consumption(BUILDINGS[large])) &&
+      fits(state, rt, access, consumption(BUILDINGS[large], rt)) &&
       chance(state.rng, LARGE_CHANCE)
     ) {
       type = large;
     }
     addBuilding(state, rt, type, tile);
-    reserve(state, rt, access, consumption(BUILDINGS[type]));
-    remaining[key] -= capacity(BUILDINGS[type]);
+    reserve(state, rt, access, consumption(BUILDINGS[type], rt));
+    remaining[key] -= capacity(rt, type);
   }
 }
 
@@ -78,25 +82,27 @@ export function growBuildings(state, rt) {
  */
 export function upgradeBuildings(state, rt) {
   const tick = state.time.tick;
+  const minTicks = DAYS_BETWEEN_UPGRADES * mod(rt, 'upgradeDays') * TICKS_PER_DAY;
 
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
     if (info.utility || info.size !== 1 || info.level >= MAX_LEVEL) continue;
-    if (tick - (b.upgradedAt ?? b.builtAt) < DAYS_BETWEEN_UPGRADES * TICKS_PER_DAY) continue;
+    if (tick - (b.upgradedAt ?? b.builtAt) < minTicks) continue;
     if (rt.demand[DEMAND_KEY[info.zone]] < 0) continue;
 
     if (b.abandoned !== undefined || !isServed(rt, b)) continue;
     const occupied = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
-    if (occupied < capacity(info)) continue;
+    if (occupied < capacity(rt, b.type)) continue;
     const next = info.level + 1;
+    if (!levelUnlocked(rt, info.zone, next)) continue;
     if (rt.landValue[b.tile] < LAND_VALUE_FOR_LEVEL[info.zone][next]) continue;
     // O nível seguinte consome mais: precisa caber na rede.
     const access = rt.access.get(b.id);
-    const nextNeed = consumption(BUILDINGS[LEVELS[info.zone][next][0]]);
-    const now = consumption(info);
+    const nextNeed = consumption(BUILDINGS[LEVELS[info.zone][next][0]], rt);
+    const now = consumption(info, rt);
     const extra = { power: nextNeed.power - now.power, water: nextNeed.water - now.water };
     if (!fits(state, rt, access, extra)) continue;
-    if (!chance(state.rng, UPGRADE_CHANCE)) continue;
+    if (!chance(state.rng, UPGRADE_CHANCE * mod(rt, `upgradeChance.${DEMAND_KEY[info.zone]}`))) continue;
 
     reserve(state, rt, access, extra);
     b.type = pick(state.rng, LEVELS[info.zone][next]);
@@ -114,9 +120,10 @@ export function upgradeBlockers(state, rt, b) {
   const occupied = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
   const blockers = [];
   const service = rt.service?.get(b.id);
+  if (!levelUnlocked(rt, info.zone, next)) blockers.push(`tecnologia: ${LEVEL_TECH_NAME[`${DEMAND_KEY[info.zone]}:${next}`] ?? 'pesquisa'}`);
   if (service && !service.power) blockers.push('energia');
   if (service && !service.water) blockers.push('água');
-  if (occupied < capacity(info)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
+  if (occupied < capacity(rt, b.type)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
   if (rt.landValue[b.tile] < needed) {
     blockers.push(`valor do terreno ${pct(needed)} (agora ${pct(rt.landValue[b.tile])})`);
   }
@@ -125,6 +132,10 @@ export function upgradeBlockers(state, rt, b) {
 }
 
 const pct = (v) => `${Math.round(v * 100)}%`;
+
+// Nome da tecnologia que libera cada nível ('residential:3' -> 'Código de zoneamento').
+const LEVEL_TECH_NAME = {};
+for (const t of TECHS) for (const e of t.effects) if (e.level) LEVEL_TECH_NAME[e.level.join(':')] = t.name;
 
 function fits(state, rt, access, need) {
   return RESOURCES.every((res) => need[res] <= 0 || spare(state, rt, access, res) >= need[res]);
