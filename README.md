@@ -201,14 +201,22 @@ trabalho, ainda dentro do lote, não aparece.
   quando a roda para.
 - Mudanças feitas pelo jogador aparecem na hora; as da simulação (prédios
   crescendo) são redesenhadas no máximo a cada 0,4 s.
+- **Redesenho parcial**: a simulação marca os trechos que mudaram (`touchMap`:
+  prédio novo, demolido, que subiu de nível, abandonado ou que ganhou/perdeu
+  energia ou água) e só esses retângulos do cache são redesenhados (~2 ms, em
+  vez de 60–100 ms do mapa inteiro numa cidade de 10 mil habitantes). Ações do
+  jogador e mudanças nas ruas redesenham tudo.
 - As luzes das janelas são refeitas a cada 15 minutos de jogo, no máximo a cada
-  0,3 s de tempo real.
+  0,3 s de tempo real, reaproveitando a geometria dos prédios do último desenho
+  e os horários das janelas (sorteados uma vez por prédio).
 - Para esconder carros atrás dos prédios, só são recortados os prédios que
   encostam num carro que está atrás deles (busca numa grade da tela).
 - Caminhos com muitos contornos não usam `closePath` (o `fill` fecha sozinho):
   no Chromium isso deixava o redesenho de mapas grandes até 30 vezes mais lento.
 - No console do navegador, `jogo.state`, `jogo.rt`, `jogo.cam`, `jogo.renderer`,
   `jogo.advance(ticks)` e `jogo.applyCommand(cmd)` ajudam a depurar.
+  `jogo.loop` (ms de simulação e de desenho no último quadro) e
+  `jogo.renderer.stats` (ms de cada camada) servem para medir desempenho.
 
 ## Como a simulação funciona
 
@@ -230,8 +238,8 @@ trabalho, ainda dentro do lote, não aparece.
   tick, com 5% de chance, até 5 tiles sorteados crescem. Mata fica mais densa
   (até 6 árvores) e grama encostada numa mata com 3 ou mais árvores vira mata
   nova. Só em tiles verdes sem estrada, zona ou prédio; num mapa 256×256 a área
-  de mata cresce uns 15% por ano. O mapa é redesenhado no máximo uma vez por
-  hora de jogo por causa disso.
+  de mata cresce uns 15% por ano. Só o trecho em volta do tile que cresceu é
+  redesenhado.
 - **Rotas**: A* sobre as estradas, com cache e no máximo 100 cálculos por tick
   (o resto espera na fila, em estado "Saindo…").
 
@@ -258,7 +266,15 @@ Proteções:
 - O servidor só escuta em `127.0.0.1` e só aceita ids `[a-z0-9_-]` (nada de `../`).
 
 Se o jogo for aberto por outro servidor estático (sem o `server.js`), ele detecta
-isso e salva no `localStorage` do navegador; exportar/importar arquivo continua funcionando.
+isso e salva no **IndexedDB** do navegador (é o caso do GitHub Pages):
+- cabe cidades grandes (centenas de MB, conforme o espaço livre do aparelho);
+- a lista de saves lê só os metadados, sem carregar as cidades inteiras;
+- o jogo pede armazenamento persistente para o navegador não apagar os saves;
+- saves de versões antigas, que ficavam no `localStorage` (limite de ~5 MB),
+  são copiados para o IndexedDB na primeira abertura e apagados de lá.
+
+O `localStorage` só é usado se o IndexedDB não abrir (ex.: modo privado de alguns
+navegadores). Exportar/importar arquivo funciona em todos os casos.
 (Abrir o `index.html` direto com duplo clique não funciona: o navegador bloqueia
 módulos JavaScript em `file://`.)
 
@@ -267,13 +283,13 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 5,                 // versão do formato (migrações em src/save/format.js)
+  "version": 6,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
     "name": "Vila Nova",
     "autosave": false,
-    "gameVersion": "0.5.0",
+    "gameVersion": "0.6.0",
     "createdAt": "…", "updatedAt": "…",
     "playTimeSeconds": 120,
     "summary": { "population": 985, "buildings": 342, "money": 38635,
@@ -285,8 +301,13 @@ módulos JavaScript em `file://`.)
 ```
 
 Dentro de `data`, as camadas do mapa (typed arrays) viram
-`{ "$typed": "Uint8Array", "length": 65536, "rle": [qtd, valor, …] }`. O arquivo é
-gravado como JSON compacto.
+`{ "$typed": "Uint8Array", "length": 65536, "rle": [qtd, valor, …] }`.
+
+Prédios e cidadãos são gravados em colunas (`src/save/table.js`): o nome de
+cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
+estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
+letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
+manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
 
 ### Mudando o formato
 
@@ -310,7 +331,8 @@ src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa
 src/ui/                 painel de inspeção e painel de orçamento
 src/save/format.js      formato do save: criar, validar, checksum, migrações, RLE
-src/save/backends.js    onde gravar: arquivos (servidor) ou navegador
+src/save/table.js       prédios e cidadãos em colunas, rotas como passos
+src/save/backends.js    onde gravar: arquivos (servidor), IndexedDB ou localStorage
 src/save/SaveManager.js salvar, carregar, automático, exportar/importar
 test/                   testes (node --test)
 ```

@@ -92,13 +92,13 @@ test('derrubar a mata zera a densidade', () => {
   assert.equal(state.map.forest[40], 0);
 });
 
-test('save v4 ganha a camada de densidade da mata', () => {
+test('save v5 ganha a camada de densidade da mata', () => {
   const state = createWorld({ width: 48, height: 48, seed: 21 });
   const expected = state.map.forest;
   const save = createSave(state, { id: 'mata' });
   // Simula um save antigo: sem a camada de densidade.
   delete save.data.map.forest;
-  save.version = 4;
+  save.version = 5;
   const { save: migrated, state: loaded } = readSave(save, { allowChecksumMismatch: true });
   assert.equal(migrated.version, SAVE_VERSION);
   assert.deepEqual(loaded.map.forest, expected);

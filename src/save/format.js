@@ -6,18 +6,19 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  5,                 // versão do FORMATO (para migrações)
+//   "version":  6,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
 // }
 
 import { calendar } from '../core/time.js';
+import { decodeTable, encodeTable } from './table.js';
 import { generateForest } from '../world/terrain.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 5;
-export const GAME_VERSION = '0.5.0';
+export const SAVE_VERSION = 6;
+export const GAME_VERSION = '0.6.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -93,16 +94,37 @@ const MIGRATIONS = {
     save.version = 4;
     return save;
   },
-  // v4 -> v5: florestas crescem. A densidade da mata, antes só visual
-  // (derivada da semente), vira uma camada do mapa salva no estado.
+  // v4 -> v5: prédios e cidadãos em colunas, e rotas como passos (ver
+  // table.js). O save fica com menos da metade do tamanho.
   4: (save) => {
-    const map = save.data.map;
-    const terrain = decodeState(map.terrain);
-    map.forest = encodeState(generateForest(terrain, map.width, map.height, save.data.seed));
+    packLists(save.data);
     save.version = 5;
     return save;
   },
+  // v5 -> v6: florestas crescem. A densidade da mata, antes só visual
+  // (derivada da semente), vira uma camada do mapa salva no estado.
+  5: (save) => {
+    const map = save.data.map;
+    const terrain = decodeState(map.terrain);
+    map.forest = encodeState(generateForest(terrain, map.width, map.height, save.data.seed));
+    save.version = 6;
+    return save;
+  },
 };
+
+// Prédios e cidadãos: de listas de objetos para tabelas em colunas (e volta).
+function packLists(data) {
+  if (Array.isArray(data.buildings)) data.buildings = encodeTable(data.buildings);
+  if (Array.isArray(data.citizens)) data.citizens = encodeTable(data.citizens, { moves: { path: data.map.width } });
+}
+
+function unpackLists(data) {
+  return {
+    ...data,
+    buildings: decodeTable(data.buildings),
+    citizens: decodeTable(data.citizens, { moves: { path: data.map.width } }),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Criação e leitura
@@ -113,7 +135,11 @@ export function createSave(state, meta) {
   if (!meta || !isValidSaveId(meta.id)) {
     throw new SaveError('INVALID_ID', `Id de save inválido: ${meta && meta.id}`);
   }
-  const data = encodeState(state);
+  // Prédios e cidadãos vão direto para as colunas (sem a cópia de encodeState).
+  const data = encodeState({ ...state, buildings: [], citizens: [] });
+  data.buildings = state.buildings;
+  data.citizens = state.citizens;
+  packLists(data);
   const now = new Date().toISOString();
   return {
     format: SAVE_FORMAT,
@@ -156,7 +182,7 @@ export function readSave(input, { allowChecksumMismatch = false } = {}) {
   }
 
   save = migrate(save);
-  return { save, state: decodeState(save.data) };
+  return { save, state: decodeState(unpackLists(save.data)) };
 }
 
 /** Valida a estrutura mínima de um save. Usado também pelo servidor. */

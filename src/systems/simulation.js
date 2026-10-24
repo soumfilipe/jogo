@@ -19,11 +19,6 @@ export function tick(state, rt) {
   growForests(state, rt);
 
   if (t % 60 === 0) {
-    // O mapa redesenha no máximo uma vez por hora por causa das matas.
-    if (rt.forestChanged) {
-      rt.forestChanged = false;
-      rt.mapVersion++;
-    }
     computeDemand(state, rt);
     // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
     // assim o resultado não depende de quando o save foi carregado.

@@ -22,6 +22,10 @@ export function buildRuntime(state) {
     pollution: new Float32Array(width * height), // 0 a 1
     // Incrementado a cada mudança visível no mapa (o renderizador usa como cache).
     mapVersion: 0,
+    // O que mudou desde o último desenho: pares [tile, tamanho] dos trechos
+    // alterados, ou dirtyAll quando é preciso redesenhar tudo (ver touchMap).
+    dirtyTiles: [],
+    dirtyAll: true,
   };
 
   for (const b of state.buildings) indexBuilding(state, rt, b);
@@ -29,6 +33,23 @@ export function buildRuntime(state) {
   recomputeRoads(state, rt, { reroute: false });
   return rt;
 }
+
+/**
+ * Avisa o renderizador que o mapa mudou: no trecho size x size a partir de
+ * `tile` ou, sem `tile`, no mapa todo. Assim ele redesenha só o que mudou.
+ */
+export function touchMap(rt, tile = -1, size = 1) {
+  rt.mapVersion++;
+  if (rt.dirtyAll) return;
+  // Muita coisa pendente (ex.: simulação sem tela): redesenha tudo de uma vez.
+  if (tile < 0 || rt.dirtyTiles.length >= MAX_DIRTY * 2) {
+    rt.dirtyAll = true;
+    rt.dirtyTiles.length = 0;
+    return;
+  }
+  rt.dirtyTiles.push(tile, size);
+}
+const MAX_DIRTY = 400;
 
 // ---------------------------------------------------------------------------
 // Prédios
@@ -43,7 +64,7 @@ export function addBuilding(state, rt, type, tile) {
   }
   indexBuilding(state, rt, building);
   rt.access.set(building.id, findAccessRoad(state, rt, tile, BUILDINGS[type].size));
-  rt.mapVersion++;
+  touchMap(rt, tile, BUILDINGS[type].size);
   return building;
 }
 
@@ -64,7 +85,7 @@ export function removeBuilding(state, rt, id) {
   rt.residents.delete(id);
   rt.workers.delete(id);
   rt.access.delete(id);
-  rt.mapVersion++;
+  touchMap(rt, building.tile, BUILDINGS[building.type].size);
 }
 
 function indexBuilding(state, rt, b) {
@@ -214,7 +235,7 @@ export function recomputeRoads(state, rt, { reroute = true } = {}) {
 
   for (const b of state.buildings) rt.access.set(b.id, findAccessRoad(state, rt, b.tile, BUILDINGS[b.type].size));
   rt.pathCache.clear();
-  rt.mapVersion++;
+  touchMap(rt);
 
   if (!reroute) return;
 

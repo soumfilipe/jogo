@@ -5,6 +5,7 @@
 
 import { FOREST, TERRAIN } from '../world/catalog.js';
 import { chance, randomInt } from '../core/rng.js';
+import { touchMap } from '../world/runtime.js';
 
 export function growForests(state, rt) {
   if (!chance(state.rng, FOREST.growChance)) return;
@@ -12,20 +13,21 @@ export function growForests(state, rt) {
   const total = width * height;
   const count = randomInt(state.rng, 1, FOREST.tilesPerTick);
   for (let i = 0; i < count; i++) {
-    if (growTile(state, rt, randomInt(state.rng, 0, total - 1))) rt.forestChanged = true;
+    growTile(state, rt, randomInt(state.rng, 0, total - 1));
   }
 }
 
 function growTile(state, rt, tile) {
   const { width, height, terrain, forest, road, zone } = state.map;
-  if (road[tile] || zone[tile] || rt.buildingAt[tile]) return false;
+  if (road[tile] || zone[tile] || rt.buildingAt[tile]) return;
 
   if (terrain[tile] === TERRAIN.FOREST) {
-    if (forest[tile] >= FOREST.maxDensity) return false;
+    if (forest[tile] >= FOREST.maxDensity) return;
     forest[tile]++;
-    return true;
+    touchMap(rt, tile);
+    return;
   }
-  if (terrain[tile] !== TERRAIN.GRASS) return false;
+  if (terrain[tile] !== TERRAIN.GRASS) return;
 
   const x = tile % width;
   const y = (tile - x) / width;
@@ -38,7 +40,7 @@ function growTile(state, rt, tile) {
   ) {
     terrain[tile] = TERRAIN.FOREST;
     forest[tile] = 1;
-    return true;
+    // Os vizinhos também mudam: árvores soltas aparecem na borda da mata nova.
+    touchMap(rt, Math.max(0, y - 1) * width + Math.max(0, x - 1), 3);
   }
-  return false;
 }
