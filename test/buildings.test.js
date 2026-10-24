@@ -150,6 +150,8 @@ test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () 
         const [x0, y0, x1, y1] = part.box;
         const size = BUILDINGS[type].size;
         assert.ok(x0 >= 0 && y0 >= 0 && x1 <= size && y1 <= size && x0 < x1 && y0 < y1, `${type} #${i}: parte fora do lote`);
+        // Faixas (sacadas, letreiros) dentro da altura da própria parte.
+        for (const band of part.bands) assert.ok(band.at + band.thick <= part.h, `${type} #${i}: faixa acima da parte`);
       }
       seen.add(JSON.stringify(d));
     }

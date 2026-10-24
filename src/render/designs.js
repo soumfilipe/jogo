@@ -188,17 +188,20 @@ const GENERATORS = {
     // Prédios de apartamentos (1x1) e condomínios (2x2).
     const h = base * r.range(0.8, 1.25);
     const form = r.pick(size === 1 ? ['box', 'tiers', 'podium', 'slab', 'box'] : ['tower', 'twin', 'podium', 'tiers', 'slab']);
-    const balc = r.chance(0.45) ? balconies(h, mixHex(w.left, '#ffffff', 0.55)) : [];
+    // Sacadas seguem a altura de cada parte (a base de um escalonado é mais
+    // baixa que h): calculadas com h, ficavam flutuando acima do bloco.
+    const balcColor = r.chance(0.45) ? mixHex(w.left, '#ffffff', 0.55) : null;
+    const balc = (ph) => (balcColor ? balconies(ph, balcColor) : []);
     const win = { cols: r.pick([3, 4]), style: 'grid' };
     const roofOptions = ['tank', 'ac', 'garden', 'antenna', 'solar', 'none'].concat(size > 1 ? ['helipad', 'crown'] : []);
     const S = size;
     const parts = [];
     if (form === 'box' || form === 'tower') {
       const m = form === 'tower' ? S * r.range(0.18, 0.28) : i;
-      parts.push(block([m, m, S - m, S - m], 0, h, w, { windows: win, bands: balc }));
+      parts.push(block([m, m, S - m, S - m], 0, h, w, { windows: win, bands: balc(h) }));
     } else if (form === 'tiers') {
       const h1 = h * r.range(0.45, 0.6);
-      parts.push(block([i, i, S - i, S - i], 0, h1, w, { windows: win, bands: balc }));
+      parts.push(block([i, i, S - i, S - i], 0, h1, w, { windows: win, bands: balc(h1) }));
       const m = i + S * 0.15;
       parts.push(block([m, m, S - m, S - m], h1, h - h1, w, { windows: win }));
     } else if (form === 'podium') {
@@ -207,16 +210,16 @@ const GENERATORS = {
         windows: { cols: 3 * S, style: 'shop' }, bands: [{ at: ph - 0.08, thick: 0.08, color: r.pick(ACCENTS) }],
       }));
       const m = S * r.range(0.22, 0.3);
-      parts.push(block([m, m, S - m, S - m], ph, h - ph, w, { windows: win, bands: balc }));
+      parts.push(block([m, m, S - m, S - m], ph, h - ph, w, { windows: win, bands: balc(h - ph) }));
     } else if (form === 'slab') {
       const alongX = r.chance(0.5);
       const box = alongX ? [i, S * 0.28, S - i, S * 0.72] : [S * 0.28, i, S * 0.72, S - i];
-      parts.push(block(box, 0, h * 0.9, w, { windows: win, bands: balc }));
+      parts.push(block(box, 0, h * 0.9, w, { windows: win, bands: balc(h * 0.9) }));
     } else if (form === 'twin') {
       const ha = h * r.range(0.8, 1);
       const hb = h * r.range(0.6, 0.9);
-      parts.push(block([0.15, 0.15, 0.9, 0.9], 0, ha, w, { windows: win, bands: balc }));
-      parts.push(block([1.1, 1.1, 1.85, 1.85], 0, hb, r.chance(0.5) ? w : r.pick(RES_WALLS), { windows: win, bands: balc }));
+      parts.push(block([0.15, 0.15, 0.9, 0.9], 0, ha, w, { windows: win, bands: balc(ha) }));
+      parts.push(block([1.1, 1.1, 1.85, 1.85], 0, hb, r.chance(0.5) ? w : r.pick(RES_WALLS), { windows: win, bands: balc(hb) }));
     }
     // Itens do telhado logo depois da parte em que estão (antes das partes da frente).
     const topPart = parts.reduce((a, p) => (p.lift + p.h > a.lift + a.h ? p : a));
