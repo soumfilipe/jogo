@@ -3,6 +3,7 @@
 // mudança em prédios, cidadãos ou estradas deve passar por aqui.
 
 import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN, ZONE, capacityOf } from './catalog.js';
+import { mod } from '../systems/mods.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -155,9 +156,14 @@ export function usesCompanies(info) {
   return info.zone === ZONE.COMMERCIAL || info.zone === ZONE.INDUSTRIAL;
 }
 
-/** Vagas de uma empresa: os andares dela vezes as pessoas por andar do prédio. */
+/**
+ * Vagas de uma empresa: os andares dela vezes as pessoas por andar do prédio,
+ * com os modificadores da pesquisa (ex.: síntese da amônia na indústria).
+ */
 export function companyJobs(rt, co) {
-  return co.floors * BUILDINGS[rt.buildingById.get(co.building).type].perFloor;
+  const info = BUILDINGS[rt.buildingById.get(co.building).type];
+  const zone = info.zone === ZONE.COMMERCIAL ? 'commercial' : 'industrial';
+  return Math.round(co.floors * info.perFloor * mod(rt, `jobs.${zone}.${info.level}`));
 }
 
 /** Vagas de todas as empresas do prédio (andares alugados). */

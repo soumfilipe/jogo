@@ -14,17 +14,20 @@ import {
 } from '../world/catalog.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { footprint, removeBuilding, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
+import { mod, utilityOutput, ZONE_KEY } from './mods.js';
 
 export const RESOURCES = ['power', 'water'];
 
 /**
  * Consumo de um tipo de prédio: { power, water }. `people` é a capacidade
- * (padrão: a do tipo; um prédio que cresceu andares passa a dele).
+ * (padrão: a do tipo; um prédio que cresceu andares passa a dele). Com `rt`,
+ * aplica os modificadores da pesquisa (ex.: iluminação LED).
  */
-export function consumption(info, people = info.residents || info.jobs) {
+export function consumption(info, people = info.residents || info.jobs, rt = null) {
   if (info.utility || !info.zone) return { power: 0, water: 0 };
   const per = CONSUMPTION[info.zone];
-  return { power: Math.ceil(people * per.power), water: Math.ceil(people * per.water) };
+  const power = rt ? per.power * mod(rt, `consumption.${ZONE_KEY[info.zone]}`) : per.power;
+  return { power: Math.ceil(people * power), water: Math.ceil(people * per.water) };
 }
 
 /**
@@ -56,11 +59,11 @@ export function computeUtilities(state, rt) {
       if (!net) continue;
       for (const res of RESOURCES) {
         if (!info.utility[res]) continue;
-        entry(net)[res].supply += info.utility[res];
+        entry(net)[res].supply += utilityOutput(rt, b.type, res);
         sources[res].push(rt.access.get(b.id));
       }
     } else if (b.abandoned === undefined) {
-      consumers.push({ b, net, need: consumption(info, capacityOf(b)) });
+      consumers.push({ b, net, need: consumption(info, capacityOf(b), rt) });
       if (net) entry(net);
     }
   }
@@ -136,12 +139,15 @@ export function isServed(rt, b) {
  */
 export function applyUtilityEffects(state, rt) {
   const tick = state.time.tick;
+  const collapseTicks = COLLAPSE_AFTER_DAYS * mod(rt, 'collapseDays') * TICKS_PER_DAY;
+  const abandonDays = ABANDON_AFTER_DAYS * mod(rt, 'abandonDays');
+  const leaveShare = UNSERVED_LEAVE_SHARE * mod(rt, 'unservedLeave');
   for (const b of [...state.buildings]) {
     const info = BUILDINGS[b.type];
     if (info.utility) continue;
 
     if (b.abandoned !== undefined) {
-      if (tick - b.abandoned >= COLLAPSE_AFTER_DAYS * TICKS_PER_DAY) removeBuilding(state, rt, b.id);
+      if (tick - b.abandoned >= collapseTicks) removeBuilding(state, rt, b.id);
       continue;
     }
     if (isServed(rt, b)) {
@@ -151,7 +157,7 @@ export function applyUtilityEffects(state, rt) {
 
     b.unservedDays = (b.unservedDays || 0) + 1;
     const people = [...(info.residents ? rt.residents.get(b.id) : rt.workers.get(b.id))].sort((x, y) => x - y);
-    const leaving = Math.min(people.length, Math.max(1, Math.ceil(people.length * UNSERVED_LEAVE_SHARE)));
+    const leaving = Math.min(people.length, Math.max(1, Math.ceil(people.length * leaveShare)));
     for (const id of people.slice(0, leaving)) {
       if (info.residents) {
         removeCitizen(state, rt, id);
@@ -162,7 +168,7 @@ export function applyUtilityEffects(state, rt) {
       }
     }
     const left = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
-    if (left === 0 && b.unservedDays >= ABANDON_AFTER_DAYS) {
+    if (left === 0 && b.unservedDays >= abandonDays) {
       b.abandoned = tick;
       delete b.unservedDays;
       touchMap(rt, b.tile, info.size);

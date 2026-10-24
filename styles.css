@@ -49,6 +49,8 @@ button {
 }
 button:hover { background: #454b57; }
 button.active { border-color: var(--accent); background: #2f3b55; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:disabled:hover { background: #3a3f4a; }
 .toolbar .separator { width: 1px; align-self: stretch; background: var(--border); margin: 0 6px; }
 #inspector .stars { color: #f5c542; letter-spacing: 1px; }
 .toolbar kbd { color: var(--muted); font-size: 11px; margin-left: 4px; }
@@ -211,6 +213,48 @@ button.money:hover { border-color: var(--border); background: #323742; }
 .loan-offers button:disabled { opacity: .45; cursor: not-allowed; }
 .budget-error { color: #ff8a80; margin: 8px 0 0; }
 
+/* --- Pesquisa ------------------------------------------------------------- */
+.research { width: 380px; }
+.research .world { margin: 6px 0 8px; }
+.research .world-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.research .world-head small { color: var(--text-secondary); }
+.meter { height: 6px; border-radius: 3px; background: #1e2127; overflow: hidden; margin-top: 4px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--area, var(--accent)); border-radius: 3px; transition: width .3s; }
+.research p { margin: 4px 0; }
+.research .warn { color: #ffcf6e; }
+.research .areas { display: flex; flex-direction: column; gap: 10px; }
+.research .area { border-top: 1px solid #3a3f4a; padding-top: 8px; }
+.research .area header { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.research .area header small { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.research .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--area); flex: none; }
+.research label { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 6px; margin: 4px 0; font-size: 12px; color: var(--text-secondary); }
+.research .goal { grid-template-columns: 44px 1fr; }
+.research input[type=range] { width: 100%; accent-color: var(--area); }
+.research .funding b { font-variant-numeric: tabular-nums; color: var(--text); min-width: 58px; text-align: right; }
+.research select { width: 100%; min-width: 0; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 4px; font: inherit; font-size: 12px; }
+.research [data-eta] { display: block; margin-top: 3px; font-size: 11.5px; }
+.research .recent { list-style: none; padding: 0; margin: 0; }
+.research .recent li { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px solid #3a3f4a; }
+.research .recent small { color: var(--text-secondary); }
+
+#toast {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+  max-width: min(420px, calc(100% - 24px));
+  background: rgb(20 24 30 / .95); border: 1px solid var(--border); border-left: 3px solid #fcc419;
+  border-radius: 6px; padding: 8px 12px; font-size: 13px; z-index: 30; pointer-events: none;
+}
+#toast b { display: block; }
+
+#new-dialog form { display: flex; flex-direction: column; gap: 10px; min-width: min(420px, 90vw); }
+#new-dialog h2 { margin: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.field input { font: inherit; font-size: 15px; padding: 6px 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+.marcos { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px 8px; margin: 0; }
+.marcos legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
+.marcos label { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; cursor: pointer; }
+.marcos small { color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 /* --- Celular ------------------------------------------------------------- */
 /* No computador, a barra inferior e os painéis de baixo não aparecem. */
 .mobile-nav, .sheet { display: none; }
@@ -226,7 +270,7 @@ button.money:hover { border-color: var(--border); background: #323742; }
     font-size: 12px;
   }
   #city-name { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar [title="Empregados / desempregados"] { display: none; }
+  .topbar [title="Empregados / desempregados"], #btn-research { display: none; }
   .topbar .spacer { display: none; }
   .speeds { margin-left: auto; }
   .speeds button { min-width: 40px; padding: 6px 8px; font-size: 12px; }
@@ -237,7 +281,7 @@ button.money:hover { border-color: var(--border); background: #323742; }
   /* Barra inferior, como as abas do iOS. */
   .mobile-nav {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     background: var(--panel);
     border-top: 1px solid #23262d;
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
@@ -284,7 +328,7 @@ button.money:hover { border-color: var(--border); background: #323742; }
   .sheet .small { margin: 10px 0 0; }
 
   /* Orçamento, inspetor e diálogos também viram painéis de baixo. */
-  #budget, #inspector {
+  #budget, #research, #inspector {
     position: fixed; top: auto; left: 0; right: 0; bottom: 0;
     width: auto; max-height: 72dvh;
     background: var(--panel);
@@ -305,7 +349,7 @@ button.money:hover { border-color: var(--border); background: #323742; }
 
 /* Celular deitado: inspetor e orçamento ao lado, para o mapa continuar visível. */
 @media (pointer: coarse) and (max-height: 500px) and (orientation: landscape) {
-  #budget, #inspector {
+  #budget, #research, #inspector {
     top: 0; bottom: 0; left: auto; right: 0;
     width: min(380px, 48vw); max-height: none;
     border-radius: 14px 0 0 14px;

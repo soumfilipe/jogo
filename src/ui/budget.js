@@ -3,7 +3,7 @@
 // applyCommand, como as ferramentas do mapa.
 
 import { ECONOMY, TAX_ZONES } from '../world/catalog.js';
-import { loanPayment, monthlyBudget } from '../systems/economy.js';
+import { loanOffers, loanPayment, loanRate, monthlyBudget } from '../systems/economy.js';
 import { calendar } from '../core/time.js';
 
 const ZONE_NAMES = { residential: 'Residencial', commercial: 'Comercial', industrial: 'Industrial' };
@@ -49,8 +49,10 @@ export class BudgetPanel {
       <h4>Este mês (previsão)</h4>
       <dl class="budget-lines">
         <dt>Impostos</dt><dd data-line="income"></dd>
+        <dt data-statal>Estatais</dt><dd data-statal data-line="statal"></dd>
         <dt>Manutenção das ruas</dt><dd data-line="roads"></dd>
         <dt>Serviços públicos</dt><dd data-line="utilities"></dd>
+        <dt>Pesquisa</dt><dd data-line="research"></dd>
         <dt>Parcelas de empréstimos</dt><dd data-line="loans"></dd>
         <dt class="total">Saldo do mês</dt><dd class="total" data-line="net"></dd>
       </dl>
@@ -60,11 +62,7 @@ export class BudgetPanel {
 
       <h4>Empréstimos</h4>
       <ul class="loans" data-loans></ul>
-      <div class="loan-offers">${ECONOMY.loanOptions.map((amount) => `
-        <button data-loan="${amount}" title="${ECONOMY.loanMonths} parcelas de ${money(loanPayment(amount))} (juros de ${ECONOMY.loanAnnualRate * 100}% ao ano)">
-          + ${money(amount)}<small>${money(loanPayment(amount))}/mês</small>
-        </button>`).join('')}
-      </div>
+      <div class="loan-offers" data-offers></div>
       <p class="budget-error" data-error hidden></p>`;
 
     this.el.addEventListener('input', (e) => {
@@ -106,9 +104,12 @@ export class BudgetPanel {
       q(`[data-tax-income="${zone}"]`).textContent = `${money(budget.income[zone])}/mês`;
     }
 
-    q('[data-line="income"]').textContent = money(budget.income.total);
+    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal);
+    for (const el of this.el.querySelectorAll('[data-statal]')) el.hidden = budget.income.statal === 0;
+    q('[data-line="statal"]').textContent = money(budget.income.statal);
     q('[data-line="roads"]').textContent = money(-budget.expenses.roads);
     q('[data-line="utilities"]').textContent = money(-budget.expenses.utilities);
+    q('[data-line="research"]').textContent = money(-budget.expenses.research);
     q('[data-line="loans"]').textContent = money(-budget.expenses.loans);
     q('[data-line="net"]').textContent = money(budget.net);
 
@@ -119,6 +120,17 @@ export class BudgetPanel {
           <small>${money(l.payment)}/mês · faltam ${l.monthsLeft} ${l.monthsLeft === 1 ? 'mês' : 'meses'}</small></span>
           <button data-repay="${l.id}">Quitar</button></li>`).join('')
       : '<li class="muted">Nenhum empréstimo.</li>';
+    // Valores e juros oferecidos mudam com a pesquisa.
+    const rate = loanRate(rt);
+    const offers = loanOffers(rt);
+    const offersKey = `${rate}|${offers.map((o) => o.amount).join()}`;
+    if (offersKey !== this.offersKey) {
+      this.offersKey = offersKey;
+      q('[data-offers]').innerHTML = offers.map(({ amount, months }) => `
+        <button data-loan="${amount}" title="${months} parcelas de ${money(loanPayment(amount, rate, months))} (juros de ${Math.round(rate * 1000) / 10}% ao ano)">
+          + ${money(amount)}<small>${money(loanPayment(amount, rate, months))}/mês</small>
+        </button>`).join('');
+    }
     for (const b of this.el.querySelectorAll('[data-loan]')) b.disabled = economy.loans.length >= ECONOMY.maxLoans;
 
     const key = `${economy.history.length}:${economy.history.at(-1)?.tick}`;

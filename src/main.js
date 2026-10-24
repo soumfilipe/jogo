@@ -1,6 +1,8 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, COSTS, DENSITY, DENSITY_INFO, ZONE, ZONE_INFO } from './world/catalog.js';
-import { applyCommand, lineTiles, planCommand, rectTiles } from './world/commands.js';
+import { BUILDINGS, DENSITY, DENSITY_INFO, ZONE, ZONE_INFO } from './world/catalog.js';
+import { applyCommand, costs, lineTiles, planCommand, rectTiles } from './world/commands.js';
+import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
+import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
 import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
@@ -12,6 +14,7 @@ import {
 } from './render/camera.js';
 import { renderInspector } from './ui/inspector.js';
 import { BudgetPanel } from './ui/budget.js';
+import { ResearchPanel } from './ui/research.js';
 import { Sheets } from './ui/sheets.js';
 import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
@@ -32,22 +35,32 @@ const TOOLS = [
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
   })),
   { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)' },
-  // Serviços públicos: um clique coloca (precisa encostar numa rua).
+  // Prédios do jogador: um clique coloca (precisa encostar numa rua). Os que
+  // dependem de pesquisa ficam escondidos (no celular, com cadeado) até liberar.
   ...[
-    ['usina_carvao', 'Carvão', '#5f5d58'], ['usina_solar', 'Solar', '#3d5c9e'],
-    ['bomba_agua', 'Bomba', '#4f97c4'], ['poco', 'Poço', '#9fc3e0'],
-  ].map(([building, label, swatch], i) => ({
-    id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch,
+    ['usina_carvao', 'Carvão', '#5f5d58', 'utility'], ['usina_gas', 'Gás', '#8d949b', 'utility'],
+    ['hidreletrica', 'Hidrelétrica', '#4a88b4', 'utility'], ['usina_eolica', 'Eólica', '#dfe2e5', 'utility'],
+    ['usina_solar', 'Solar', '#3d5c9e', 'utility'], ['usina_hidrogenio', 'Hidrogênio', '#16a085', 'utility'],
+    ['bomba_agua', 'Bomba', '#4f97c4', 'utility'], ['poco', 'Poço', '#9fc3e0', 'utility'],
+    ['instituto_pesquisa', 'Instituto', '#e9edf2', 'research'], ['parque_tecnologico', 'Parque tec.', '#7fa6d6', 'research'],
+    ['refinaria', 'Refinaria', '#c8ccd2', 'research'], ['fabrica_cimento', 'Cimento', '#cfc9b8', 'research'],
+    ['usina_etanol', 'Etanol', '#7d8a5c', 'research'],
+  ].map(([building, label, swatch, group], i) => ({
+    id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch, group,
     separatorBefore: i === 0,
   })),
 ];
 
-// Preço mostrado nos botões do painel "Construir" (celular).
-const TOOL_COSTS = {
-  road: `$${COSTS.road}/tile`,
-  bulldoze: 'varia',
-  ...Object.fromEntries([ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL].map((z) => [`zone-${z}`, `$${COSTS.zone}/tile`])),
-};
+/** Preço mostrado nos botões do painel "Construir" (celular). */
+function toolCost(t) {
+  if (t.building) return `$${utilityCost(rt, t.building).toLocaleString('pt-BR')}`;
+  const c = costs(rt);
+  if (t.id === 'road') return `$${round(c.road)}/tile`;
+  if (t.zone) return `$${round(c.zone)}/tile`;
+  if (t.id === 'bulldoze') return 'varia';
+  return '';
+}
+const round = (v) => (Math.round(v * 10) / 10).toLocaleString('pt-BR');
 
 let state;
 let rt;
@@ -96,8 +109,8 @@ function setWorld(next) {
   updateInspector();
 }
 
-function newCity(name) {
-  setWorld(createWorld({ name }));
+function newCity(name, startMarco = 1) {
+  setWorld(createWorld({ name, startMarco }));
   saves.startNew(state.city.name);
 }
 
@@ -157,6 +170,9 @@ function throttledHud() {
   renderHud();
   if (selection) updateInspector();
   budget.render(state, rt);
+  research.render(state, rt);
+  refreshTools();
+  announceResearch();
 }
 
 function renderHud() {
@@ -261,10 +277,47 @@ function showDensity() {
 }
 function utilityTitle(id) {
   const u = BUILDINGS[id].utility;
-  const makes = u.power ? `${u.power.toLocaleString('pt-BR')} de energia` : `${u.water.toLocaleString('pt-BR')} de água`;
+  const fmt = (v) => v.toLocaleString('pt-BR');
+  const makes = [];
+  if (u.power) makes.push(`produz ${fmt(utilityOutput(rt, id, 'power'))} de energia`);
+  if (u.water) makes.push(`produz ${fmt(utilityOutput(rt, id, 'water'))} de água`);
+  if (u.institute) makes.push('transforma a verba de pesquisa em tecnologia');
+  if (u.privateResearch) makes.push('escritórios em volta fazem pesquisa');
+  if (u.income) makes.push(`estatal: rende até $${fmt(u.income)}/mês`);
   const notes = [u.pollution ? 'polui' : null, u.needsWater ? 'na beira de rio ou lago' : null].filter(Boolean);
-  return `Produz ${makes} · $${u.cost.toLocaleString('pt-BR')} + $${u.upkeep}/mês${notes.length ? ' · ' + notes.join(', ') : ''}`;
+  const text = `${makes.join(', ')} · $${fmt(utilityCost(rt, id))} + $${fmt(utilityUpkeep(rt, id))}/mês`;
+  return text.charAt(0).toUpperCase() + text.slice(1) + (notes.length ? ' · ' + notes.join(', ') : '');
 }
+
+/** Tecnologia que falta para um prédio, em texto curto ("Usina solar, marco 4"). */
+function lockText(building) {
+  const tech = TECH_BY_ID.get(BUILDING_TECH[building]);
+  return `${tech.name} · marco ${tech.marco}`;
+}
+
+// Liberações e preços mudam com a pesquisa: atualiza os botões.
+let toolsKey = '';
+function refreshTools() {
+  const key = `${state.research.done.length}|${[...rt.mods.keys()].join()}|${[...rt.unlocked].join()}`;
+  if (key === toolsKey) return;
+  toolsKey = key;
+  for (const t of TOOLS) {
+    const buttons = document.querySelectorAll(`[data-tool="${t.id}"]`);
+    const locked = t.building && !isUnlocked(rt, t.building);
+    for (const button of buttons) {
+      const mobile = button.closest('.sheet');
+      if (!mobile) {
+        button.hidden = Boolean(locked);
+        if (t.building) button.title = `${t.name}: ${utilityTitle(t.building)}`;
+        continue;
+      }
+      button.disabled = Boolean(locked);
+      button.querySelector('small').textContent = locked ? `🔒 ${lockText(t.building)}` : toolCost(t);
+    }
+  }
+  if (tool.building && !isUnlocked(rt, tool.building)) selectTool(TOOLS[0]);
+}
+
 function selectTool(t) {
   tool = t;
   drag = null;
@@ -287,10 +340,45 @@ const budget = new BudgetPanel($('budget'), {
     return result;
   },
 });
-$('btn-budget').onclick = () => {
-  budget.toggle();
+$('btn-budget').onclick = () => toggleBudget();
+
+// Pesquisa: painel aberto pelo botão 🔬 no topo ou pela tecla T. Ocupa o
+// mesmo canto do orçamento, então abrir um fecha o outro.
+const research = new ResearchPanel($('research'), {
+  act: (cmd) => {
+    const result = applyCommand(state, rt, cmd);
+    if (result.ok) dirty = true;
+    return result;
+  },
+});
+$('btn-research').onclick = () => toggleResearch();
+
+function toggleBudget(force) {
+  budget.toggle(force);
+  if (budget.open) research.toggle(false);
   budget.render(state, rt);
-};
+}
+function toggleResearch(force) {
+  research.toggle(force);
+  if (research.open) budget.toggle(false);
+  research.render(state, rt);
+}
+
+// Aviso de tecnologia concluída (a simulação deixa os ids em rt.researchEvents).
+let toastTimer = null;
+function announceResearch() {
+  const events = rt.researchEvents;
+  if (!events?.length) return;
+  rt.researchEvents = [];
+  const names = events.map((id) => TECH_BY_ID.get(id));
+  const toast = $('toast');
+  toast.innerHTML = names.map((t) => `<b>🔬 ${escapeHtml(t.name)}</b><span>${escapeHtml(t.mechanic)}</span>`).join('');
+  toast.hidden = false;
+  status(`Nova tecnologia: ${names.map((t) => t.name).join(', ')}`);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+}
+const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
 const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h' };
@@ -320,14 +408,13 @@ for (const t of TOOLS) {
   if (t.id === 'inspect') continue;
   const button = document.createElement('button');
   button.dataset.tool = t.id;
-  const cost = t.building ? `$${BUILDINGS[t.building].utility.cost.toLocaleString('pt-BR')}` : TOOL_COSTS[t.id] ?? '';
   button.innerHTML = `<span class="swatch" style="background:${t.swatch || t.color}"></span>
-    <span>${t.label || t.name}</span><small>${cost}</small>`;
+    <span>${t.label || t.name}</span><small>${toolCost(t)}</small>`;
   button.onclick = () => {
     selectTool(t);
     sheets.close();
   };
-  document.querySelector(`[data-build-group="${t.building ? 'utility' : 'ground'}"]`).append(button);
+  document.querySelector(`[data-build-group="${t.group ?? 'ground'}"]`).append(button);
 }
 
 for (const [id, mode] of [[null, { name: 'Nenhum' }], ...Object.entries(MAP_MODES)]) {
@@ -362,8 +449,10 @@ for (const button of $('mobile-nav').children) {
       selectTool(TOOLS[0]);
     } else if (button.dataset.mobile === 'budget') {
       sheets.close();
-      budget.toggle();
-      budget.render(state, rt);
+      toggleBudget();
+    } else if (button.dataset.mobile === 'research') {
+      sheets.close();
+      toggleResearch();
     }
   };
 }
@@ -628,11 +717,13 @@ window.addEventListener('keydown', (e) => {
     drag = null;
     select(null);
     budget.toggle(false);
+    research.toggle(false);
   } else if (key === DENSITY_KEY) {
     setDensity((density + 1) % Object.keys(DENSITY_INFO).length);
   } else if (key === 'o') {
-    budget.toggle();
-    budget.render(state, rt);
+    toggleBudget();
+  } else if (key === 't') {
+    toggleResearch();
   } else if (PAN_KEYS[key]) {
     e.preventDefault();
     keysDown.add(key);
@@ -695,14 +786,30 @@ function confirmDiscard() {
 
 function adopt({ state: loaded, meta }) {
   setWorld(loaded);
+  toolsKey = '';
   status(`Carregado: ${meta.name}`);
 }
 
+// Nova cidade: nome e marco inicial (como escolher o ano no SimCity 2000).
+$('new-marcos').innerHTML = MARCOS.map((m, i) => {
+  const ready = TECHS.filter((t) => t.order < m.from).length;
+  return `<label><input type="radio" name="marco" value="${m.id}"${i === 0 ? ' checked' : ''}>
+    <span>${m.id}. ${m.name}<br><small>${i === 0 ? 'só o básico' : `${ready} tecnologias já prontas`}</small></span></label>`;
+}).join('');
 $('btn-new').onclick = () => {
   if (!confirmDiscard()) return;
-  const name = prompt('Nome da cidade:', 'Nova Cidade');
-  if (name) newCity(name.trim());
+  $('new-name').value = 'Nova Cidade';
+  $('new-dialog').showModal();
 };
+$('new-dialog').addEventListener('close', () => {
+  if ($('new-dialog').returnValue !== 'ok') return;
+  const name = $('new-name').value.trim() || 'Nova Cidade';
+  const marco = Number(new FormData($('new-form')).get('marco')) || 1;
+  newCity(name, marco);
+  toolsKey = '';
+  refreshTools();
+  status(`Cidade fundada no marco ${marco}.`);
+});
 
 $('btn-save').onclick = () => attempt(() => saves.save());
 

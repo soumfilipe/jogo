@@ -433,6 +433,125 @@ const UTILITY_GENERATORS = {
     parts.push({ kind: 'cylinder', cx: 0.5, cy: 0.5, r: 0.26, lift: 0.95, h: r.range(0.4, 0.55), color: r.pick(['#d9dde2', '#e3c66b', '#9fc3e0']), top: '#aeb4bb' });
     return parts;
   },
+
+  usina_gas(r) {
+    const w = r.pick([wall('#b5b0a6', '#98938a'), wall('#9fb7cf', '#8299b2'), wall('#e6e2da', '#c9c4ba')]);
+    const h = r.range(1, 1.2);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#6d6f73', lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.3, 1.1], 0, h, w, {
+      windows: { cols: 3, style: 'bands' },
+      bands: [{ at: h * 0.8, thick: 0.06, color: r.pick(STRIPES) }],
+      doors: { count: 2, color: '#3e4145' },
+    }));
+    // Duas chaminés finas de exaustão e os tanques de gás.
+    for (const cx of [0.35, 0.7]) parts.push({ kind: 'cylinder', cx, cy: 0.35, r: 0.08, lift: h, h: r.range(1.4, 1.8), color: '#c8ccd2', top: '#5b5f66' });
+    for (const cy of [1.4, 1.75]) parts.push({ kind: 'cylinder', cx: 1.5, cy, r: 0.17, lift: 0, h: 0.4, color: '#e6e2da', top: '#c9c4ba' });
+    return parts;
+  },
+
+  hidreletrica(r) {
+    const concrete = wall('#c9c6bd', '#a9a69d');
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8a8f86', lift: 0 }];
+    // Barragem em degraus e a casa de força.
+    parts.push(block([0.1, 0.1, 1.9, 0.55], 0, r.range(1.3, 1.6), concrete, { bands: [{ at: 0.4, thick: 0.05, color: '#8d9093' }] }));
+    parts.push(block([0.3, 0.75, 1.5, 1.55], 0, 0.7, wall('#e6e2da', '#c9c4ba'), {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 3, color: '#3f6fc0' },
+    }));
+    // Comportas: faixas azuis de água descendo.
+    for (const x of [0.45, 0.9, 1.35]) parts.push(block([x, 0.56, x + 0.2, 0.74], 0, 0.15, wall('#5aa0d0', '#4a88b4'), { top: '#8cc4e8' }));
+    return parts;
+  },
+
+  usina_eolica(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: r.pick(['#8fae7d', '#9ab486']), lift: 0 }];
+    for (const [cx, cy] of [[0.5, 0.5], [1.5, 0.6], [0.6, 1.5], [1.45, 1.45]]) {
+      const h = r.range(2.6, 3.2);
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.05, lift: 0, h, color: '#eef0f2', top: '#d6d9dd' });
+      // Pás: três hastes finas no alto.
+      parts.push(block([cx - 0.35, cy - 0.02, cx + 0.35, cy + 0.02], h, 0.05, wall('#f4f5f6', '#dfe2e5'), { top: '#ffffff' }));
+      parts.push(block([cx - 0.02, cy - 0.02, cx + 0.02, cy + 0.02], h - 0.3, 0.6, wall('#f4f5f6', '#dfe2e5'), { top: '#ffffff' }));
+    }
+    return parts;
+  },
+
+  usina_hidrogenio(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#9aa3ad', lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.1, 1.0], 0, 0.9, wall('#e9edf2', '#c8ced6'), {
+      windows: { cols: 3, style: 'bands' }, bands: [{ at: 0.75, thick: 0.06, color: '#16a085' }],
+    }));
+    // Tanques esféricos (aqui, cilindros baixos) e eletrolisadores.
+    for (const [cx, cy] of [[1.45, 0.45], [1.45, 1.0]]) parts.push({ kind: 'cylinder', cx, cy, r: 0.24, lift: 0, h: 0.6, color: '#f4f5f6', top: '#16a085' });
+    for (let k = 0; k < 3; k++) parts.push(block([0.2 + k * 0.45, 1.3, 0.55 + k * 0.45, 1.85], 0, 0.4, METAL, { top: '#d6d8dc' }));
+    return parts;
+  },
+
+  refinaria(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5f5d58', lift: 0 }];
+    // Torres de destilação de alturas diferentes.
+    for (const [cx, cy, h] of [[0.35, 0.35, 2.8], [0.7, 0.35, 2.2], [0.35, 0.75, 1.8]]) {
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.12, lift: 0, h: h * r.range(0.9, 1.1), color: '#c8ccd2', top: '#8d949b' });
+    }
+    // Tanques de armazenamento.
+    for (const [cx, cy] of [[1.3, 0.45], [1.7, 0.45], [1.3, 0.95], [1.7, 0.95]]) {
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.2, lift: 0, h: 0.45, color: r.pick(['#e6e2da', '#f0e6d2']), top: '#b5b0a6' });
+    }
+    parts.push(block([0.15, 1.3, 1.85, 1.85], 0, 0.55, r.pick(IND_WALLS), {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 2, color: '#3e4145' },
+      bands: [{ at: 0.45, thick: 0.05, color: '#e8b931' }],
+    }));
+    parts.push({ kind: 'antenna', cx: 0.7, cy: 0.75, lift: 0, h: 3.2 });
+    return parts;
+  },
+
+  fabrica_cimento(r) {
+    const dust = wall('#cfc9b8', '#b0aa99');
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#a7a397', lift: 0 }];
+    // Forno rotativo comprido, silos e a chaminé.
+    parts.push(block([0.15, 1.35, 1.85, 1.65], 0.2, 0.3, wall('#b08260', '#94694b'), { top: '#c49a78' }));
+    for (const cx of [0.4, 0.8, 1.2]) parts.push({ kind: 'cylinder', cx, cy: 0.5, r: 0.18, lift: 0, h: r.range(1.6, 2), color: '#dcd8cc', top: '#b0aa99' });
+    parts.push(block([1.4, 0.15, 1.85, 1.0], 0, 1.4, dust, { windows: { cols: 2, style: 'grid' } }));
+    parts.push({ kind: 'cylinder', cx: 1.62, cy: 0.58, r: 0.07, lift: 1.4, h: 1.6, color: '#b5b0a6', top: '#5b5f66' });
+    return parts;
+  },
+
+  usina_etanol(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7d8a5c', lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.2, 0.95], 0, 1.1, r.pick(IND_WALLS), {
+      windows: { cols: 3, style: 'grid' }, bands: [{ at: 0.9, thick: 0.06, color: '#3d8f5a' }], doors: { count: 2, color: '#3e4145' },
+    }));
+    // Tanques de fermentação e a pilha de bagaço.
+    for (const [cx, cy] of [[1.5, 0.35], [1.5, 0.8]]) parts.push({ kind: 'cylinder', cx, cy, r: 0.2, lift: 0, h: 0.9, color: '#d9dde2', top: '#9fa6ad' });
+    parts.push(block([0.2, 1.3, 1.1, 1.85], 0, 0.25, wall('#c9b27a', '#a99260'), { top: '#d9c08a' }));
+    parts.push({ kind: 'cylinder', cx: 0.35, cy: 0.35, r: 0.07, lift: 1.1, h: 1.2, color: '#c8ccd2', top: '#5b5f66' });
+    return parts;
+  },
+
+  instituto_pesquisa(r) {
+    const w = r.pick([wall('#e9edf2', '#c8ced6'), wall('#e6e2da', '#c9c4ba'), wall('#d9c39a', '#bfa57a')]);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8fae7d', lift: 0 }];
+    const h = r.range(1.2, 1.6);
+    parts.push(block([0.15, 0.15, 1.85, 0.9], 0, h, w, {
+      windows: { cols: 5, style: 'grid' }, doors: { count: 1, color: '#3f6fc0' },
+      bands: [{ at: h * 0.92, thick: 0.05, color: '#3f6fc0' }],
+    }));
+    parts.push(block([0.15, 1.05, 0.95, 1.85], 0, h * 0.7, w, { windows: { cols: 3, style: 'bands' } }));
+    // Observatório: cúpula branca sobre um tambor.
+    parts.push({ kind: 'cylinder', cx: 1.4, cy: 1.45, r: 0.3, lift: 0, h: 0.6, color: '#f4f5f6', top: '#dfe2e5' });
+    parts.push({ kind: 'cylinder', cx: 1.4, cy: 1.45, r: 0.2, lift: 0.6, h: 0.25, color: '#cfd5dc', top: '#eef0f2' });
+    parts.push({ kind: 'antenna', cx: 0.4, cy: 0.4, lift: h, h: 0.9 });
+    return parts;
+  },
+
+  parque_tecnologico(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8fae7d', lift: 0 }];
+    // Prédios de vidro baixos e um mais alto, com um pátio verde no meio.
+    parts.push(block([0.12, 0.12, 0.85, 0.85], 0, r.range(2.2, 2.8), r.pick(GLASS), { windows: { cols: 3, style: 'bands' } }));
+    parts.push(block([1.1, 0.15, 1.85, 0.75], 0, 1.1, r.pick(GLASS), { windows: { cols: 3, style: 'bands' } }));
+    parts.push(block([0.15, 1.15, 0.85, 1.85], 0, 0.9, r.pick(GLASS), { windows: { cols: 3, style: 'bands' } }));
+    parts.push(block([1.1, 1.1, 1.85, 1.85], 0, 1.4, r.pick(GLASS), { windows: { cols: 3, style: 'grid' } }));
+    parts.push({ kind: 'antenna', cx: 0.5, cy: 0.5, lift: 2.5, h: 0.8 });
+    return parts;
+  },
 };
 
 // Telhado dente de serra: várias águas estreitas em sequência.

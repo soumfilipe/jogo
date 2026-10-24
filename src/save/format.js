@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  8,                 // versão do FORMATO (para migrações)
+//   "version":  9,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -15,10 +15,11 @@
 import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
 import { generateForest } from '../world/terrain.js';
+import { createResearch } from '../systems/research.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 8;
-export const GAME_VERSION = '0.8.0';
+export const SAVE_VERSION = 9;
+export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -127,6 +128,14 @@ const MIGRATIONS = {
     save.data.companies = encodeTable([]);
     save.data.legacyJobs = true;
     save.version = 8;
+    return save;
+  },
+  // v8 -> v9: pesquisa. A cidade começa no primeiro marco, só com as
+  // tecnologias iniciais. Prédios que hoje dependem de pesquisa (como a usina
+  // solar) continuam funcionando; só não dá para construir novos.
+  8: (save) => {
+    save.data.research = createResearch(1);
+    save.version = 9;
     return save;
   },
 };

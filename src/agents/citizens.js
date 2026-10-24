@@ -31,6 +31,7 @@ import {
 } from '../world/runtime.js';
 import { findRoadPath } from './pathfinding.js';
 import { isServed } from '../systems/utilities.js';
+import { mod } from '../systems/mods.js';
 import { FIRST_NAMES, LAST_NAMES } from './names.js';
 
 // Quantas rotas calcular por tick no máximo (o resto espera na fila).
@@ -167,9 +168,10 @@ function evictOldest(map, count) {
 
 function moveCitizens(state, rt) {
   const width = state.map.width;
+  const speed = mod(rt, 'citizenSpeed', CITIZEN_SPEED);
   for (const id of rt.movers) {
     const c = rt.citizenById.get(id);
-    let budget = CITIZEN_SPEED;
+    let budget = speed;
     while (budget > 0 && c.step < c.path.length - 1) {
       const next = c.path[c.step + 1];
       const nx = (next % width) + 0.5;

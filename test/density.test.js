@@ -18,8 +18,9 @@ import { checksum, createSave, readSave, SAVE_VERSION } from '../src/save/format
 
 const W = 24;
 
-function world() {
-  const state = createWorld({ width: W, height: W, seed: 5 });
+// Marco 2: o código de zoneamento (nível 3) já vem pesquisado.
+function world(startMarco = 2) {
+  const state = createWorld({ width: W, height: W, seed: 5, startMarco });
   state.map.terrain.fill(TERRAIN.GRASS);
   state.utilities.imported = { power: true, water: true };
   state.economy.money = 1_000_000;
@@ -29,8 +30,8 @@ function world() {
 }
 
 /** Prédio lotado, abastecido, com demanda e terreno valorizado. */
-function fullBuilding(type, density) {
-  const { state, rt } = world();
+function fullBuilding(type, density, startMarco = 2) {
+  const { state, rt } = world(startMarco);
   const tile = 6 * W + 5;
   applyCommand(state, rt, { type: 'zone', zone: BUILDINGS[type].zone, density, tiles: [tile] });
   const b = addBuilding(state, rt, type, tile);
@@ -87,6 +88,14 @@ test('densidade baixa para no sobrado', () => {
   applyCommand(state, rt, { type: 'zone', zone: ZONE.RESIDENTIAL, density: DENSITY.MEDIUM, tiles: [b.tile] });
   grow(state, rt, b);
   assert.equal(b.type, 'apartamentos');
+});
+
+test('sem o código de zoneamento, nem a densidade média passa do sobrado', () => {
+  const { state, rt, b, fill } = fullBuilding('sobrado', DENSITY.MEDIUM, 1);
+  fill();
+  grow(state, rt, b);
+  assert.equal(b.type, 'sobrado');
+  assert.match(upgradeBlockers(state, rt, b).blockers.join(), /Código de zoneamento/);
 });
 
 test('prédio alto ganha um andar por vez, até o limite da densidade', () => {

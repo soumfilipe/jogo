@@ -29,8 +29,9 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `X` Densidade (Baixa / Média / Alta) | densidade das zonas residenciais e comerciais; arrastar sobre lotes construídos troca só a densidade |
 | `B` Demolir | arraste sobre prédios, estradas, árvores ou zonas |
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
-| Carvão / Solar / Bomba / Poço | coloca um serviço público (um clique; precisa encostar numa rua) |
+| Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
+| `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
 | `L` / `P` / `N` / `H` Mapas | valor do terreno, poluição, energia ou água sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
@@ -42,7 +43,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 Em telas estreitas (ou celular deitado) a interface muda:
 
 - **Barra inferior**: Mover (arrastar a câmera e tocar para inspecionar),
-  Construir, Mapas, Orçamento e Arquivo. O rótulo mostra a ferramenta ou o mapa
+  Construir, Mapas, Orçamento, Pesquisa e Arquivo. O rótulo mostra a ferramenta ou o mapa
   escolhido.
 - **Painéis que sobem de baixo**, como o teclado do iOS: Construir (ruas, zonas e
   serviços públicos, com preço), Mapas e Arquivo (salvar, carregar, exportar,
@@ -75,6 +76,41 @@ Painel aberto pela tecla `O` ou clicando no dinheiro no topo
 - O painel mostra a previsão do mês e um gráfico de receita e despesa dos últimos
   24 meses (com dica ao passar o mouse e a mesma informação em tabela); o
   histórico de 36 meses fica no save.
+
+## Pesquisa e tecnologias
+
+Painel aberto pela tecla `T` ou pelo 🔬 no topo (`src/ui/research.js`; regras em
+`src/systems/research.js`, árvore em `src/world/techs.js` e `RESEARCH` no catálogo).
+A árvore inteira, com o que cada tecnologia libera e os sistemas que ainda
+faltam, está em [`docs/arvore-tecnologica.html`](docs/arvore-tecnologica.html)
+(abra pelo servidor: <http://localhost:8080/docs/arvore-tecnologica.html>).
+
+- **218 tecnologias em 11 áreas** do conhecimento (educação, cultura e esporte,
+  economia e sociedade, segurança, química, alimentação e logística, engenharia,
+  energia, computação, saúde e ciências ambientais).
+- **A pesquisa vem de instituições.** Cada **Instituto de pesquisa** lotado
+  transforma a verba de cada área (até $10 mil por mês) em pontos, com retorno
+  decrescente: 4× a verba rende 2× os pontos. Sem instituto, a verba não rende
+  nem é cobrada. Prédios que atuam numa área também pesquisam, 15× mais devagar
+  (usinas em energia, bombas e poços em saúde, refinaria em química). O
+  **Parque tecnológico** faz os escritórios em volta pesquisarem (P&D privado).
+- **Alvo de cada área**: por padrão, os pontos vão para a tecnologia disponível
+  mais barata da área; dá para escolher outra no painel. Quando todas as áreas
+  do custo têm pontos suficientes, ela é concluída no fechamento do mês e um
+  aviso aparece na tela.
+- **Marcos do mundo**: o mundo avança sozinho (3 "anos" por ano de jogo) por
+  seis marcos, de *Eletricidade e concreto* a *Transição verde e digital*.
+  Antes de o mundo chegar a uma tecnologia, a cidade só a consegue como
+  pioneira, pagando 3× os pontos. Em **Nova cidade** escolhe-se o marco inicial,
+  como o ano no SimCity 2000; o que veio antes já vem pronto.
+- **Efeitos**: tecnologias liberam prédios (usina a gás, hidrelétrica, eólica,
+  solar, a hidrogênio; refinaria, fábrica de cimento e usina de etanol, que são
+  estatais e dão receita), liberam o nível 3 de residências e comércio (código
+  de zoneamento) e mudam parâmetros do jogo: manutenção, juros, velocidade dos
+  cidadãos, poluição, consumo, impostos, valor do terreno, demanda.
+- Nesta versão, 59 tecnologias podem ser pesquisadas. As outras dependem de
+  sistemas que ainda não existem (trânsito, escolaridade, saúde, segurança,
+  lixo...) e aparecem como "chega numa próxima versão".
 
 ## Energia e água
 
@@ -113,8 +149,10 @@ da rua em que estão encostados (`src/systems/utilities.js`).
 | Grande 2×2 | Condomínio (48) | Shopping (80) | Galpão logístico (70) |
 
 - Um prédio 1×1 sobe um nível quando está **lotado**, o **valor do terreno** é
-  suficiente (residencial 45% / 62%, comercial 45% / 60%; indústria não exige) e
-  a demanda da zona não está negativa. Entre um nível e outro passam pelo menos
+  suficiente (residencial 45% / 62%, comercial 45% / 60%; indústria não exige),
+  a demanda da zona não está negativa e o nível já foi liberado pela pesquisa
+  (o nível 2 vem com o concreto armado, no começo; o nível 3 e os prédios
+  grandes, com o **código de zoneamento**). Entre um nível e outro passam pelo menos
   3 dias. Os moradores e funcionários continuam no prédio.
 - Prédios grandes nascem em lotes vazios 2×2 da mesma zona, com valor do terreno
   de nível 2, depois que a cidade passa de 300 habitantes.
@@ -354,7 +392,7 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 8,                 // versão do formato (migrações em src/save/format.js)
+  "version": 9,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
@@ -379,6 +417,9 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves de antes da pesquisa (formato 8) abrem no primeiro marco, só com as
+tecnologias iniciais; usinas solares que já existiam continuam funcionando.
 
 Saves de antes das empresas (formato 7) abrem normalmente: a migração marca o
 save, e ao carregar cada prédio comercial e industrial ganha empresas em todos

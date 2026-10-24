@@ -14,6 +14,7 @@
     <span title="População">👥 <span id="population">0</span></span>
     <span title="Empregados / desempregados">💼 <span id="employment">0</span></span>
     <button id="btn-budget" class="money" title="Orçamento (O)">💰 <span id="money">0</span></button>
+    <button id="btn-research" class="money" title="Pesquisa (T)">🔬 <span id="research-hud">Pesquisa</span></button>
     <span id="power" title="Energia: consumo / produção">⚡ <span>0</span></span>
     <span id="water" title="Água: consumo / produção">💧 <span>0</span></span>
     <span id="utility-hint" class="hint" hidden></span>
@@ -37,6 +38,8 @@
     <canvas id="map"></canvas>
     <div id="tooltip" hidden></div>
     <aside id="budget" class="budget" hidden></aside>
+    <aside id="research" class="budget research" hidden></aside>
+    <div id="toast" hidden></div>
     <aside id="inspector" hidden>
       <button id="inspector-close" class="close" title="Fechar">×</button>
       <div id="inspector-body"></div>
@@ -64,6 +67,7 @@
     <button data-sheet="sheet-build"><span class="ico">🏗️</span><span data-build-label>Construir</span></button>
     <button data-sheet="sheet-maps"><span class="ico">🗺️</span><span data-maps-label>Mapas</span></button>
     <button data-mobile="budget"><span class="ico">💰</span><span>Orçamento</span></button>
+    <button data-mobile="research"><span class="ico">🔬</span><span>Pesquisa</span></button>
     <button data-sheet="sheet-file"><span class="ico">💾</span><span>Arquivo</span></button>
   </nav>
 
@@ -76,8 +80,10 @@
       <div class="sheet-grid" data-build-group="ground"></div>
       <h4>Densidade (residencial e comercial)</h4>
       <div class="sheet-grid" data-build-group="density"></div>
-      <h4>Serviços públicos</h4>
+      <h4>Energia e água</h4>
       <div class="sheet-grid" data-build-group="utility"></div>
+      <h4>Pesquisa e estatais</h4>
+      <div class="sheet-grid" data-build-group="research"></div>
     </section>
   </div>
 
@@ -107,6 +113,23 @@
       <p class="muted small" data-file-status></p>
     </section>
   </div>
+
+  <dialog id="new-dialog">
+    <form method="dialog" id="new-form">
+      <h2>Nova cidade</h2>
+      <label class="field">Nome<input id="new-name" value="Nova Cidade" maxlength="60" required></label>
+      <fieldset class="marcos">
+        <legend>Começar no marco</legend>
+        <div id="new-marcos"></div>
+      </fieldset>
+      <p class="muted small">As tecnologias dos marcos anteriores já vêm prontas. O mundo segue
+        descobrindo coisas novas com o tempo, e a sua cidade pode chegar antes dele pesquisando.</p>
+      <div class="row">
+        <button value="ok" class="primary">Fundar a cidade</button>
+        <button value="cancel" formnovalidate>Cancelar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="load-dialog">
     <h2>Carregar cidade</h2>
