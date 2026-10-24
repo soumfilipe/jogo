@@ -251,7 +251,15 @@ Proteções:
 - O servidor só escuta em `127.0.0.1` e só aceita ids `[a-z0-9_-]` (nada de `../`).
 
 Se o jogo for aberto por outro servidor estático (sem o `server.js`), ele detecta
-isso e salva no `localStorage` do navegador; exportar/importar arquivo continua funcionando.
+isso e salva no **IndexedDB** do navegador (é o caso do GitHub Pages):
+- cabe cidades grandes (centenas de MB, conforme o espaço livre do aparelho);
+- a lista de saves lê só os metadados, sem carregar as cidades inteiras;
+- o jogo pede armazenamento persistente para o navegador não apagar os saves;
+- saves de versões antigas, que ficavam no `localStorage` (limite de ~5 MB),
+  são copiados para o IndexedDB na primeira abertura e apagados de lá.
+
+O `localStorage` só é usado se o IndexedDB não abrir (ex.: modo privado de alguns
+navegadores). Exportar/importar arquivo funciona em todos os casos.
 (Abrir o `index.html` direto com duplo clique não funciona: o navegador bloqueia
 módulos JavaScript em `file://`.)
 
@@ -303,7 +311,7 @@ src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa
 src/ui/                 painel de inspeção e painel de orçamento
 src/save/format.js      formato do save: criar, validar, checksum, migrações, RLE
-src/save/backends.js    onde gravar: arquivos (servidor) ou navegador
+src/save/backends.js    onde gravar: arquivos (servidor), IndexedDB ou localStorage
 src/save/SaveManager.js salvar, carregar, automático, exportar/importar
 test/                   testes (node --test)
 ```
