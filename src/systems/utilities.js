@@ -13,7 +13,7 @@ import {
   ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE,
 } from '../world/catalog.js';
 import { TICKS_PER_DAY } from '../core/time.js';
-import { footprint, removeBuilding, removeCitizen, sendHome, setJob } from '../world/runtime.js';
+import { footprint, removeBuilding, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
 
 export const RESOURCES = ['power', 'water'];
 
@@ -91,22 +91,19 @@ export function computeUtilities(state, rt) {
     }
   }
 
-  // Muda o desenho (ícones, mapas) só quando alguém ganhou ou perdeu serviço.
-  let changed = !rt.service || rt.service.size !== service.size;
-  if (!changed) {
-    for (const [id, s] of service) {
-      const old = rt.service.get(id);
-      if (!old || old.power !== s.power || old.water !== s.water) {
-        changed = true;
-        break;
-      }
+  // Redesenha (ícones de falta) só os prédios que ganharam ou perderam serviço.
+  // Prédios novos, demolidos ou abandonados já avisaram o renderizador.
+  for (const [id, s] of service) {
+    const old = rt.service?.get(id);
+    if (old && (old.power !== s.power || old.water !== s.water)) {
+      const b = rt.buildingById.get(id);
+      touchMap(rt, b.tile, BUILDINGS[b.type].size);
     }
   }
   rt.service = service;
   rt.utilityNets = nets;
   rt.utilityTotals = totals(nets);
   fillMaps(state, rt, nets, imported);
-  if (changed) rt.mapVersion++;
 }
 
 /** Energia/água sobrando na rede do tile de estrada `access` (para crescer). */
@@ -166,7 +163,7 @@ export function applyUtilityEffects(state, rt) {
     if (left === 0 && b.unservedDays >= ABANDON_AFTER_DAYS) {
       b.abandoned = tick;
       delete b.unservedDays;
-      rt.mapVersion++;
+      touchMap(rt, b.tile, info.size);
     }
   }
 }

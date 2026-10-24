@@ -10,6 +10,10 @@ import { designFor, mixHex } from './designs.js';
 // Altura de uma fileira de janelas, em "andares".
 const WINDOW_ROW = 9 / 32;
 const DAY_GLASS = 'rgba(255, 255, 255, 0.38)';
+// Altura máxima de um prédio, em andares (TILE_H cada), contando telhado e
+// antenas, com folga. O renderizador usa para saber até onde um prédio
+// pode cobrir os tiles atrás dele.
+export const MAX_FLOORS = 9;
 
 /**
  * Geometria do prédio na tela: as partes projetadas, o centro de cada janela

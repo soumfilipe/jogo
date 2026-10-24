@@ -27,33 +27,59 @@ export const LIGHT_COLORS = {
  * para residências; para o resto, 1 se tem funcionários, 0 se não tem).
  */
 export function isWindowLit(b, info, k, minute, occupancy) {
-  const r = (salt) => hash2(b.id * 64 + k, salt);
-  if (r(1) >= occupancy) return false;
+  return isLit(windowSchedules(b, info, k + 1), k, minute, occupancy);
+}
 
-  if (info.zone === ZONE.RESIDENTIAL) {
-    const on = H(17.5) + r(2) * H(2.5); //                  17h30 a 20h
-    const nightOwl = r(6) < 0.08;
-    const off = nightOwl ? H(2) + r(3) * H(2) : H(22) + r(3) * H(3.5); // 22h a 1h30 (ou 2h a 4h)
-    if (within(minute, on, off)) return true;
-    // Parte das casas acende cedo, antes de sair para o trabalho.
-    return r(4) < 0.35 && within(minute, H(5.5) + r(5) * H(1), H(7));
+/**
+ * Horários das janelas 0..count-1 do prédio, sorteados uma vez só (o
+ * renderizador guarda e reaproveita a cada redesenho das luzes). Por janela,
+ * SCHEDULE_FIELDS números: o limite de ocupação para acender e dois
+ * intervalos [acende, apaga) em minutos do dia (-1 = sem o intervalo).
+ */
+export function windowSchedules(b, info, count) {
+  const out = new Int16Array(count * SCHEDULE_FIELDS);
+  for (let k = 0; k < count; k++) {
+    const r = (salt) => hash2(b.id * 64 + k, salt);
+    const o = k * SCHEDULE_FIELDS;
+    // Limite em milésimos: acende se a ocupação passar dele.
+    out[o] = Math.floor(r(1) * 1000);
+    out[o + 1] = out[o + 2] = out[o + 3] = out[o + 4] = -1;
+    const set = (i, start, end) => {
+      out[o + 1 + i * 2] = Math.floor(start) % 1440;
+      out[o + 2 + i * 2] = Math.floor(end) % 1440;
+    };
+
+    if (info.zone === ZONE.RESIDENTIAL) {
+      const on = H(17.5) + r(2) * H(2.5); //                  17h30 a 20h
+      const nightOwl = r(6) < 0.08;
+      const off = nightOwl ? H(2) + r(3) * H(2) : H(22) + r(3) * H(3.5); // 22h a 1h30 (ou 2h a 4h)
+      set(0, on, off);
+      // Parte das casas acende cedo, antes de sair para o trabalho.
+      if (r(4) < 0.35) set(1, H(5.5) + r(5) * H(1), H(7));
+    } else if (info.zone === ZONE.COMMERCIAL) {
+      const on = H(17) + r(2) * H(1.5); //                    17h a 18h30
+      const lateOffice = info.level >= 3 && r(6) < 0.06;
+      const off = lateOffice ? H(1) + r(3) * H(2) : H(20) + r(3) * H(3); // 20h a 23h
+      set(0, on, off);
+    } else if (r(2) < 0.3) {
+      // Indústria: turno da noite.
+      set(0, H(17.5) + r(3) * H(1), H(6));
+    }
   }
+  return out;
+}
+export const SCHEDULE_FIELDS = 5;
 
-  if (info.zone === ZONE.COMMERCIAL) {
-    const on = H(17) + r(2) * H(1.5); //                    17h a 18h30
-    const lateOffice = info.level >= 3 && r(6) < 0.06;
-    const off = lateOffice ? H(1) + r(3) * H(2) : H(20) + r(3) * H(3); // 20h a 23h
-    return within(minute, on, off);
-  }
-
-  // Indústria: turno da noite.
-  return r(2) < 0.3 && within(minute, H(17.5) + r(3) * H(1), H(6));
+/** A janela `k` de `schedules` (ver windowSchedules) está acesa? */
+export function isLit(schedules, k, minute, occupancy) {
+  const o = k * SCHEDULE_FIELDS;
+  if (schedules[o] >= occupancy * 1000) return false;
+  return within(minute, schedules[o + 1], schedules[o + 2]) || within(minute, schedules[o + 3], schedules[o + 4]);
 }
 
 /** Minuto dentro do intervalo [start, end), que pode virar a meia-noite. */
 function within(minute, start, end) {
-  start = Math.floor(start) % 1440;
-  end = Math.floor(end) % 1440;
+  if (start < 0) return false;
   return start <= end ? minute >= start && minute < end : minute >= start || minute < end;
 }
 
