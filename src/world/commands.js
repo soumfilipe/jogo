@@ -5,7 +5,9 @@
 //
 // Comandos:
 //   { type: 'road',     tiles }
-//   { type: 'zone',     tiles, zone }       (zone = ZONE.NONE remove a zona)
+//   { type: 'zone',     tiles, zone, density? }
+//                       (zone = ZONE.NONE remove a zona; density padrão: média.
+//                        Mudar só a densidade vale também em lote construído)
 //   { type: 'bulldoze', tiles }
 //   { type: 'place', building, tile }    (prédio do jogador; tile = canto de cima)
 //   { type: 'tax', zone, percent }       (zone: residential | commercial | industrial)
@@ -14,8 +16,8 @@
 //   { type: 'funding', area, amount }    (verba de pesquisa por mês numa área)
 //   { type: 'priority', area, tech }     (tecnologia prioritária da área; null = automático)
 
-import { BUILDINGS, COSTS, TERRAIN, ZONE } from './catalog.js';
-import { addBuilding, recomputeRoads, removeBuilding } from './runtime.js';
+import { BUILDINGS, COSTS, DENSITY, TERRAIN, ZONE } from './catalog.js';
+import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
 import { isBuildable } from './world.js';
 import { BUILDING_TECH, TECH_BY_ID, marcoAt } from './techs.js';
 import { repayLoan, setTax, takeLoan } from '../systems/economy.js';
@@ -24,7 +26,7 @@ import { setFunding, setPriority } from '../systems/research.js';
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
-  const { road, zone, terrain } = state.map;
+  const { road, zone, terrain, density } = state.map;
   const tiles = [];
   const buildings = new Set(); // prédios grandes ocupam vários tiles: conta uma vez
   const c = costs(rt);
@@ -38,8 +40,11 @@ export function planCommand(state, rt, cmd) {
       if (road[tile] || rt.buildingAt[tile] || !isBuildable(state, tile)) continue;
       cost += c.road + (forest ? c.clearForest : 0);
     } else if (cmd.type === 'zone') {
-      if (road[tile] || zone[tile] === cmd.zone || !isBuildable(state, tile)) continue;
-      if (rt.buildingAt[tile]) continue; // demolir antes de rezonear
+      if (road[tile] || !isBuildable(state, tile)) continue;
+      const sameZone = zone[tile] === cmd.zone;
+      if (sameZone && (cmd.zone === ZONE.NONE || density[tile] === zoneDensity(cmd))) continue;
+      // Com prédio, só a densidade muda; trocar a zona exige demolir antes.
+      if (rt.buildingAt[tile] && !sameZone) continue;
       cost += cmd.zone === ZONE.NONE ? 0 : c.zone;
     } else if (cmd.type === 'bulldoze') {
       const id = rt.buildingAt[tile];
@@ -96,21 +101,21 @@ export function applyCommand(state, rt, cmd) {
     if (utility.water) imported.water = false;
     state.economy.money -= cost;
     computeMods(state, rt);
-    rt.mapVersion++;
     return { ok: true, cost, count: 1 };
   }
 
-  const { road, zone, terrain } = state.map;
+  const { road, zone, terrain, density } = state.map;
   let roadsChanged = false;
 
   for (const tile of tiles) {
     if (cmd.type === 'road') {
       road[tile] = 1;
       zone[tile] = ZONE.NONE;
-      if (terrain[tile] === TERRAIN.FOREST) terrain[tile] = TERRAIN.GRASS;
+      if (terrain[tile] === TERRAIN.FOREST) clearForest(state, tile);
       roadsChanged = true;
     } else if (cmd.type === 'zone') {
       zone[tile] = cmd.zone;
+      if (cmd.zone !== ZONE.NONE) density[tile] = zoneDensity(cmd);
     } else if (cmd.type === 'bulldoze') {
       if (rt.buildingAt[tile]) {
         removeBuilding(state, rt, rt.buildingAt[tile]);
@@ -118,7 +123,7 @@ export function applyCommand(state, rt, cmd) {
         road[tile] = 0;
         roadsChanged = true;
       } else if (terrain[tile] === TERRAIN.FOREST) {
-        terrain[tile] = TERRAIN.GRASS;
+        clearForest(state, tile);
       } else {
         zone[tile] = ZONE.NONE;
       }
@@ -128,9 +133,11 @@ export function applyCommand(state, rt, cmd) {
   state.economy.money -= cost;
   if (roadsChanged) recomputeRoads(state, rt);
   if (cmd.type === 'bulldoze') computeMods(state, rt);
-  rt.mapVersion++;
+  touchMap(rt);
   return { ok: true, cost, count: tiles.length };
 }
+
+const zoneDensity = (cmd) => cmd.density ?? DENSITY.MEDIUM;
 
 /**
  * Prédio do jogador: precisa estar liberado pela pesquisa; o terreno inteiro

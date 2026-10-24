@@ -2,8 +2,8 @@
 // (buildRuntime) e mantidos atualizados pelas funções deste módulo. Qualquer
 // mudança em prédios, cidadãos ou estradas deve passar por aqui.
 
-import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN } from './catalog.js';
-import { jobsOf } from '../systems/mods.js';
+import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN, ZONE, capacityOf } from './catalog.js';
+import { mod } from '../systems/mods.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -13,6 +13,9 @@ export function buildRuntime(state) {
     buildingAt: new Int32Array(width * height), // id do prédio em cada tile (0 = nenhum)
     residents: new Map(), // id do prédio -> Set de ids de cidadãos
     workers: new Map(), //   id do prédio -> Set de ids de cidadãos
+    companyById: new Map(),
+    companiesIn: new Map(), // id do prédio -> empresas dele, do andar mais baixo ao mais alto
+    companyWorkers: new Map(), // id da empresa -> Set de ids de cidadãos
     departures: new Map(), // minuto do dia -> Set de ids de cidadãos
     movers: new Set(), //    cidadãos andando agora
     roadComponent: new Int32Array(width * height), // rede de estradas de cada tile (0 = sem)
@@ -23,13 +26,35 @@ export function buildRuntime(state) {
     pollution: new Float32Array(width * height), // 0 a 1
     // Incrementado a cada mudança visível no mapa (o renderizador usa como cache).
     mapVersion: 0,
+    // O que mudou desde o último desenho: pares [tile, tamanho] dos trechos
+    // alterados, ou dirtyAll quando é preciso redesenhar tudo (ver touchMap).
+    dirtyTiles: [],
+    dirtyAll: true,
   };
 
   for (const b of state.buildings) indexBuilding(state, rt, b);
+  for (const co of state.companies) indexCompany(rt, co);
   for (const c of state.citizens) indexCitizen(rt, c);
   recomputeRoads(state, rt, { reroute: false });
   return rt;
 }
+
+/**
+ * Avisa o renderizador que o mapa mudou: no trecho size x size a partir de
+ * `tile` ou, sem `tile`, no mapa todo. Assim ele redesenha só o que mudou.
+ */
+export function touchMap(rt, tile = -1, size = 1) {
+  rt.mapVersion++;
+  if (rt.dirtyAll) return;
+  // Muita coisa pendente (ex.: simulação sem tela): redesenha tudo de uma vez.
+  if (tile < 0 || rt.dirtyTiles.length >= MAX_DIRTY * 2) {
+    rt.dirtyAll = true;
+    rt.dirtyTiles.length = 0;
+    return;
+  }
+  rt.dirtyTiles.push(tile, size);
+}
+const MAX_DIRTY = 400;
 
 // ---------------------------------------------------------------------------
 // Prédios
@@ -40,11 +65,11 @@ export function addBuilding(state, rt, type, tile) {
   const building = { id: state.nextId++, type, tile, builtAt: state.time.tick };
   state.buildings.push(building);
   for (const t of footprint(state, building)) {
-    if (state.map.terrain[t] === TERRAIN.FOREST) state.map.terrain[t] = TERRAIN.GRASS;
+    if (state.map.terrain[t] === TERRAIN.FOREST) clearForest(state, t);
   }
   indexBuilding(state, rt, building);
   rt.access.set(building.id, findAccessRoad(state, rt, tile, BUILDINGS[type].size));
-  rt.mapVersion++;
+  touchMap(rt, tile, BUILDINGS[type].size);
   return building;
 }
 
@@ -58,6 +83,7 @@ export function removeBuilding(state, rt, id) {
     if (citizen.state !== 'casa') sendHome(state, rt, citizen);
     setJob(rt, citizen, null);
   }
+  for (const co of [...(rt.companiesIn.get(id) || [])]) removeCompany(state, rt, co.id);
 
   state.buildings.splice(state.buildings.indexOf(building), 1);
   rt.buildingById.delete(id);
@@ -65,7 +91,7 @@ export function removeBuilding(state, rt, id) {
   rt.residents.delete(id);
   rt.workers.delete(id);
   rt.access.delete(id);
-  rt.mapVersion++;
+  touchMap(rt, building.tile, BUILDINGS[building.type].size);
 }
 
 function indexBuilding(state, rt, b) {
@@ -73,6 +99,13 @@ function indexBuilding(state, rt, b) {
   for (const t of footprint(state, b)) rt.buildingAt[t] = b.id;
   rt.residents.set(b.id, new Set());
   rt.workers.set(b.id, new Set());
+  rt.companiesIn.set(b.id, []);
+}
+
+/** Derruba a mata de um tile (vira grama). */
+export function clearForest(state, tile) {
+  state.map.terrain[tile] = TERRAIN.GRASS;
+  state.map.forest[tile] = 0;
 }
 
 export function buildingInfo(b) {
@@ -96,14 +129,79 @@ export function frontTile(state, b) {
 }
 
 // Prédio abandonado não recebe moradores nem contrata.
+// Nas zonas comercial e industrial, só contratam as empresas: andar vago não
+// tem vagas.
 export function vacancies(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return BUILDINGS[b.type].residents - rt.residents.get(b.id).size;
+  if (!BUILDINGS[b.type].residents) return 0;
+  return capacityOf(b) - rt.residents.get(b.id).size;
 }
 
 export function openJobs(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return jobsOf(rt, b.type) - rt.workers.get(b.id).size;
+  const info = BUILDINGS[b.type];
+  if (!info.jobs) return 0;
+  if (!usesCompanies(info)) return capacityOf(b) - rt.workers.get(b.id).size;
+  let open = 0;
+  for (const co of rt.companiesIn.get(b.id)) open += Math.max(0, companyJobs(rt, co) - rt.companyWorkers.get(co.id).size);
+  return open;
+}
+
+// ---------------------------------------------------------------------------
+// Empresas (ver systems/companies.js)
+// ---------------------------------------------------------------------------
+
+/** Prédios cujas vagas vêm de empresas: os das zonas comercial e industrial. */
+export function usesCompanies(info) {
+  return info.zone === ZONE.COMMERCIAL || info.zone === ZONE.INDUSTRIAL;
+}
+
+/**
+ * Vagas de uma empresa: os andares dela vezes as pessoas por andar do prédio,
+ * com os modificadores da pesquisa (ex.: síntese da amônia na indústria).
+ */
+export function companyJobs(rt, co) {
+  const info = BUILDINGS[rt.buildingById.get(co.building).type];
+  const zone = info.zone === ZONE.COMMERCIAL ? 'commercial' : 'industrial';
+  return Math.round(co.floors * info.perFloor * mod(rt, `jobs.${zone}.${info.level}`));
+}
+
+/** Vagas de todas as empresas do prédio (andares alugados). */
+export function leasedJobs(rt, b) {
+  let jobs = 0;
+  for (const co of rt.companiesIn.get(b.id)) jobs += companyJobs(rt, co);
+  return jobs;
+}
+
+export function addCompany(state, rt, company) {
+  company.id = state.nextId++;
+  state.companies.push(company);
+  indexCompany(rt, company);
+  return company;
+}
+
+/** Fecha a empresa: os funcionários ficam desempregados e o andar, vago. */
+export function removeCompany(state, rt, id) {
+  const co = rt.companyById.get(id);
+  if (!co) return;
+  for (const cid of [...rt.companyWorkers.get(id)]) {
+    const citizen = rt.citizenById.get(cid);
+    if (citizen.state !== 'casa') sendHome(state, rt, citizen);
+    setJob(rt, citizen, null);
+  }
+  state.companies.splice(state.companies.indexOf(co), 1);
+  rt.companyById.delete(id);
+  rt.companyWorkers.delete(id);
+  const list = rt.companiesIn.get(co.building);
+  list.splice(list.indexOf(co), 1);
+}
+
+function indexCompany(rt, co) {
+  rt.companyById.set(co.id, co);
+  rt.companyWorkers.set(co.id, new Set());
+  const list = rt.companiesIn.get(co.building);
+  list.push(co);
+  list.sort((a, b) => a.floor - b.floor);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,25 +230,32 @@ function indexCitizen(rt, c) {
   rt.residents.get(c.home).add(c.id);
   if (c.job !== null) {
     rt.workers.get(c.job).add(c.id);
+    if (c.company != null) rt.companyWorkers.get(c.company).add(c.id);
     addDeparture(rt, c.departWork, c.id);
     addDeparture(rt, c.departHome, c.id);
   }
   if (c.state === 'viajando') rt.movers.add(c.id);
 }
 
-/** Define (ou remove, com null) o emprego do cidadão e seus horários. */
-export function setJob(rt, citizen, jobId, departWork = 0, departHome = 0) {
+/**
+ * Define (ou remove, com null) o emprego do cidadão e seus horários. `company`
+ * é a empresa em que trabalha dentro do prédio (null nos serviços públicos).
+ */
+export function setJob(rt, citizen, jobId, departWork = 0, departHome = 0, company = null) {
   if (citizen.job !== null) {
     rt.workers.get(citizen.job)?.delete(citizen.id);
+    if (citizen.company != null) rt.companyWorkers.get(citizen.company)?.delete(citizen.id);
     rt.departures.get(citizen.departWork)?.delete(citizen.id);
     rt.departures.get(citizen.departHome)?.delete(citizen.id);
   }
   citizen.job = jobId;
+  citizen.company = jobId === null ? null : company;
   citizen.departWork = jobId === null ? null : departWork;
   citizen.departHome = jobId === null ? null : departHome;
   if (jobId === null) citizen.shift = null;
   if (jobId !== null) {
     rt.workers.get(jobId).add(citizen.id);
+    if (company !== null) rt.companyWorkers.get(company).add(citizen.id);
     addDeparture(rt, departWork, citizen.id);
     addDeparture(rt, departHome, citizen.id);
   }
@@ -209,7 +314,7 @@ export function recomputeRoads(state, rt, { reroute = true } = {}) {
 
   for (const b of state.buildings) rt.access.set(b.id, findAccessRoad(state, rt, b.tile, BUILDINGS[b.type].size));
   rt.pathCache.clear();
-  rt.mapVersion++;
+  touchMap(rt);
 
   if (!reroute) return;
 

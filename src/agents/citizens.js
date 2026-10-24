@@ -6,6 +6,8 @@
 // {
 //   id, name, age,
 //   home: id do prédio,      job: id do prédio | null,
+//   company: id da empresa em que trabalha, dentro do prédio `job` (null sem
+//            emprego ou num serviço público),
 //   departWork / departHome: minuto do dia em que sai (null sem emprego),
 //   shift: turno ('diurno', 'noturno', 'madrugada', 'manha', 'tarde'; null sem emprego),
 //   state: 'casa' | 'trabalho' | 'aguardando' (rota sendo calculada) | 'viajando',
@@ -14,16 +16,18 @@
 //   path:  tiles da viagem atual | null,   step: índice no path
 // }
 
-import { CITIZEN_SPEED, SHIFTS } from '../world/catalog.js';
+import { BUILDINGS, CITIZEN_SPEED, SECTORS, SHIFTS } from '../world/catalog.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { pick, random, randomInt } from '../core/rng.js';
 import {
   addCitizen,
+  companyJobs,
   openJobs,
   sameNetwork,
   sendHome,
   setJob,
   tileCenter,
+  usesCompanies,
 } from '../world/runtime.js';
 import { findRoadPath } from './pathfinding.js';
 import { isServed } from '../systems/utilities.js';
@@ -43,6 +47,7 @@ export function createCitizen(state, rt, home) {
     age: randomInt(state.rng, 18, 75),
     home: home.id,
     job: null,
+    company: null,
     departWork: null,
     departHome: null,
     shift: null,
@@ -59,23 +64,36 @@ export function canWork(citizen) {
   return citizen.age >= WORKING_AGE[0] && citizen.age <= WORKING_AGE[1];
 }
 
-/** Contrata: sorteia o turno e os horários de saída dentro das faixas dele. */
+/**
+ * Contrata: escolhe a empresa com vaga no prédio (a do andar mais baixo),
+ * sorteia o turno pelo setor dela e os horários de saída dentro das faixas.
+ */
 export function hire(state, rt, citizen, workplace) {
-  const shift = pickShift(random(state.rng));
+  let company = null;
+  if (usesCompanies(BUILDINGS[workplace.type])) {
+    company = rt.companiesIn.get(workplace.id).find((co) => rt.companyWorkers.get(co.id).size < companyJobs(rt, co));
+    if (!company) return;
+  }
+  const shift = pickShift(random(state.rng), company ? SECTORS[company.sector].shifts : undefined);
   const { leave, back, hours } = SHIFTS[shift];
   const departWork = randomInt(state.rng, leave[0], leave[1]);
   const departHome = back
     ? randomInt(state.rng, back[0], back[1])
     : (departWork + randomInt(state.rng, hours[0], hours[1])) % MINUTES_PER_DAY;
-  setJob(rt, citizen, workplace.id, departWork, departHome);
+  setJob(rt, citizen, workplace.id, departWork, departHome, company ? company.id : null);
   citizen.shift = shift;
 }
 
-/** Turno para um sorteio `roll` em [0, 1), pelas frações do catálogo. */
-export function pickShift(roll) {
+const SHIFT_SHARES = Object.fromEntries(Object.entries(SHIFTS).map(([id, s]) => [id, s.share]));
+
+/**
+ * Turno para um sorteio `roll` em [0, 1), pelas frações `shares` (padrão: as
+ * do catálogo, usadas nos serviços públicos; empresas usam as do setor).
+ */
+export function pickShift(roll, shares = SHIFT_SHARES) {
   let acc = 0;
-  for (const [id, shift] of Object.entries(SHIFTS)) {
-    acc += shift.share;
+  for (const [id, share] of Object.entries(shares)) {
+    acc += share;
     if (roll < acc) return id;
   }
   return 'diurno';

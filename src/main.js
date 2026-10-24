@@ -1,5 +1,5 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, DENSITY, DENSITY_INFO, ZONE, ZONE_INFO } from './world/catalog.js';
 import { applyCommand, costs, lineTiles, planCommand, rectTiles } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
@@ -67,6 +67,10 @@ let rt;
 let cam;
 let speed = 1;
 let tool = TOOLS[1];
+// Densidade usada ao zonear residencial e comercial (tecla X troca).
+let density = DENSITY.MEDIUM;
+const DENSITY_KEY = 'x';
+const usesDensity = (t) => t.zone === ZONE.RESIDENTIAL || t.zone === ZONE.COMMERCIAL;
 let dirty = false; // mudanças desde o último save manual
 let hover = null;
 let drag = null; //   { kind: 'tool' | 'pan', start, last, moved }
@@ -85,6 +89,9 @@ const saves = new SaveManager({
   onEvent: handleSaveEvent,
 });
 $('storage-mode').textContent = `Saves: ${saves.backend.label}`;
+if (saves.backend.migrated) {
+  status(`${saves.backend.migrated} save(s) movidos do localStorage para o IndexedDB`);
+}
 
 // ---------------------------------------------------------------------------
 // Partida
@@ -110,7 +117,7 @@ function newCity(name, startMarco = 1) {
 newCity('Nova Cidade');
 saves.startAutosave(AUTOSAVE_MS);
 
-startLoop({
+const loopStats = startLoop({
   getSpeed: () => speed,
   tick: () => tick(state, rt),
   render: (dt) => {
@@ -146,6 +153,8 @@ window.jogo = {
   },
   advance: (ticks) => advance(state, rt, ticks),
   renderer,
+  loop: loopStats,
+  saves,
   setSpeed,
 };
 
@@ -238,6 +247,33 @@ for (const t of TOOLS) {
   button.dataset.tool = t.id;
   button.onclick = () => selectTool(t);
   $('tools').append(button);
+  if (t.zone === ZONE.INDUSTRIAL) $('tools').append(densityButtons('density'));
+}
+
+// Escolha da densidade: Baixa / Média / Alta. Na barra fica depois das zonas;
+// no celular, num grupo do painel "Construir".
+function densityButtons(className) {
+  const group = document.createElement('span');
+  group.className = className;
+  group.title = `Densidade das zonas residenciais e comerciais (tecla ${DENSITY_KEY.toUpperCase()})`;
+  for (const [value, info] of Object.entries(DENSITY_INFO)) {
+    const button = document.createElement('button');
+    button.dataset.density = value;
+    button.title = `${info.name}: ${info.maxLevel < 3 ? 'casas, sobrados, lojas e mercados' : `prédios até ${info.maxFloors} andares`}`;
+    button.textContent = info.name;
+    button.onclick = () => setDensity(Number(value));
+    group.append(button);
+  }
+  return group;
+}
+function setDensity(value) {
+  density = value;
+  showDensity();
+  // Escolher a densidade com outra ferramenta na mão já pega a zona residencial.
+  if (!usesDensity(tool)) selectTool(TOOLS.find(usesDensity));
+}
+function showDensity() {
+  for (const b of document.querySelectorAll('[data-density]')) b.classList.toggle('active', Number(b.dataset.density) === density);
 }
 function utilityTitle(id) {
   const u = BUILDINGS[id].utility;
@@ -289,6 +325,8 @@ function selectTool(t) {
   updateMobileNav();
 }
 selectTool(tool);
+document.querySelector('[data-build-group="density"]')?.append(...densityButtons('').children);
+showDensity();
 
 // Orçamento: painel aberto pelo dinheiro no topo ou pela tecla O.
 const budget = new BudgetPanel($('budget'), {
@@ -446,7 +484,7 @@ function toolCommand() {
     : rectTiles(width, start.x, start.y, hover.x, hover.y);
   if (tool.id === 'road') return { type: 'road', tiles };
   if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
-  return { type: 'zone', zone: tool.zone, tiles };
+  return usesDensity(tool) ? { type: 'zone', zone: tool.zone, density, tiles } : { type: 'zone', zone: tool.zone, tiles };
 }
 
 function currentPreview() {
@@ -466,7 +504,8 @@ function currentPreview() {
     tooltip.style.color = plan.reason ? '#ff8a80' : '';
     return { tiles: plan.tiles, color: plan.reason ? 'rgba(255,80,60,0.5)' : 'rgba(80,220,120,0.5)' };
   }
-  tooltip.textContent = `${plan.tiles.length} tiles · $${plan.cost.toLocaleString('pt-BR')}`;
+  const zoneName = usesDensity(tool) ? `${tool.name} ${DENSITY_INFO[density].name.toLowerCase()} · ` : '';
+  tooltip.textContent = `${zoneName}${plan.tiles.length} tiles · $${plan.cost.toLocaleString('pt-BR')}`;
   tooltip.style.color = plan.cost > state.economy.money ? '#ff8a80' : '';
   return { tiles: plan.tiles, color: tool.color };
 }
@@ -679,6 +718,8 @@ window.addEventListener('keydown', (e) => {
     select(null);
     budget.toggle(false);
     research.toggle(false);
+  } else if (key === DENSITY_KEY) {
+    setDensity((density + 1) % Object.keys(DENSITY_INFO).length);
   } else if (key === 'o') {
     toggleBudget();
   } else if (key === 't') {

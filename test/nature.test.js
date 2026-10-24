@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createWorld } from '../src/world/world.js';
 import { TERRAIN, ZONE } from '../src/world/catalog.js';
 import { treesFor, waterDepth } from '../src/render/nature.js';
+import { generateForest } from '../src/world/terrain.js';
 
 function world() {
   const state = createWorld({ width: 40, height: 40, seed: 3 });
@@ -13,6 +14,7 @@ function world() {
 test('florestas têm densidade variada e tipos de árvore diferentes', () => {
   const state = world();
   state.map.terrain.fill(TERRAIN.FOREST);
+  state.map.forest = generateForest(state.map.terrain, 40, 40, state.seed);
   const counts = new Set();
   const kinds = new Set();
   for (let y = 0; y < 40; y++) {
@@ -34,7 +36,10 @@ test('florestas têm densidade variada e tipos de árvore diferentes', () => {
 test('árvores soltas na borda da mata, nunca em ruas ou zonas', () => {
   const state = world();
   const W = 40;
-  for (let y = 0; y < 40; y++) state.map.terrain[y * W + 20] = TERRAIN.FOREST; // uma faixa de mata
+  for (let y = 0; y < 40; y++) {
+    state.map.terrain[y * W + 20] = TERRAIN.FOREST; // uma faixa de mata
+    state.map.forest[y * W + 20] = 3;
+  }
   let edge = 0;
   let open = 0;
   for (let y = 0; y < 40; y++) {

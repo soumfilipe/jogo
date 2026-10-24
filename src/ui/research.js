@@ -154,7 +154,9 @@ export class ResearchPanel {
 function idle(rt, area) {
   const left = TECHS.filter((t) => t.area === area && !rt.techDone.has(t.id));
   if (left.length === 0) return 'Todas as tecnologias desta área foram concluídas.';
-  const blocked = left.some((t) => t.ready);
+  // Alguma desta área dá para alcançar nesta versão (os requisitos existem ou já vieram)?
+  const reachable = left.some((t) => t.ready && t.requires.every((r) => rt.techDone.has(r) || TECH_BY_ID.get(r).ready));
+  const blocked = reachable;
   return blocked
     ? 'As próximas desta área dependem de tecnologias de outras áreas.'
     : 'As próximas tecnologias desta área chegam numa próxima versão do jogo.';

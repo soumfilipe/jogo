@@ -10,19 +10,22 @@
 // o estado e por isso só rodam em horários fixos da simulação.
 
 import {
-  ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE,
+  ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE, capacityOf,
 } from '../world/catalog.js';
 import { TICKS_PER_DAY } from '../core/time.js';
-import { footprint, removeBuilding, removeCitizen, sendHome, setJob } from '../world/runtime.js';
+import { footprint, removeBuilding, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
 import { mod, utilityOutput, ZONE_KEY } from './mods.js';
 
 export const RESOURCES = ['power', 'water'];
 
-/** Consumo de um tipo de prédio: { power, water }. Com `rt`, aplica os modificadores. */
-export function consumption(info, rt) {
+/**
+ * Consumo de um tipo de prédio: { power, water }. `people` é a capacidade
+ * (padrão: a do tipo; um prédio que cresceu andares passa a dele). Com `rt`,
+ * aplica os modificadores da pesquisa (ex.: iluminação LED).
+ */
+export function consumption(info, people = info.residents || info.jobs, rt = null) {
   if (info.utility || !info.zone) return { power: 0, water: 0 };
   const per = CONSUMPTION[info.zone];
-  const people = info.residents || info.jobs;
   const power = rt ? per.power * mod(rt, `consumption.${ZONE_KEY[info.zone]}`) : per.power;
   return { power: Math.ceil(people * power), water: Math.ceil(people * per.water) };
 }
@@ -60,7 +63,7 @@ export function computeUtilities(state, rt) {
         sources[res].push(rt.access.get(b.id));
       }
     } else if (b.abandoned === undefined) {
-      consumers.push({ b, net, need: consumption(info, rt) });
+      consumers.push({ b, net, need: consumption(info, capacityOf(b), rt) });
       if (net) entry(net);
     }
   }
@@ -93,22 +96,19 @@ export function computeUtilities(state, rt) {
     }
   }
 
-  // Muda o desenho (ícones, mapas) só quando alguém ganhou ou perdeu serviço.
-  let changed = !rt.service || rt.service.size !== service.size;
-  if (!changed) {
-    for (const [id, s] of service) {
-      const old = rt.service.get(id);
-      if (!old || old.power !== s.power || old.water !== s.water) {
-        changed = true;
-        break;
-      }
+  // Redesenha (ícones de falta) só os prédios que ganharam ou perderam serviço.
+  // Prédios novos, demolidos ou abandonados já avisaram o renderizador.
+  for (const [id, s] of service) {
+    const old = rt.service?.get(id);
+    if (old && (old.power !== s.power || old.water !== s.water)) {
+      const b = rt.buildingById.get(id);
+      touchMap(rt, b.tile, BUILDINGS[b.type].size);
     }
   }
   rt.service = service;
   rt.utilityNets = nets;
   rt.utilityTotals = totals(nets);
   fillMaps(state, rt, nets, imported);
-  if (changed) rt.mapVersion++;
 }
 
 /** Energia/água sobrando na rede do tile de estrada `access` (para crescer). */
@@ -171,7 +171,7 @@ export function applyUtilityEffects(state, rt) {
     if (left === 0 && b.unservedDays >= abandonDays) {
       b.abandoned = tick;
       delete b.unservedDays;
-      rt.mapVersion++;
+      touchMap(rt, b.tile, info.size);
     }
   }
 }
