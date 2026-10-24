@@ -78,6 +78,11 @@ export function target(state, rt, area) {
   const chosen = state.research.priority[area];
   const tech = chosen && TECH_BY_ID.get(chosen);
   if (tech && isAvailable(rt, tech)) return tech;
+  return autoTarget(state, rt, area);
+}
+
+/** Alvo automático: a tecnologia disponível mais barata da área. */
+export function autoTarget(state, rt, area) {
   let best = null;
   let bestCost = Infinity;
   for (const t of TECHS) {

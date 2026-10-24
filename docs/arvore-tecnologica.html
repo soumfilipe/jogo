@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Documento de design da árvore tecnológica. Abra pelo servidor do jogo: http://localhost:8080/docs/arvore-tecnologica.html -->
+<title>Árvore Tecnológica 1910–2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Overpass:wght@400;600;700&family=Overpass+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: mapa de linhas de metrô — cada área é uma linha, cada tecnologia uma estação no ano em que o mundo a descobre. */
+:root {
+  --bg: #eef1f3;
+  --surface: #ffffff;
+  --band: #e4e9ed;
+  --fg: #19222c;
+  --muted: #5b6876;
+  --line: #cbd3db;
+  --accent: #d9480f;
+  --on-c: #ffffff;
+  --l-educacao: #c2255c;
+  --l-social: #6741d9;
+  --l-cultura: #5c940d;
+  --l-seguranca: #e03131;
+  --l-abastecimento: #3b5bdb;
+  --l-quimica: #d9480f;
+  --l-engenharia: #7a5a3a;
+  --l-energia: #b78800;
+  --l-computacao: #1971c2;
+  --l-saude: #2b8a3e;
+  --l-ambiental: #0b7285;
+  --f-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --f-body: "Overpass", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "Overpass Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c; --surface: #19202a; --band: #161c24; --fg: #e5eaf0; --muted: #94a1af; --line: #2c3743;
+    --accent: #ff8a4c; --on-c: #11161c;
+    --l-educacao: #f06595; --l-cultura: #94d82d; --l-seguranca: #ff6b6b; --l-abastecimento: #748ffc; --l-social: #9775fa; --l-quimica: #ff8a4c; --l-engenharia: #c9a57f;
+    --l-energia: #fcc419; --l-computacao: #4dabf7; --l-saude: #51cf66; --l-ambiental: #3bc9db;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #19202a; --band: #161c24; --fg: #e5eaf0; --muted: #94a1af; --line: #2c3743;
+  --accent: #ff8a4c; --on-c: #11161c;
+  --l-educacao: #f06595; --l-cultura: #94d82d; --l-seguranca: #ff6b6b; --l-abastecimento: #748ffc; --l-social: #9775fa; --l-quimica: #ff8a4c; --l-engenharia: #c9a57f;
+  --l-energia: #fcc419; --l-computacao: #4dabf7; --l-saude: #51cf66; --l-ambiental: #3bc9db;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 22px; }
+
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 {
+  font-family: var(--f-display); font-weight: 800; font-size: clamp(34px, 6vw, 58px);
+  line-height: .95; margin: 0; letter-spacing: .01em; text-transform: uppercase; text-wrap: balance;
+}
+h1 span { color: var(--accent); }
+.lede { max-width: 68ch; margin: 0; color: var(--fg); }
+.lede b { font-weight: 700; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: end; }
+.year-ctl { display: grid; gap: 4px; flex: 1 1 320px; min-width: 0; }
+.year-ctl label { font-size: 13px; color: var(--muted); }
+.year-readout { font-family: var(--f-display); font-weight: 700; font-size: 30px; line-height: 1; }
+.year-readout small { font-family: var(--f-body); font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; flex: 2 1 420px; min-width: 0; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.legend i { width: 18px; height: 4px; border-radius: 2px; background: var(--c); display: inline-block; }
+.legend em { font-style: normal; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+
+.map {
+  overflow-x: auto; overflow-y: hidden; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.map svg { display: block; }
+.hint { font-size: 13px; color: var(--muted); margin: -12px 0 0; }
+
+/* SVG */
+.era { fill: var(--band); }
+.era-label { font-family: var(--f-mono); font-size: 10.5px; fill: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.tick { stroke: var(--line); stroke-width: 1; }
+.tick-label { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.lane-sep { stroke: var(--line); stroke-width: 1; }
+.lane-label { font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; fill: var(--c); }
+.edge { fill: none; stroke: var(--c); stroke-width: 1.6; opacity: .55; transition: opacity .15s; }
+.edge.cross { stroke: var(--muted); stroke-dasharray: 4 4; opacity: .45; stroke-width: 1.2; }
+.now-line { stroke: var(--accent); stroke-width: 2; }
+.now-label { font-family: var(--f-mono); font-size: 11px; font-weight: 600; fill: var(--accent); }
+.future-shade { fill: var(--bg); opacity: .55; }
+
+.node { cursor: pointer; transition: opacity .15s; outline: none; }
+.node rect { fill: color-mix(in srgb, var(--c) 13%, var(--surface)); stroke: var(--c); stroke-width: 1.3; }
+.node .dot { fill: var(--c); stroke: var(--surface); stroke-width: 2; }
+.node .yr { font-family: var(--f-mono); font-size: 10.5px; fill: var(--muted); }
+.node .nm { font-family: var(--f-body); font-weight: 600; font-size: 12.5px; fill: var(--fg); }
+.node.start rect { fill: var(--c); }
+.node.start .yr, .node.start .nm { fill: var(--on-c); }
+.node.future rect { fill: var(--surface); stroke-dasharray: 3 3; }
+.node.future .nm { fill: var(--muted); }
+.node:hover rect, .node:focus-visible rect { stroke-width: 2.4; }
+.node.sel rect { stroke: var(--fg); stroke-width: 2.4; }
+
+svg.focusing .node:not(.hl) { opacity: .22; }
+svg.focusing .edge:not(.hl) { opacity: .07; }
+svg.focusing .edge.hl { opacity: 1; stroke-width: 2.2; }
+svg.focusing .edge.cross.hl { stroke: var(--fg); }
+
+/* Painel */
+.below { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 820px) { .below { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 20px 22px; display: grid; gap: 12px; }
+.panel .area { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--c); display: flex; align-items: center; gap: 8px; }
+.panel .area::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.panel h2 { font-family: var(--f-display); font-weight: 800; font-size: 32px; line-height: 1; margin: 0; text-transform: uppercase; text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.status { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.status.ok { color: var(--l-saude); }
+.status.pioneer { color: var(--accent); }
+.status.start { color: var(--l-computacao); }
+.costs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cost { font-family: var(--f-mono); font-size: 12px; padding: 3px 8px; border-radius: 4px; background: color-mix(in srgb, var(--c) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 45%, var(--surface)); font-variant-numeric: tabular-nums; }
+.cost b { font-weight: 600; }
+.panel dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 14px; }
+.panel dt { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 2px; }
+.panel dd { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 13px; cursor: pointer; padding: 2px 9px; border-radius: 4px; border: 1px solid var(--c); background: transparent; color: var(--fg); }
+.chip:hover, .chip:focus-visible { background: color-mix(in srgb, var(--c) 16%, var(--surface)); outline: none; }
+.none { color: var(--muted); font-size: 13px; }
+
+.notes { display: grid; gap: 10px; font-size: 14px; }
+.notes h3 { font-family: var(--f-display); font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: .03em; margin: 0; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.notes code { font-family: var(--f-mono); font-size: 12.5px; }
+.sample { display: inline-block; vertical-align: middle; width: 26px; height: 0; border-top: 2px solid var(--muted); margin: 0 4px; }
+.sample.dash { border-top-style: dashed; }
+
+
+/* Abas e vistas */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); }
+.tabs button {
+  font: inherit; font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: .04em; text-transform: uppercase;
+  background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  padding: 8px 12px 6px; cursor: pointer;
+}
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs button:hover, .tabs button:focus-visible { color: var(--fg); outline: none; }
+.view { display: grid; gap: 22px; }
+
+.sys { display: inline-block; font-size: 12px; line-height: 1.3; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--sc); color: var(--fg); background: color-mix(in srgb, var(--sc) 12%, var(--surface)); white-space: nowrap; }
+.sys.existe { --sc: var(--l-saude); }
+.sys.ampliar { --sc: var(--l-energia); }
+.sys.novo { --sc: var(--accent); }
+.kind { font-family: var(--f-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; }
+.filters label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; min-width: 0; }
+.filters .grow { flex: 1 1 220px; }
+.filters select, .filters input {
+  font: inherit; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; min-width: 0; max-width: 100%;
+}
+.filters select:focus-visible, .filters input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.count { margin: 0; font-size: 14px; color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table.techs { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 860px; }
+table.techs th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--band); position: sticky; top: 0; }
+table.techs td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.techs tr:last-child td { border-bottom: 0; }
+table.techs td.yr { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+table.techs td.ph { font-family: var(--f-mono); font-size: 13px; text-align: center; }
+table.techs .syss { display: flex; flex-wrap: wrap; gap: 4px; }
+.tlink { font: inherit; font-weight: 600; text-align: left; color: var(--fg); background: none; border: 0; padding: 0; cursor: pointer; display: grid; gap: 1px; }
+.tlink small { font-weight: 400; font-size: 12px; color: var(--c); }
+.tlink:hover span, .tlink:focus-visible span { text-decoration: underline; text-decoration-color: var(--c); text-underline-offset: 3px; }
+.tlink:focus-visible { outline: none; }
+
+.phases { display: grid; gap: 30px; }
+.phase { display: grid; gap: 14px; }
+.phase-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 6px 24px; align-items: end; }
+@media (max-width: 720px) { .phase-head { grid-template-columns: minmax(0, 1fr); } }
+.phase-head h3 { font-family: var(--f-display); font-weight: 800; font-size: 26px; line-height: 1; margin: 0; text-transform: uppercase; }
+.phase-head h3 em { font-style: normal; color: var(--accent); margin-right: 8px; }
+.phase-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; max-width: 62ch; }
+.meter { display: grid; gap: 4px; font-size: 13px; }
+.meter .bar { height: 8px; border-radius: 4px; background: var(--band); border: 1px solid var(--line); overflow: hidden; }
+.meter .bar i { display: block; height: 100%; background: var(--accent); }
+.meter b { font-variant-numeric: tabular-nums; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.card h4 { margin: 0; font-size: 17px; font-weight: 700; }
+.card p { margin: 0; font-size: 14px; }
+.card ul { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 3px; }
+.card .used { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.card .chips .chip { font-size: 12px; padding: 1px 7px; }
+.intro { max-width: 72ch; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .node, .edge { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Proposta de design · sistema de pesquisa</div>
+    <h1>Árvore tecnológica <span>1910–2026</span></h1>
+    <p class="lede">Onze áreas do conhecimento e <b data-count></b> tecnologias, do concreto armado à IA generativa. Cada uma fica no <b>ano em que o mundo a descobre</b>. Antes desse ano, a cidade só consegue a tecnologia como pioneira e paga 3× os pontos. Depois, ela adota pelo custo normal.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Vistas">
+    <button type="button" role="tab" data-tab="arvore" aria-selected="true">Árvore</button>
+    <button type="button" role="tab" data-tab="mapeamento" aria-selected="false">O que cada tecnologia libera</button>
+    <button type="button" role="tab" data-tab="sistemas" aria-selected="false">Sistemas e etapas</button>
+  </nav>
+
+  <section class="view" data-view="arvore">
+  <div class="controls">
+    <div class="year-ctl">
+      <label for="year">Ano no mundo (arraste para ver o que já foi descoberto)</label>
+      <div class="year-readout"><span data-year></span><small data-year-info></small></div>
+      <input id="year" type="range" min="1910" max="2026" step="1" value="1975">
+    </div>
+    <div class="legend" data-legend></div>
+  </div>
+
+  <div class="map" data-map></div>
+  <p class="hint">Passe o mouse ou toque numa tecnologia para ver a cadeia de pré-requisitos. Role para os lados para andar no tempo.</p>
+
+  <div class="below">
+    <section class="panel" data-panel aria-live="polite"></section>
+    <section class="notes">
+      <h3>Como ler</h3>
+      <ul>
+        <li>Cada faixa é uma área. A posição horizontal é o ano mundial da tecnologia.</li>
+        <li>As estações preenchidas já estão disponíveis no início do jogo, em 1910.</li>
+        <li><span class="sample"></span>pré-requisito na mesma área. <span class="sample dash"></span>pré-requisito de outra área.</li>
+        <li>O custo é uma sugestão de balanceamento: os pontos da área principal crescem com o ano, e cada área secundária pede metade.</li>
+        <li>No calendário do jogo, o ano 1 é 1910. Uma cidade iniciada no ano 1 percorre toda a árvore em 117 anos de jogo.</li>
+        <li>A usina solar, que hoje já está no jogo, passaria a ser desbloqueada em 1982.</li>
+      </ul>
+    </section>
+  </div>
+  </section>
+
+  <section class="view" data-view="mapeamento" hidden>
+    <p class="intro">Para cada tecnologia: o tipo de recompensa, o que muda no jogo e quais sistemas precisam existir para ela funcionar. Os sistemas em verde já existem no jogo, os amarelos precisam ser ampliados e os laranja são novos.</p>
+    <div class="filters">
+      <label for="f-sys">Sistema<select id="f-sys"></select></label>
+      <label for="f-kind">Tipo<select id="f-kind"></select></label>
+      <label for="f-phase">Etapa<select id="f-phase"></select></label>
+      <label class="grow" for="f-q">Buscar<input id="f-q" type="search" placeholder="semáforo, estádio, lixo..."></label>
+    </div>
+    <p class="count" data-map-count></p>
+    <div class="table-wrap">
+      <table class="techs">
+        <thead><tr><th>Ano</th><th>Tecnologia</th><th>Tipo</th><th>O que muda no jogo</th><th>Precisa dos sistemas</th><th>Etapa</th></tr></thead>
+        <tbody data-rows></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="view" data-view="sistemas" hidden>
+    <p class="intro" data-sys-intro></p>
+    <div class="phases" data-phases></div>
+  </section>
+</div>
+
+<script type="module">
+// Os dados vêm do próprio jogo: src/world/techs.js é a única fonte.
+import {
+  AREAS, START_TECHS, TECHS, SYSTEMS, PHASES as PHASE_LIST,
+} from '../src/world/techs.js';
+const START = new Set(START_TECHS);
+const T = TECHS.map((t) => [t.id, t.area, t.order, t.name, t.requires, t.extraAreas, t.desc, t.note]);
+const SYS = Object.fromEntries(Object.entries(SYSTEMS).map(([k, s]) => [k, { n: s.name, st: s.status, fase: s.phase, d: s.desc, b: s.todo }]));
+const PHASES = PHASE_LIST.map((p) => [p.name, p.desc]);
+const MAP = Object.fromEntries(TECHS.map((t) => [t.id, [t.kind, t.systems.join(' '), t.mechanic]]));
+const READY = new Set(TECHS.filter((t) => t.ready).map((t) => t.id));
+
+const ORDER = Object.keys(AREAS);
+
+
+const techs = T.map(([id, a, y, n, r, x, e, h]) => ({ id, a, y, n, r, x, e, h, start: START.has(id) }));
+const byId = new Map(techs.map((t) => [t.id, t]));
+const children = new Map(techs.map((t) => [t.id, []]));
+for (const t of techs) for (const p of t.r) {
+  if (!byId.has(p)) { console.error('Requisito desconhecido:', p, 'em', t.id); continue; }
+  children.get(p).push(t.id);
+}
+for (const t of techs) {
+  const base = t.start ? 0 : Math.round((80 + (t.y - 1910) * 9) / 10) * 10;
+  t.cost = { [t.a]: base };
+  for (const a of t.x) t.cost[a] = Math.round(base / 20) * 10;
+}
+
+
+
+
+
+for (const t of techs) {
+  const m = MAP[t.id];
+  if (!m) console.error('Sem mapeamento:', t.id);
+  const [k = '?', sys = '', mec = ''] = m || [];
+  t.k = k; t.m = mec;
+  t.s = sys.split(' ').filter(Boolean);
+  for (const s of t.s) if (!SYS[s]) console.error('Sistema desconhecido:', s, 'em', t.id);
+  t.fase = Math.max(0, ...t.s.map((s) => SYS[s]?.fase ?? 0));
+}
+for (const id of Object.keys(MAP)) if (!byId.has(id)) console.error('Mapeamento sem tecnologia:', id);
+const ST_LABEL = { existe: 'Já existe', ampliar: 'Ampliar', novo: 'Novo' };
+const sysChip = (s) => `<span class="sys ${SYS[s].st}" title="${ST_LABEL[SYS[s].st]} · etapa ${SYS[s].fase}">${esc(SYS[s].n)}</span>`;
+
+const ERAS = [
+  [1910, 1929, 'Entreguerras'],
+  [1929, 1945, 'Depressão e guerra'],
+  [1945, 1973, 'Pós-guerra'],
+  [1973, 1991, 'Crises do petróleo e microeletrônica'],
+  [1991, 2008, 'Internet e globalização'],
+  [2008, 2027, 'Transição digital e energética'],
+];
+
+const PX = 22, X0 = 30, AX = 46, ROWH = 34, NODEH = 24, LANEPAD = 28;
+const xOf = (y) => X0 + (y - 1910) * PX;
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const cvar = (a) => `var(--l-${a})`;
+
+const mapEl = document.querySelector('[data-map]');
+const yearInput = document.getElementById('year');
+let svg, selected = 'asfalto', interacted = false;
+
+function layout() {
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = '600 12.5px Overpass, "Segoe UI", system-ui, sans-serif';
+  for (const t of techs) t.w = Math.ceil(ctx.measureText(t.n).width) + 54;
+
+  let cursor = AX;
+  const lanes = [];
+  for (const a of ORDER) {
+    const list = techs.filter((t) => t.a === a).sort((p, q) => p.y - q.y || p.n.localeCompare(q.n));
+    const rows = [];
+    for (const t of list) {
+      t.x0 = xOf(t.y);
+      let i = rows.findIndex((end) => end + 14 <= t.x0);
+      if (i < 0) { i = rows.length; rows.push(0); }
+      rows[i] = t.x0 + t.w;
+      t.row = i;
+    }
+    const h = LANEPAD + rows.length * ROWH + 6;
+    for (const t of list) t.cy = cursor + LANEPAD + t.row * ROWH + NODEH / 2;
+    lanes.push({ a, top: cursor, h });
+    cursor += h;
+  }
+  const W = Math.max(xOf(2026) + 40, ...techs.map((t) => t.x0 + t.w + 24));
+  return { lanes, W, H: cursor + AX };
+}
+
+function render() {
+  const { lanes, W, H } = layout();
+  const parts = [];
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Árvore tecnológica de 1910 a 2026, por área">`);
+
+  ERAS.forEach(([a, b, label], i) => {
+    const x = xOf(a) - 8, w = xOf(b) - xOf(a);
+    if (i % 2 === 0) parts.push(`<rect class="era" x="${x}" y="0" width="${w}" height="${H}"/>`);
+    parts.push(`<text class="era-label" x="${x + 6}" y="13">${esc(label)}</text>`);
+  });
+  for (let y = 1910; y <= 2026; y += 10) {
+    const x = xOf(y);
+    parts.push(`<line class="tick" x1="${x}" x2="${x}" y1="${AX - 10}" y2="${AX - 4}"/><text class="tick-label" x="${x}" y="${AX - 13}" text-anchor="middle">${y}</text>`);
+    parts.push(`<line class="tick" x1="${x}" x2="${x}" y1="${H - AX + 4}" y2="${H - AX + 10}"/><text class="tick-label" x="${x}" y="${H - AX + 23}" text-anchor="middle">${y}</text>`);
+  }
+  for (const l of lanes) {
+    parts.push(`<line class="lane-sep" x1="0" x2="${W}" y1="${l.top}" y2="${l.top}"/>`);
+    for (const [a] of ERAS) {
+      parts.push(`<text class="lane-label" style="--c:${cvar(l.a)}" x="${xOf(a) - 2}" y="${l.top + 18}">${esc(AREAS[l.a])}</text>`);
+    }
+  }
+  const last = lanes[lanes.length - 1];
+  parts.push(`<line class="lane-sep" x1="0" x2="${W}" y1="${last.top + last.h}" y2="${last.top + last.h}"/>`);
+
+  parts.push(`<rect class="future-shade" data-shade x="0" y="${AX}" width="0" height="${H - 2 * AX}"/>`);
+
+  for (const t of techs) for (const p of t.r) {
+    const s = byId.get(p);
+    if (!s) continue;
+    const sx = Math.min(s.x0 + s.w, Math.max(s.x0 + 10, t.x0 - 28));
+    const dx = Math.max(24, (t.x0 - sx) / 2);
+    const cross = s.a !== t.a;
+    parts.push(`<path class="edge${cross ? ' cross' : ''}" data-from="${s.id}" data-to="${t.id}" style="--c:${cvar(t.a)}" d="M${sx},${s.cy} C${sx + dx},${s.cy} ${t.x0 - dx},${t.cy} ${t.x0},${t.cy}"/>`);
+  }
+
+  parts.push(`<g data-now><line class="now-line" x1="0" x2="0" y1="${AX - 4}" y2="${H - AX + 4}"/><text class="now-label" x="6" y="${AX + 12}"></text></g>`);
+
+  for (const t of techs) {
+    parts.push(`<g class="node${t.start ? ' start' : ''}" data-id="${t.id}" style="--c:${cvar(t.a)}" transform="translate(${t.x0},${t.cy - NODEH / 2})" tabindex="0" role="button" aria-label="${esc(t.n)}, ${t.y}">`
+      + `<rect x="0" y="0" width="${t.w}" height="${NODEH}" rx="4"/>`
+      + `<circle class="dot" cx="0" cy="${NODEH / 2}" r="5"/>`
+      + `<text class="yr" x="11" y="16">${t.y}</text>`
+      + `<text class="nm" x="45" y="16.5">${esc(t.n)}</text></g>`);
+  }
+  parts.push('</svg>');
+  mapEl.innerHTML = parts.join('');
+  svg = mapEl.querySelector('svg');
+  svg.dataset.h = H;
+
+  svg.querySelectorAll('.node').forEach((g) => {
+    const id = g.dataset.id;
+    g.addEventListener('mouseenter', () => highlight(id));
+    g.addEventListener('mouseleave', () => highlight(interacted ? selected : null));
+    g.addEventListener('click', () => select(id));
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(id); } });
+  });
+  updateYear();
+  highlight(interacted ? selected : null);
+}
+
+function chain(id) {
+  const set = new Set([id]);
+  const up = [id], down = [id];
+  while (up.length) for (const p of byId.get(up.pop()).r) if (byId.has(p) && !set.has(p)) { set.add(p); up.push(p); }
+  const desc = new Set([id]);
+  while (down.length) for (const c of children.get(down.pop())) if (!desc.has(c)) { desc.add(c); down.push(c); }
+  for (const d of desc) set.add(d);
+  return set;
+}
+
+function highlight(id) {
+  if (!svg) return;
+  const set = id ? chain(id) : null;
+  svg.classList.toggle('focusing', !!set);
+  svg.querySelectorAll('.node').forEach((g) => {
+    g.classList.toggle('hl', !!set && set.has(g.dataset.id));
+    g.classList.toggle('sel', g.dataset.id === selected);
+  });
+  svg.querySelectorAll('.edge').forEach((p) => {
+    p.classList.toggle('hl', !!set && set.has(p.dataset.from) && set.has(p.dataset.to));
+  });
+}
+
+function select(id, scroll) {
+  selected = id;
+  interacted = true;
+  highlight(id);
+  renderPanel();
+  if (scroll) {
+    const t = byId.get(id);
+    mapEl.scrollTo({ left: Math.max(0, t.x0 - mapEl.clientWidth / 2 + t.w / 2), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+}
+
+function chipList(ids) {
+  if (!ids.length) return '<span class="none">Nenhuma</span>';
+  return '<div class="chips">' + ids.map((i) => byId.get(i)).sort((a, b) => a.y - b.y)
+    .map((t) => `<button class="chip" type="button" data-go="${t.id}" style="--c:${cvar(t.a)}">${esc(t.n)} <span class="none">${t.y}</span></button>`).join('') + '</div>';
+}
+
+function renderPanel() {
+  const t = byId.get(selected);
+  const year = +yearInput.value;
+  let status;
+  if (t.start) status = '<span class="status start">Disponível no início</span>';
+  else if (t.y <= year) status = `<span class="status ok">Em ${year}: adoção, custo normal</span>`;
+  else status = `<span class="status pioneer">Em ${year}: só como pioneira, custo 3×</span>`;
+  const mult = !t.start && t.y > year ? 3 : 1;
+  const costs = t.start ? '<span class="none">Sem custo</span>' : '<div class="costs">' + Object.entries(t.cost)
+    .map(([a, v]) => `<span class="cost" style="--c:${cvar(a)}"><b>${(v * mult).toLocaleString('pt-BR')}</b> ${esc(AREAS[a])}</span>`).join('') + '</div>';
+  const panel = document.querySelector('[data-panel]');
+  panel.style.setProperty('--c', cvar(t.a));
+  panel.innerHTML = `
+    <div class="area">${esc(AREAS[t.a])}</div>
+    <h2>${esc(t.n)}</h2>
+    <div class="meta"><span>${t.y} · ano ${t.y - 1909} do jogo</span>${status}</div>
+    <dl>
+      <dt>No jogo</dt><dd>${esc(t.e)}</dd>
+      <dt>Mecânica</dt><dd><span class="kind">${esc(t.k)}</span> · ${esc(t.m)}</dd>
+      <dt>Sistemas</dt><dd>${t.s.length ? '<div class="chips">' + t.s.map(sysChip).join('') + '</div>' : '<span class="none">Nenhum: só pré-requisito</span>'} <span class="none">· etapa ${t.fase}</span></dd>
+      <dt>Na história</dt><dd>${esc(t.h)}</dd>
+      <dt>Custo</dt><dd>${costs}</dd>
+      <dt>Requer</dt><dd>${chipList(t.r.filter((i) => byId.has(i)))}</dd>
+      <dt>Libera</dt><dd>${chipList(children.get(t.id))}</dd>
+    </dl>`;
+  panel.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => select(b.dataset.go, true)));
+}
+
+function updateYear() {
+  const year = +yearInput.value;
+  const known = techs.filter((t) => t.y <= year).length;
+  document.querySelector('[data-year]').textContent = year;
+  document.querySelector('[data-year-info]').textContent = `ano ${year - 1909} do jogo · ${known} de ${techs.length} descobertas`;
+  if (!svg) return;
+  const x = xOf(year + 1) - 4;
+  const now = svg.querySelector('[data-now]');
+  now.setAttribute('transform', `translate(${x},0)`);
+  now.querySelector('text').textContent = year;
+  const shade = svg.querySelector('[data-shade]');
+  shade.setAttribute('x', x);
+  shade.setAttribute('width', Math.max(0, svg.width.baseVal.value - x));
+  svg.querySelectorAll('.node').forEach((g) => g.classList.toggle('future', byId.get(g.dataset.id).y > year));
+}
+
+document.querySelector('[data-count]').textContent = techs.length;
+document.querySelector('[data-legend]').innerHTML = ORDER.map((a) =>
+  `<span style="--c:${cvar(a)}"><i></i>${esc(AREAS[a])} <em>${techs.filter((t) => t.a === a).length}</em></span>`).join('');
+
+yearInput.addEventListener('input', () => { updateYear(); renderPanel(); });
+render();
+renderPanel();
+
+// --- Vista: o que cada tecnologia libera --------------------------------------
+const fSys = document.getElementById('f-sys');
+const fKind = document.getElementById('f-kind');
+const fPhase = document.getElementById('f-phase');
+const fQ = document.getElementById('f-q');
+const ST_ORDER = { novo: 0, ampliar: 1, existe: 2 };
+const sysIds = Object.keys(SYS).sort((a, b) => SYS[a].fase - SYS[b].fase || ST_ORDER[SYS[a].st] - ST_ORDER[SYS[b].st] || SYS[a].n.localeCompare(SYS[b].n));
+fSys.innerHTML = '<option value="">Todos</option>' + sysIds.map((s) => `<option value="${s}">${esc(SYS[s].n)}</option>`).join('');
+const kinds = [...new Set(techs.map((t) => t.k))].sort();
+fKind.innerHTML = '<option value="">Todos</option>' + kinds.map((k) => `<option>${esc(k)}</option>`).join('');
+fPhase.innerHTML = '<option value="">Todas</option>' + PHASES.map(([n], i) => `<option value="${i}">${i} · ${esc(n)}</option>`).join('');
+
+const norm = (x) => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function renderRows() {
+  const q = norm(fQ.value.trim());
+  const rows = techs.filter((t) =>
+    (!fSys.value || t.s.includes(fSys.value)) &&
+    (!fKind.value || t.k === fKind.value) &&
+    (fPhase.value === '' || t.fase === +fPhase.value) &&
+    (!q || norm(`${t.n} ${t.m} ${t.e} ${AREAS[t.a]}`).includes(q)))
+    .sort((a, b) => a.y - b.y || a.n.localeCompare(b.n));
+  document.querySelector('[data-map-count]').textContent = `${rows.length} de ${techs.length} tecnologias`;
+  document.querySelector('[data-rows]').innerHTML = rows.map((t) => `<tr>
+    <td class="yr">${t.y}</td>
+    <td><button class="tlink" type="button" data-go="${t.id}" style="--c:${cvar(t.a)}"><span>${esc(t.n)}</span><small>${esc(AREAS[t.a])}</small></button></td>
+    <td><span class="kind">${esc(t.k)}</span></td>
+    <td>${esc(t.m)}</td>
+    <td><div class="syss">${t.s.map(sysChip).join('') || '<span class="none">Nenhum</span>'}</div></td>
+    <td class="ph">${t.fase}${READY.has(t.id) ? ' <span class="sys existe" title="Já pode ser pesquisada no jogo">no jogo</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="none">Nenhuma tecnologia com esses filtros.</td></tr>';
+}
+[fSys, fKind, fPhase].forEach((el) => el.addEventListener('change', renderRows));
+fQ.addEventListener('input', renderRows);
+
+// --- Vista: sistemas e etapas -------------------------------------------------
+function renderSystems() {
+  const ready0 = techs.filter((t) => t.fase === 0).length;
+  const novos = sysIds.filter((s) => SYS[s].st !== 'existe').length;
+  document.querySelector('[data-sys-intro]').textContent =
+    `Das ${techs.length} tecnologias, ${ready0} funcionam com o que o jogo já simula, assim que o núcleo de pesquisa existir. ` +
+    `As outras dependem de ${novos} sistemas novos ou ampliados. As etapas abaixo agrupam esses sistemas na ordem em que um depende do outro, e cada etapa deixa mais tecnologias jogáveis.`;
+  let total = 0;
+  document.querySelector('[data-phases]').innerHTML = PHASES.map(([name, desc], i) => {
+    const added = techs.filter((t) => t.fase === i).length;
+    total += added;
+    const pct = Math.round((total / techs.length) * 100);
+    const cards = sysIds.filter((s) => SYS[s].fase === i).map((s) => {
+      const sy = SYS[s];
+      const used = techs.filter((t) => t.s.includes(s)).sort((a, b) => a.y - b.y);
+      return `<article class="card">
+        <header><h4>${esc(sy.n)}</h4><span class="sys ${sy.st}">${ST_LABEL[sy.st]}</span></header>
+        <p>${esc(sy.d)}</p>
+        <ul>${sy.b.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+        <div class="used">Usado por ${used.length} tecnologia${used.length === 1 ? '' : 's'}</div>
+        <div class="chips">${used.map((t) => `<button class="chip" type="button" data-go="${t.id}" style="--c:${cvar(t.a)}">${esc(t.n)}</button>`).join('')}</div>
+      </article>`;
+    }).join('');
+    return `<section class="phase">
+      <div class="phase-head">
+        <div><h3><em>Etapa ${i}</em>${esc(name)}</h3><p>${esc(desc)}</p></div>
+        <div class="meter"><span><b>+${added}</b> tecnologias · <b>${total}</b> de ${techs.length} funcionando (${pct}%)</span><div class="bar"><i style="width:${pct}%"></i></div></div>
+      </div>
+      <div class="cards">${cards}</div>
+    </section>`;
+  }).join('');
+}
+
+// --- Abas ---------------------------------------------------------------------
+const VIEWS = ['arvore', 'mapeamento', 'sistemas'];
+function show(v) {
+  if (!VIEWS.includes(v)) v = 'arvore';
+  document.querySelectorAll('[data-view]').forEach((el) => { el.hidden = el.dataset.view !== v; });
+  document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === v)));
+}
+document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+  show(b.dataset.tab);
+  try { history.replaceState(null, '', '#' + b.dataset.tab); } catch (e) { /* sem histórico */ }
+}));
+window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-go]');
+  if (!b || b.closest('[data-panel]')) return;
+  show('arvore');
+  try { history.replaceState(null, '', '#arvore'); } catch (err) { /* sem histórico */ }
+  select(b.dataset.go, true);
+  mapEl.scrollIntoView({ block: 'start', behavior: 'auto' });
+});
+renderRows();
+renderSystems();
+show(location.hash.slice(1));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+</script>
+</body>
+</html>

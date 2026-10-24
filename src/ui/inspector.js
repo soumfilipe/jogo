@@ -4,6 +4,8 @@
 import { BUILDINGS, MAX_LEVEL, SHIFTS } from '../world/catalog.js';
 import { formatClock } from '../core/time.js';
 import { upgradeBlockers } from '../systems/growth.js';
+import { jobsOf, mod, utilityOutput, utilityUpkeep } from '../systems/mods.js';
+import { AREAS } from '../world/techs.js';
 
 const STATE_TEXT = {
   casa: 'Em casa',
@@ -29,7 +31,7 @@ function renderBuilding(el, b, state, rt) {
   const residents = [...rt.residents.get(b.id)].map((id) => rt.citizenById.get(id));
   const workers = [...rt.workers.get(b.id)].map((id) => rt.citizenById.get(id));
   const people = info.residents ? residents : workers;
-  const capacity = info.residents || info.jobs;
+  const capacity = info.residents || jobsOf(rt, b.type);
   const access = rt.access.get(b.id) >= 0;
   const stars = '★'.repeat(info.level) + '☆'.repeat(MAX_LEVEL - info.level);
   const upgrade = upgradeBlockers(state, rt, b);
@@ -71,18 +73,25 @@ const NO = '<b style="color:#ff8a80">Não</b>';
 function renderUtility(el, b, state, rt) {
   const info = BUILDINGS[b.type];
   const u = info.utility;
-  const res = u.power ? 'power' : 'water';
+  const res = u.power ? 'power' : u.water ? 'water' : null;
   const label = res === 'power' ? 'energia' : 'água';
   const access = rt.access.get(b.id);
-  const net = access >= 0 ? rt.utilityNets?.get(rt.roadComponent[access]) : null;
+  const net = res && access >= 0 ? rt.utilityNets?.get(rt.roadComponent[access]) : null;
   const workers = rt.workers.get(b.id).size;
+  const jobs = jobsOf(rt, b.type);
+  const fmt = (v) => Math.round(v).toLocaleString('pt-BR');
+  const kind = u.institute || u.privateResearch ? 'Pesquisa' : u.income ? 'Estatal' : 'Serviço público';
   el.innerHTML = `
     <h3>${esc(info.name)} #${b.id}</h3>
-    <p class="muted">Serviço público · ${info.size}×${info.size}</p>
+    <p class="muted">${kind} · ${info.size}×${info.size}</p>
     <dl>
-      <dt>Produz</dt><dd>${u[res].toLocaleString('pt-BR')} de ${label}</dd>
-      <dt>Manutenção</dt><dd>$${u.upkeep}/mês</dd>
-      <dt>Funcionários</dt><dd>${workers} / ${info.jobs}</dd>
+      ${res ? `<dt>Produz</dt><dd>${fmt(utilityOutput(rt, b.type, res))} de ${label}</dd>` : ''}
+      ${u.income ? `<dt>Receita</dt><dd>$${fmt(u.income * (workers / jobs) * mod(rt, `output.${b.type}`))}/mês</dd>` : ''}
+      <dt>Manutenção</dt><dd>$${fmt(utilityUpkeep(rt, b.type))}/mês</dd>
+      <dt>${u.institute ? 'Pesquisadores' : 'Funcionários'}</dt><dd>${workers} / ${jobs}</dd>
+      ${u.institute ? '<dt>Pesquisa</dt><dd>nas áreas com verba (painel Pesquisa)</dd>' : ''}
+      ${u.area ? `<dt>Pesquisa</dt><dd>um pouco de ${esc(AREAS[u.area])}</dd>` : ''}
+      ${u.privateResearch ? '<dt>Pesquisa</dt><dd>P&amp;D dos escritórios em volta</dd>' : ''}
       <dt>Acesso a estrada</dt><dd>${access >= 0 ? 'Sim' : NO}</dd>
       ${net ? `<dt>Rede (${label})</dt><dd>${net[res].used.toLocaleString('pt-BR')} usados de ${net[res].supply.toLocaleString('pt-BR')}</dd>` : ''}
       ${u.pollution ? `<dt>Poluição</dt><dd>alta em volta</dd>` : ''}

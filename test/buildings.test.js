@@ -168,3 +168,18 @@ test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () 
   // O mesmo prédio sempre usa o mesmo projeto.
   assert.equal(designFor({ id: 77, type: 'casa' }), designFor({ id: 77, type: 'casa' }));
 });
+
+test('todo prédio do jogador tem desenho, dentro do próprio lote', async () => {
+  const { design } = await import('../src/render/designs.js');
+  for (const type of Object.keys(BUILDINGS).filter((t) => BUILDINGS[t].utility)) {
+    const size = BUILDINGS[type].size;
+    for (let i = 0; i < 3; i++) {
+      const d = design(type, i);
+      assert.ok(d.parts.length > 0, `${type} sem partes`);
+      for (const part of d.parts) {
+        const box = part.box ?? [part.cx - (part.r ?? 0), part.cy - (part.r ?? 0), part.cx + (part.r ?? 0), part.cy + (part.r ?? 0)];
+        assert.ok(box[0] >= 0 && box[1] >= 0 && box[2] <= size && box[3] <= size, `${type}: ${part.kind} fora do lote`);
+      }
+    }
+  }
+});
