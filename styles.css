@@ -110,6 +110,9 @@ button { touch-action: manipulation; }
 #inspector ul { list-style: none; padding: 0; margin: 6px 0 0; }
 #inspector li { padding: 4px 0; border-top: 1px solid #3a3f4a; display: flex; justify-content: space-between; gap: 8px; }
 #inspector li small { color: var(--muted); }
+#inspector h4 { margin: 12px 0 0; font-size: 13px; }
+#inspector .companies li { display: block; }
+#inspector .companies small { display: block; }
 #inspector .link { background: none; border: none; padding: 0; color: #9cc1ff; cursor: pointer; text-align: left; }
 #inspector .close { position: absolute; top: 6px; right: 6px; padding: 0 7px; }
 

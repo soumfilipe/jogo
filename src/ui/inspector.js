@@ -2,8 +2,10 @@
 // cidadão individual (casa, emprego, rotina e o que está fazendo agora).
 
 import {
-  BUILDINGS, DENSITY_INFO, MAX_LEVEL, SHIFTS, ZONE, buildingFloors, capacityOf,
+  BUILDINGS, DENSITY_INFO, MAX_LEVEL, SECTORS, SHIFTS, ZONE, buildingFloors, capacityOf,
 } from '../world/catalog.js';
+import { companyJobs, usesCompanies } from '../world/runtime.js';
+import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
 import { upgradeBlockers } from '../systems/growth.js';
 
@@ -68,6 +70,7 @@ function renderBuilding(el, b, state, rt) {
       ${b.unservedDays ? `<dt>Dias sem serviço</dt><dd>${b.unservedDays}</dd>` : ''}
     </dl>
     <p class="muted">${next}</p>
+    ${usesCompanies(info) ? companies(b, rt) : ''}
     <ul>${people.map((c) => `
       <li><button class="link" data-citizen="${c.id}">${esc(c.name)}</button>
           <small>${esc(activity(c))}</small></li>`).join('')}
@@ -75,6 +78,20 @@ function renderBuilding(el, b, state, rt) {
 }
 
 const NO = '<b style="color:#ff8a80">Não</b>';
+
+// Empresas do prédio, andar por andar, e os andares vagos.
+function companies(b, rt) {
+  const list = rt.companiesIn.get(b.id);
+  const vacant = vacantFloors(rt, b);
+  const rows = list.map((co) => `
+    <li><b>${esc(co.name)}</b> <small>${esc(SECTORS[co.sector].name)} · ${floorsLabel(co.floor, co.floors)} ·
+      ${rt.companyWorkers.get(co.id).size} / ${companyJobs(rt, co)} vagas${co.understaffedDays ? ` · sem gente há ${co.understaffedDays} dias` : ''}</small></li>`);
+  if (vacant.length) rows.push(`<li class="muted">Vago (aluga-se): ${vacant.map((f) => floorsLabel(f, 1)).join(', ')}</li>`);
+  return `<h4>Empresas</h4><ul class="companies">${rows.join('')}</ul>`;
+}
+
+const floorLabel = (f) => (f === 0 ? 'térreo' : `${f}º andar`);
+const floorsLabel = (floor, floors) => (floors === 1 ? floorLabel(floor) : `${floorLabel(floor)} ao ${floorLabel(floor + floors - 1)}`);
 
 function renderUtility(el, b, state, rt) {
   const info = BUILDINGS[b.type];
@@ -100,13 +117,14 @@ function renderUtility(el, b, state, rt) {
 function renderCitizen(el, c, rt, following) {
   const home = rt.buildingById.get(c.home);
   const job = c.job !== null ? rt.buildingById.get(c.job) : null;
+  const company = c.company != null ? rt.companyById.get(c.company) : null;
   el.innerHTML = `
     <h3>${esc(c.name)}</h3>
     <p class="muted">${c.age} anos · ${esc(activity(c))}</p>
     <dl>
       <dt>Casa</dt><dd><button class="link" data-building="${home.id}">${esc(BUILDINGS[home.type].name)} #${home.id}</button></dd>
       <dt>Trabalho</dt><dd>${job
-        ? `<button class="link" data-building="${job.id}">${esc(BUILDINGS[job.type].name)} #${job.id}</button>`
+        ? `${company ? `${esc(company.name)}, ` : ''}<button class="link" data-building="${job.id}">${esc(BUILDINGS[job.type].name)} #${job.id}</button>`
         : c.age > 64 ? 'Aposentado(a)' : 'Desempregado(a)'}</dd>
       ${job ? `<dt>Turno</dt><dd>${esc(SHIFTS[c.shift ?? 'diurno'].name)}</dd>
       <dt>Rotina</dt><dd>sai ${formatClock(c.departWork)}, volta ${formatClock(c.departHome)}</dd>` : ''}

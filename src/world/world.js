@@ -39,6 +39,7 @@ export function createWorld({
     },
     buildings: [], // { id, type, tile, builtAt, floors? } (floors: só se cresceu andares)
     citizens: [], //  ver src/agents/citizens.js
+    companies: [], // { id, name, sector, building, floor, floors, foundedAt, understaffedDays? }
     pathQueue: [], // ids de cidadãos esperando o cálculo de rota
     // Energia e água importadas da região (só em saves anteriores aos serviços
     // públicos; acaba quando o jogador constrói a primeira usina/bomba).

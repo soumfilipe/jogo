@@ -7,7 +7,8 @@ import {
   BUILDINGS, DAYS_BETWEEN_UPGRADES, DENSITY, DENSITY_INFO, LAND_VALUE_FOR_LEVEL, LARGE_BUILDINGS, LEVELS,
   MAX_LEVEL, ZONE, buildingFloors, capacityOf, landValueForFloor, maxFloorsFor,
 } from '../world/catalog.js';
-import { addBuilding, findAccessRoad, touchMap, vacancies } from '../world/runtime.js';
+import { addBuilding, findAccessRoad, touchMap, usesCompanies, vacancies } from '../world/runtime.js';
+import { fitCompanies, foundCompanies, vacantFloors } from './companies.js';
 import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
@@ -68,7 +69,8 @@ export function growBuildings(state, rt) {
     ) {
       type = large;
     }
-    addBuilding(state, rt, type, tile);
+    const b = addBuilding(state, rt, type, tile);
+    if (usesCompanies(BUILDINGS[type])) foundCompanies(state, rt, b);
     reserve(state, rt, access, consumption(BUILDINGS[type]));
     remaining[key] -= capacity(BUILDINGS[type]);
   }
@@ -107,6 +109,7 @@ export function upgradeBuildings(state, rt) {
     } else {
       b.type = pick(state.rng, LEVELS[info.zone][step.level]);
       delete b.floors;
+      fitCompanies(state, rt, b);
     }
     b.upgradedAt = tick;
     touchMap(rt, b.tile, info.size);
@@ -160,7 +163,8 @@ export function upgradeBlockers(state, rt, b) {
   const service = rt.service?.get(b.id);
   if (service && !service.power) blockers.push('energia');
   if (service && !service.water) blockers.push('água');
-  if (occupied(rt, b) < capacityOf(b)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
+  if (usesCompanies(info) && vacantFloors(rt, b).length) blockers.push('alugar os andares vagos');
+  else if (occupied(rt, b) < capacityOf(b)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
   if (rt.landValue[b.tile] < step.landValue) {
     blockers.push(`valor do terreno ${pct(step.landValue)} (agora ${pct(rt.landValue[b.tile])})`);
   }

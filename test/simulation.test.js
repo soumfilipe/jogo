@@ -102,9 +102,10 @@ test('cidade cresce e cidadãos fazem a rotina casa -> trabalho -> casa', () => 
   assert.ok(notNight.every((c) => c.state === 'casa'), 'fora do turno da noite, todos em casa à meia-noite');
 });
 
-test('turnos: 7% à noite, 3% de madrugada, 10% meio período, e a cidade se move em todos os horários', () => {
+test('turnos: poucos à noite e de madrugada, alguns de meio período, e a cidade se move em todos os horários', () => {
   const { pickShift } = SHIFT_HELPERS;
-  // Distribuição exata das frações do catálogo.
+  // Serviços públicos: distribuição exata das frações do catálogo. Nas
+  // empresas, as frações do setor (ver SECTORS); na cidade, a mistura delas.
   const counts = {};
   for (let i = 0; i < 1000; i++) counts[pickShift((i + 0.5) / 1000)] = (counts[pickShift((i + 0.5) / 1000)] || 0) + 1;
   assert.deepEqual(counts, { diurno: 800, noturno: 70, madrugada: 30, manha: 50, tarde: 50 });

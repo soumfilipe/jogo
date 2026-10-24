@@ -109,7 +109,7 @@ da rua em que estão encostados (`src/systems/utilities.js`).
 | --- | --- | --- | --- |
 | 1 | Casa (4 moradores) | Loja (5 vagas) | Fábrica (10 vagas) |
 | 2 | Sobrado (8) | Mercado (12) | Indústria (18) |
-| 3 | Prédio de apartamentos (16) | Escritórios (30) | Complexo industrial (30) |
+| 3 | Prédio de apartamentos (16) | Escritórios (32) | Complexo industrial (30) |
 | Grande 2×2 | Condomínio (48) | Shopping (80) | Galpão logístico (70) |
 
 - Um prédio 1×1 sobe um nível quando está **lotado**, o **valor do terreno** é
@@ -177,7 +177,7 @@ botões Baixa / Média / Alta; fica em `state.map.density`, por tile):
   mais. A indústria não usa densidade.
 - O lote vazio fica mais forte quanto maior a densidade, e o inspetor mostra
   andares, densidade e o que falta para o próximo andar.
-- Saves anteriores (formato 5) abrem com tudo em densidade média, que é como
+- Saves do formato 5 abrem com tudo em densidade média, que é como
   as zonas funcionavam antes.
 
 ## Noite e luzes
@@ -197,9 +197,34 @@ casa: casa vazia fica apagada. As luzes ficam numa camada própria, redesenhada 
 cada 15 minutos de jogo, em que cada prédio esconde as luzes dos que estão atrás.
 À noite os cidadãos andando aparecem por cima da escuridão, como faróis.
 
+## Empresas
+
+Quem emprega no comércio e na indústria são **empresas** (`src/systems/companies.js`,
+setores em `SECTORS` no catálogo). Cada uma aluga andares inteiros de um prédio, e
+cada andar alugado dá `perFloor` vagas:
+
+- **Lojas, mercados e shopping**: uma empresa de varejo por andar (padaria,
+  mercadinho, farmácia, restaurante, bar, loja de roupas).
+- **Escritórios**: empresas de 1 a 3 andares (contabilidade, advocacia,
+  tecnologia, clínica, central de atendimento); o térreo às vezes é comércio.
+- **Indústria**: uma empresa só no prédio inteiro (metalúrgica, alimentos,
+  têxtil, logística, química), que ocupa os andares novos quando o prédio cresce.
+
+Prédio novo nasce alugado. Andar **vago** (o prédio cresceu ou uma empresa
+fechou) não tem vagas, não entra na demanda e recebe uma empresa nova quando a
+zona tem demanda, antes de surgirem prédios novos. Uma empresa com menos da
+metade dos funcionários por 20 dias seguidos (depois de 7 dias para contratar)
+**fecha** e demite todo mundo. Prédio com andar vago não cresce até alugá-lo.
+
+O inspetor do prédio lista as empresas por andar (com vagas preenchidas) e os
+andares vagos; o do cidadão mostra onde ele trabalha. À noite, prédios
+comerciais acendem na proporção de quem trabalha lá.
+
 ## Turnos de trabalho
 
-Cada contratação sorteia um turno (`SHIFTS` em `src/world/catalog.js`):
+Cada funcionário de empresa tem o turno sorteado pelas frações do **setor** dela
+(padaria começa de madrugada, bar trabalha à tarde e à noite, escritório é quase
+todo diurno). Nos serviços públicos, valem as frações de `SHIFTS` no catálogo:
 
 | Turno | Parcela | Sai de casa | Volta |
 | --- | --- | --- | --- |
@@ -322,7 +347,7 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 5,                 // versão do formato (migrações em src/save/format.js)
+  "version": 7,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
@@ -342,11 +367,16 @@ módulos JavaScript em `file://`.)
 Dentro de `data`, as camadas do mapa (typed arrays) viram
 `{ "$typed": "Uint8Array", "length": 65536, "rle": [qtd, valor, …] }`.
 
-Prédios e cidadãos são gravados em colunas (`src/save/table.js`): o nome de
+Prédios, cidadãos e empresas são gravados em colunas (`src/save/table.js`): o nome de
 cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves de antes das empresas (formato 6) abrem normalmente: a migração marca o
+save, e ao carregar cada prédio comercial e industrial ganha empresas em todos
+os andares, com quem já trabalhava lá distribuído entre elas, mantendo emprego,
+turno e horários. Nenhum andar fica vago e ninguém perde o emprego.
 
 ### Mudando o formato
 
@@ -364,13 +394,13 @@ src/core/               relógio/laço, tempo do jogo, RNG com semente
 src/world/              estado (world.js), catálogo de prédios, terreno,
                         índices derivados (runtime.js), ações do jogador
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes
-src/systems/            demanda, valor do terreno, energia e água, crescimento e níveis,
+src/systems/            demanda, valor do terreno, energia e água, crescimento e níveis, empresas,
                         economia, ordem dos sistemas
 src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa
 src/ui/                 painel de inspeção e painel de orçamento
 src/save/format.js      formato do save: criar, validar, checksum, migrações, RLE
-src/save/table.js       prédios e cidadãos em colunas, rotas como passos
+src/save/table.js       prédios, cidadãos e empresas em colunas, rotas como passos
 src/save/backends.js    onde gravar: arquivos (servidor), IndexedDB ou localStorage
 src/save/SaveManager.js salvar, carregar, automático, exportar/importar
 test/                   testes (node --test)

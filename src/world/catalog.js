@@ -61,7 +61,7 @@ export const BUILDINGS = {
     name: 'Mercado', zone: ZONE.COMMERCIAL, level: 2, size: 1, residents: 0, jobs: 12, perFloor: 6,
   },
   escritorios: {
-    name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 30, perFloor: 8, tall: true,
+    name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 32, perFloor: 8, tall: true,
   },
   shopping: {
     name: 'Shopping', zone: ZONE.COMMERCIAL, level: 3, size: 2, residents: 0, jobs: 80, perFloor: 40,
@@ -233,6 +233,40 @@ export const SHIFTS = {
   manha: { name: 'Meio período (manhã)', share: 0.05, leave: [hm(7), hm(9)], back: [hm(12), hm(13, 30)] },
   tarde: { name: 'Meio período (tarde)', share: 0.05, leave: [hm(12, 30), hm(14)], back: [hm(17, 30), hm(19, 30)] },
 };
+
+// Empresas: ocupam andares inteiros dos prédios comerciais e industriais, e
+// cada andar alugado dá perFloor vagas do prédio. Andar sem empresa fica
+// vago ("aluga-se") e não tem vagas. Cada setor tem os turnos dos seus
+// funcionários (frações, como em SHIFTS) e um modelo de nome ({L} e {M} são
+// sobrenomes sorteados).
+//   kind: 'varejo' (térreos e lojas), 'escritorio' (andares de escritórios)
+//         ou 'industria' (uma empresa ocupa o prédio industrial inteiro)
+export const SECTORS = {
+  padaria: { name: 'Padaria', kind: 'varejo', label: 'Padaria {L}', shifts: { madrugada: 0.2, diurno: 0.5, manha: 0.15, tarde: 0.15 } },
+  mercadinho: { name: 'Mercadinho', kind: 'varejo', label: 'Mercadinho {L}', shifts: { diurno: 0.7, manha: 0.15, tarde: 0.15 } },
+  farmacia: { name: 'Farmácia', kind: 'varejo', label: 'Farmácia {L}', shifts: { diurno: 0.75, noturno: 0.1, tarde: 0.15 } },
+  restaurante: { name: 'Restaurante', kind: 'varejo', label: 'Restaurante {L}', shifts: { diurno: 0.6, tarde: 0.3, noturno: 0.1 } },
+  bar: { name: 'Bar', kind: 'varejo', label: 'Bar {L}', shifts: { tarde: 0.5, noturno: 0.5 } },
+  roupas: { name: 'Loja de roupas', kind: 'varejo', label: '{L} Modas', shifts: { diurno: 0.8, manha: 0.1, tarde: 0.1 } },
+  contabilidade: { name: 'Contabilidade', kind: 'escritorio', label: 'Contabilidade {L}', shifts: { diurno: 0.9, manha: 0.05, tarde: 0.05 } },
+  advocacia: { name: 'Advocacia', kind: 'escritorio', label: '{L} & {M} Advogados', shifts: { diurno: 1 } },
+  tecnologia: { name: 'Tecnologia', kind: 'escritorio', label: '{L} Tecnologia', shifts: { diurno: 0.85, tarde: 0.15 } },
+  clinica: { name: 'Clínica', kind: 'escritorio', label: 'Clínica {L}', shifts: { diurno: 0.7, manha: 0.15, tarde: 0.15 } },
+  atendimento: { name: 'Central de atendimento', kind: 'escritorio', label: '{L} Atendimento', shifts: { diurno: 0.55, tarde: 0.2, noturno: 0.15, madrugada: 0.1 } },
+  metalurgica: { name: 'Metalúrgica', kind: 'industria', label: 'Metalúrgica {L}', shifts: { diurno: 0.8, noturno: 0.12, madrugada: 0.08 } },
+  alimentos: { name: 'Alimentos', kind: 'industria', label: '{L} Alimentos', shifts: { diurno: 0.75, noturno: 0.1, madrugada: 0.1, manha: 0.05 } },
+  textil: { name: 'Têxtil', kind: 'industria', label: 'Têxtil {L}', shifts: { diurno: 0.8, tarde: 0.1, noturno: 0.1 } },
+  logistica: { name: 'Logística', kind: 'industria', label: '{L} Logística', shifts: { diurno: 0.6, noturno: 0.2, madrugada: 0.1, manha: 0.05, tarde: 0.05 } },
+  quimica: { name: 'Química', kind: 'industria', label: 'Química {L}', shifts: { diurno: 0.8, noturno: 0.1, madrugada: 0.1 } },
+};
+
+// Uma empresa nova tem COMPANY_GRACE_DAYS dias para contratar; depois, se
+// passar COMPANY_CLOSE_DAYS dias seguidos com menos da metade das vagas
+// preenchidas, fecha e o andar volta a ficar vago.
+export const COMPANY_GRACE_DAYS = 7;
+export const COMPANY_CLOSE_DAYS = 20;
+// Chance por hora de uma empresa nova abrir num andar vago, havendo demanda.
+export const COMPANY_OPEN_CHANCE = 0.1;
 
 // Velocidade dos cidadãos, em tiles por minuto de jogo.
 export const CITIZEN_SPEED = 0.5;

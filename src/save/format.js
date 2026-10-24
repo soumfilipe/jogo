@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  6,                 // versão do FORMATO (para migrações)
+//   "version":  7,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -16,8 +16,8 @@ import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 6;
-export const GAME_VERSION = '0.7.0';
+export const SAVE_VERSION = 7;
+export const GAME_VERSION = '0.8.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -109,11 +109,22 @@ const MIGRATIONS = {
     save.version = 6;
     return save;
   },
+  // v6 -> v7: empresas. O save ganha a lista (vazia) e a marca legacyJobs: ao
+  // carregar, a simulação cria empresas em todos os andares dos prédios
+  // comerciais e industriais e põe quem já trabalhava lá nelas (ver
+  // convertLegacyJobs em systems/companies.js). A cidade continua igual.
+  6: (save) => {
+    save.data.companies = encodeTable([]);
+    save.data.legacyJobs = true;
+    save.version = 7;
+    return save;
+  },
 };
 
-// Prédios e cidadãos: de listas de objetos para tabelas em colunas (e volta).
+// Prédios, cidadãos e empresas: de listas de objetos para tabelas em colunas (e volta).
 function packLists(data) {
   if (Array.isArray(data.buildings)) data.buildings = encodeTable(data.buildings);
+  if (Array.isArray(data.companies)) data.companies = encodeTable(data.companies);
   if (Array.isArray(data.citizens)) data.citizens = encodeTable(data.citizens, { moves: { path: data.map.width } });
 }
 
@@ -121,6 +132,7 @@ function unpackLists(data) {
   return {
     ...data,
     buildings: decodeTable(data.buildings),
+    ...(data.companies ? { companies: decodeTable(data.companies) } : {}),
     citizens: decodeTable(data.citizens, { moves: { path: data.map.width } }),
   };
 }
@@ -134,10 +146,11 @@ export function createSave(state, meta) {
   if (!meta || !isValidSaveId(meta.id)) {
     throw new SaveError('INVALID_ID', `Id de save inválido: ${meta && meta.id}`);
   }
-  // Prédios e cidadãos vão direto para as colunas (sem a cópia de encodeState).
-  const data = encodeState({ ...state, buildings: [], citizens: [] });
+  // Prédios, cidadãos e empresas vão direto para as colunas (sem a cópia de encodeState).
+  const data = encodeState({ ...state, buildings: [], citizens: [], companies: [] });
   data.buildings = state.buildings;
   data.citizens = state.citizens;
+  data.companies = state.companies;
   packLists(data);
   const now = new Date().toISOString();
   return {

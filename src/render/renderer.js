@@ -731,14 +731,16 @@ export class Renderer {
 
 // ---------------------------------------------------------------------------
 
-// Fração de gente no prédio: moradores em casa, ou se tem alguém trabalhando.
+// Fração de gente no prédio: moradores em casa, ou funcionários das empresas.
 function buildingOccupancy(rt, b, info) {
   if (info.residents) {
     let home = 0;
     for (const id of rt.residents.get(b.id)) if (rt.citizenById.get(id).state === 'casa') home++;
     return home / capacityOf(b);
   }
-  return rt.workers.get(b.id).size > 0 ? 0.9 : 0;
+  // Comércio e indústria: acende na proporção de quem trabalha lá (andar vago
+  // fica escuro).
+  return Math.min(0.9, rt.workers.get(b.id).size / capacityOf(b));
 }
 
 const diag = (tile, width) => (tile % width) + Math.floor(tile / width);
