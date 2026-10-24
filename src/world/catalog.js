@@ -141,6 +141,16 @@ export const LAND_VALUE_FOR_LEVEL = {
 // Dias mínimos entre uma mudança de nível e a próxima.
 export const DAYS_BETWEEN_UPGRADES = 3;
 
+// Florestas: densidade de 1 a `maxDensity` (árvores por tile). A cada tick,
+// com `growChance`, até `tilesPerTick` tiles sorteados crescem: mata fica mais
+// densa, e grama livre ao lado de mata com pelo menos `spreadDensity` vira mata.
+export const FOREST = {
+  maxDensity: 6,
+  growChance: 0.05,
+  tilesPerTick: 5,
+  spreadDensity: 3,
+};
+
 export const COSTS = {
   road: 10,
   zone: 5,

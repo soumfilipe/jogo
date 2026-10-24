@@ -39,7 +39,7 @@ export function addBuilding(state, rt, type, tile) {
   const building = { id: state.nextId++, type, tile, builtAt: state.time.tick };
   state.buildings.push(building);
   for (const t of footprint(state, building)) {
-    if (state.map.terrain[t] === TERRAIN.FOREST) state.map.terrain[t] = TERRAIN.GRASS;
+    if (state.map.terrain[t] === TERRAIN.FOREST) clearForest(state, t);
   }
   indexBuilding(state, rt, building);
   rt.access.set(building.id, findAccessRoad(state, rt, tile, BUILDINGS[type].size));
@@ -72,6 +72,12 @@ function indexBuilding(state, rt, b) {
   for (const t of footprint(state, b)) rt.buildingAt[t] = b.id;
   rt.residents.set(b.id, new Set());
   rt.workers.set(b.id, new Set());
+}
+
+/** Derruba a mata de um tile (vira grama). */
+export function clearForest(state, tile) {
+  state.map.terrain[tile] = TERRAIN.GRASS;
+  state.map.forest[tile] = 0;
 }
 
 export function buildingInfo(b) {

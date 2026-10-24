@@ -9,14 +9,21 @@ import { growBuildings, moveIn, upgradeBuildings } from './growth.js';
 import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
 import { applyUtilityEffects, computeUtilities } from './utilities.js';
+import { growForests } from './forest.js';
 
 export function tick(state, rt) {
   state.time.tick++;
   const t = state.time.tick;
 
   updateCitizens(state, rt);
+  growForests(state, rt);
 
   if (t % 60 === 0) {
+    // O mapa redesenha no máximo uma vez por hora por causa das matas.
+    if (rt.forestChanged) {
+      rt.forestChanged = false;
+      rt.mapVersion++;
+    }
     computeDemand(state, rt);
     // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
     // assim o resultado não depende de quando o save foi carregado.
