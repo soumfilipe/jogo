@@ -54,7 +54,8 @@ button.active { border-color: var(--accent); background: #2f3b55; }
 .toolbar kbd { color: var(--muted); font-size: 11px; margin-left: 4px; }
 .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
 
-.speeds { display: flex; gap: 2px; }
+.speeds, .toolbar .density { display: flex; gap: 2px; }
+.toolbar .density button { padding: 5px 8px; }
 .speeds button { padding: 4px 8px; min-width: 34px; }
 
 .rci { display: inline-flex; gap: 3px; align-items: center; height: 24px; }

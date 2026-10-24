@@ -2,7 +2,7 @@
 // (buildRuntime) e mantidos atualizados pelas funções deste módulo. Qualquer
 // mudança em prédios, cidadãos ou estradas deve passar por aqui.
 
-import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN } from './catalog.js';
+import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN, capacityOf } from './catalog.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -118,12 +118,14 @@ export function frontTile(state, b) {
 // Prédio abandonado não recebe moradores nem contrata.
 export function vacancies(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return BUILDINGS[b.type].residents - rt.residents.get(b.id).size;
+  if (!BUILDINGS[b.type].residents) return 0;
+  return capacityOf(b) - rt.residents.get(b.id).size;
 }
 
 export function openJobs(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return BUILDINGS[b.type].jobs - rt.workers.get(b.id).size;
+  if (!BUILDINGS[b.type].jobs) return 0;
+  return capacityOf(b) - rt.workers.get(b.id).size;
 }
 
 // ---------------------------------------------------------------------------

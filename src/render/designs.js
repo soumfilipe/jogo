@@ -18,7 +18,7 @@
 //   { kind: 'antenna', cx, cy, lift, h }
 //   { kind: 'slab', box, color, lines }      (chão: estacionamento, pátio)
 
-import { BUILDINGS, ZONE, floorsOf } from '../world/catalog.js';
+import { BUILDINGS, ZONE, buildingFloors, floorsOf } from '../world/catalog.js';
 import { createRng, hash2, random } from '../core/rng.js';
 
 export const VARIANTS = 20;
@@ -56,19 +56,24 @@ const METAL = wall('#b9bcc2', '#9a9da3');
 
 const cache = new Map();
 
-/** Projeto do prédio `b` (um dos VARIANTS do tipo dele). */
+/** Projeto do prédio `b` (um dos VARIANTS do tipo dele, com os andares dele). */
 export function designFor(b) {
-  return design(b.type, Math.floor(hash2(b.id, 13) * VARIANTS));
+  return design(b.type, Math.floor(hash2(b.id, 13) * VARIANTS), buildingFloors(b));
 }
 
-export function design(type, index) {
-  const key = `${type}:${index}`;
+/**
+ * Projeto `index` do tipo, com `floors` andares (padrão: os do tipo). O
+ * sorteio depende só do tipo e do índice: um prédio que ganha andares
+ * continua com a mesma forma e as mesmas cores, só mais alto.
+ */
+export function design(type, index, floors = floorsOf(BUILDINGS[type])) {
+  const key = `${type}:${index}:${floors}`;
   let d = cache.get(key);
   if (!d) {
     const info = BUILDINGS[type];
-    const rng = createRng(hashString(key) ^ 0x9e3779b9);
+    const rng = createRng(hashString(`${type}:${index}`) ^ 0x9e3779b9);
     const r = makeRandom(rng);
-    const parts = info.utility ? UTILITY_GENERATORS[type](r) : GENERATORS[info.zone](info, r);
+    const parts = info.utility ? UTILITY_GENERATORS[type](r) : GENERATORS[info.zone](info, r, floors);
     d = { parts, color: parts.find((p) => p.wall)?.wall.left ?? '#999999' };
     cache.set(key, d);
   }
@@ -177,9 +182,8 @@ const balconies = (n, fh, color) => {
 };
 
 const GENERATORS = {
-  [ZONE.RESIDENTIAL](info, r) {
+  [ZONE.RESIDENTIAL](info, r, n) {
     const size = info.size;
-    const n = floorsOf(info);
     const fh = RES_FLOOR;
     const w = r.pick(RES_WALLS);
     const roofColor = r.pick(ROOFS);
@@ -254,9 +258,8 @@ const GENERATORS = {
     return parts;
   },
 
-  [ZONE.COMMERCIAL](info, r) {
+  [ZONE.COMMERCIAL](info, r, n) {
     const S = info.size;
-    const n = floorsOf(info);
     const i = r.range(0.08, 0.18);
     const accent = r.pick(ACCENTS);
     const parts = [];
@@ -315,9 +318,8 @@ const GENERATORS = {
     return parts;
   },
 
-  [ZONE.INDUSTRIAL](info, r) {
+  [ZONE.INDUSTRIAL](info, r, n) {
     const S = info.size;
-    const n = floorsOf(info);
     const w = r.pick(IND_WALLS);
     const stripe = r.pick(STRIPES);
     const i = r.range(0.06, 0.15);

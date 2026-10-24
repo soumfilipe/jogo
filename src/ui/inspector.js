@@ -1,7 +1,9 @@
 // Painel de inspeção: mostra um prédio (com moradores/funcionários) ou um
 // cidadão individual (casa, emprego, rotina e o que está fazendo agora).
 
-import { BUILDINGS, MAX_LEVEL, SHIFTS, floorsOf } from '../world/catalog.js';
+import {
+  BUILDINGS, DENSITY_INFO, MAX_LEVEL, SHIFTS, ZONE, buildingFloors, capacityOf,
+} from '../world/catalog.js';
 import { formatClock } from '../core/time.js';
 import { upgradeBlockers } from '../systems/growth.js';
 
@@ -29,7 +31,7 @@ function renderBuilding(el, b, state, rt) {
   const residents = [...rt.residents.get(b.id)].map((id) => rt.citizenById.get(id));
   const workers = [...rt.workers.get(b.id)].map((id) => rt.citizenById.get(id));
   const people = info.residents ? residents : workers;
-  const capacity = info.residents || info.jobs;
+  const capacity = capacityOf(b);
   const access = rt.access.get(b.id) >= 0;
   const stars = '★'.repeat(info.level) + '☆'.repeat(MAX_LEVEL - info.level);
   const upgrade = upgradeBlockers(state, rt, b);
@@ -37,10 +39,14 @@ function renderBuilding(el, b, state, rt) {
   const service = rt.service?.get(b.id);
   if (b.abandoned !== undefined) {
     next = 'Abandonado: ninguém mora ou trabalha aqui. Vai desabar se não for demolido.';
+  } else if (upgrade?.limited) {
+    next = `A densidade ${upgrade.limited.name.toLowerCase()} da zona não deixa crescer mais: rezoneie com densidade maior.`;
   } else if (upgrade) {
     next = upgrade.blockers.length
-      ? `Para o nível ${upgrade.next} falta: ${upgrade.blockers.map(esc).join('; ')}.`
-      : `Pronto para o nível ${upgrade.next}.`;
+      ? `Para o ${upgrade.label} falta: ${upgrade.blockers.map(esc).join('; ')}.`
+      : `Pronto para o ${upgrade.label}.`;
+  } else if (info.tall) {
+    next = 'Altura máxima.';
   } else if (info.size > 1) {
     next = 'Prédio grande (nível máximo).';
   } else {
@@ -52,7 +58,8 @@ function renderBuilding(el, b, state, rt) {
     <p class="muted"><span class="stars" title="Nível ${info.level}">${stars}</span> · nível ${info.level}${info.size > 1 ? ` · ${info.size}×${info.size}` : ''}</p>
     <dl>
       <dt>${info.residents ? 'Moradores' : 'Funcionários'}</dt><dd>${people.length} / ${capacity}</dd>
-      <dt>Andares</dt><dd>${floorsOf(info)} (${info.perFloor} por andar)</dd>
+      <dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>
+      ${info.zone !== ZONE.INDUSTRIAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
       <dt>Poluição</dt><dd>${pct(rt.pollution[b.tile])}</dd>
       <dt>Acesso a estrada</dt><dd>${access ? 'Sim' : NO}</dd>

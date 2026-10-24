@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BUILDINGS, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, TERRAIN, ZONE, floorsOf,
+  BUILDINGS, DENSITY, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, TERRAIN, ZONE, floorsOf, maxFloorsFor,
 } from '../src/world/catalog.js';
 import { createWorld } from '../src/world/world.js';
 import { addBuilding, footprint, removeCitizen } from '../src/world/runtime.js';
@@ -163,6 +163,22 @@ test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () 
   }
   // O mesmo prédio sempre usa o mesmo projeto.
   assert.equal(designFor({ id: 77, type: 'casa' }), designFor({ id: 77, type: 'casa' }));
+
+  // Prédios que crescem: do primeiro ao último andar cabem em MAX_FLOORS, e
+  // cada andar a mais deixa o projeto mais alto, com a mesma cor.
+  for (const type of Object.keys(BUILDINGS).filter((t) => BUILDINGS[t].tall)) {
+    for (let i = 0; i < VARIANTS; i++) {
+      let last = 0;
+      for (let f = floorsOf(BUILDINGS[type]); f <= maxFloorsFor(BUILDINGS[type], DENSITY.HIGH); f++) {
+        const d = design(type, i, f);
+        const top = Math.max(...d.parts.map((p) => (p.lift || 0) + (p.h || 0) + (p.roof ? p.roof.rise : 0)));
+        assert.ok(top < MAX_FLOORS, `${type} #${i} com ${f} andares: mais alto que MAX_FLOORS`);
+        assert.ok(top > last, `${type} #${i}: ${f} andares não ficou mais alto`);
+        assert.equal(d.color, design(type, i).color);
+        last = top;
+      }
+    }
+  }
 });
 
 test('1 cidadão = 1 pessoa: os andares saem da capacidade', async () => {

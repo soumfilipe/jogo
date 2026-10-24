@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checksum, createSave, readSave } from '../src/save/format.js';
+import { checksum, createSave, readSave, SAVE_VERSION } from '../src/save/format.js';
 import { decodeMoves, decodeTable, encodeMoves, encodeTable } from '../src/save/table.js';
 import { advance } from '../src/systems/simulation.js';
 import { testCity } from './helpers.js';
@@ -41,7 +41,7 @@ test('save do formato 4 (listas de objetos) abre no formato novo', () => {
   v4.version = 4;
   v4.checksum = checksum(v4.data);
   const { save, state: loaded } = readSave(JSON.stringify(v4));
-  assert.equal(save.version, 5);
+  assert.equal(save.version, SAVE_VERSION);
   assert.deepEqual(loaded.citizens, state.citizens);
   assert.deepEqual(loaded.buildings, state.buildings);
   assert.ok(JSON.stringify(v5).length < JSON.stringify(v4).length / 2, 'formato novo bem menor');

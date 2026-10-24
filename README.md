@@ -26,6 +26,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | --- | --- |
 | `E` Estrada | arraste para traçar uma estrada em "L" ($10 por tile) |
 | `R` / `C` / `I` Zonas | arraste um retângulo de zona residencial, comercial ou industrial ($5 por tile) |
+| `X` Densidade (Baixa / Média / Alta) | densidade das zonas residenciais e comerciais; arrastar sobre lotes construídos troca só a densidade |
 | `B` Demolir | arraste sobre prédios, estradas, árvores ou zonas |
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
 | Carvão / Solar / Bomba / Poço | coloca um serviço público (um clique; precisa encostar numa rua) |
@@ -143,10 +144,10 @@ necessários (`floorsOf`). Cada fileira de janelas é um andar.
 | Tipo | Por andar | Andares |
 | --- | --- | --- |
 | Casa / Sobrado | 4 | 1 / 2 |
-| Prédio de apartamentos | 4 | 4 |
-| Condomínio (2×2) | 8 | 6 |
+| Prédio de apartamentos | 4 | 4 a 12 |
+| Condomínio (2×2) | 8 | 6 a 12 |
 | Loja / Mercado | 5 / 6 | 1 / 2 |
-| Escritórios | 8 | 4 |
+| Escritórios | 8 | 4 a 12 |
 | Shopping (2×2) | 40 | 2 |
 | Fábrica / Indústria / Galpão | 10 / 18 / 70 | 1 (pé-direito alto) |
 | Complexo industrial | 15 | 2 |
@@ -154,6 +155,30 @@ necessários (`floorsOf`). Cada fileira de janelas é um andar.
 As formas repartem os andares entre as partes (a base de um escalonado fica
 com a maioria; uma lâmina, mais estreita, ganha um andar a mais). Térreos de
 loja, pódios e o escritório anexo das fábricas são extras de acabamento.
+
+### Densidade e crescimento andar por andar
+
+Ao zonear residencial ou comercial, o jogador escolhe a **densidade** (`X` ou os
+botões Baixa / Média / Alta; fica em `state.map.density`, por tile):
+
+| Densidade | Até onde cresce |
+| --- | --- |
+| Baixa | nível 2: casas, sobrados, lojas e mercados; sem prédios grandes |
+| Média | prédios de até 6 andares |
+| Alta | prédios de até 12 andares |
+
+- Apartamentos, condomínios e escritórios (`tall` no catálogo) continuam
+  crescendo **um andar por vez** depois de chegar ao nível 3: com o prédio
+  lotado, abastecido, demanda na zona e o **valor do terreno** exigido para o
+  andar, que sobe do valor do nível 3 até 90% no 12º andar. Cada andar soma
+  `perFloor` moradores ou vagas (`capacityOf`) e mais consumo de energia e água.
+- Arrastar a zona sobre lotes construídos troca só a densidade (custa o mesmo
+  que zonear). Um prédio acima do limite novo fica como está, só não cresce
+  mais. A indústria não usa densidade.
+- O lote vazio fica mais forte quanto maior a densidade, e o inspetor mostra
+  andares, densidade e o que falta para o próximo andar.
+- Saves anteriores (formato 5) abrem com tudo em densidade média, que é como
+  as zonas funcionavam antes.
 
 ## Noite e luzes
 

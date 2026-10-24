@@ -4,6 +4,19 @@ export const TERRAIN = { GRASS: 0, WATER: 1, FOREST: 2, SAND: 3 };
 
 export const ZONE = { NONE: 0, RESIDENTIAL: 1, COMMERCIAL: 2, INDUSTRIAL: 3 };
 
+// Densidade de uma zona residencial ou comercial, escolhida pelo jogador ao
+// zonear (state.map.density, por tile). Limita até onde os prédios crescem:
+//   maxLevel:  nível máximo (baixa fica em casas, sobrados, lojas e mercados,
+//              e não recebe prédios grandes)
+//   maxFloors: andares máximos dos prédios que crescem andar por andar
+// A indústria não usa densidade.
+export const DENSITY = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+export const DENSITY_INFO = {
+  [DENSITY.LOW]: { name: 'Baixa', maxLevel: 2, maxFloors: 2 },
+  [DENSITY.MEDIUM]: { name: 'Média', maxLevel: 3, maxFloors: 6 },
+  [DENSITY.HIGH]: { name: 'Alta', maxLevel: 3, maxFloors: 12 },
+};
+
 export const ZONE_INFO = {
   [ZONE.RESIDENTIAL]: { name: 'Residencial', color: '#5fbf5a', key: 'r' },
   [ZONE.COMMERCIAL]: { name: 'Comercial', color: '#4f8ff7', key: 'c' },
@@ -16,7 +29,10 @@ export const ZONE_INFO = {
 //   residents: quantos cidadãos moram
 //   jobs:      quantas vagas de emprego
 //   perFloor:  quantas pessoas cabem num andar; o número de andares sai da
-//              capacidade, 1 pessoa = 1 cidadão (ver floorsOf). A aparência
+//              capacidade, 1 pessoa = 1 cidadão (ver floorsOf)
+//   tall:      cresce andar por andar depois de pronto, até o limite da
+//              densidade da zona (residents/jobs são a capacidade inicial;
+//              cada andar a mais soma perFloor, ver capacityOf). A aparência
 //              de cada prédio vem dos projetos em src/render/designs.js (20
 //              por tipo)
 //
@@ -31,10 +47,10 @@ export const BUILDINGS = {
     name: 'Sobrado', zone: ZONE.RESIDENTIAL, level: 2, size: 1, residents: 8, jobs: 0, perFloor: 4,
   },
   apartamentos: {
-    name: 'Prédio de apartamentos', zone: ZONE.RESIDENTIAL, level: 3, size: 1, residents: 16, jobs: 0, perFloor: 4,
+    name: 'Prédio de apartamentos', zone: ZONE.RESIDENTIAL, level: 3, size: 1, residents: 16, jobs: 0, perFloor: 4, tall: true,
   },
   condominio: {
-    name: 'Condomínio', zone: ZONE.RESIDENTIAL, level: 3, size: 2, residents: 48, jobs: 0, perFloor: 8,
+    name: 'Condomínio', zone: ZONE.RESIDENTIAL, level: 3, size: 2, residents: 48, jobs: 0, perFloor: 8, tall: true,
   },
 
   // --- Comercial -------------------------------------------------------------
@@ -45,7 +61,7 @@ export const BUILDINGS = {
     name: 'Mercado', zone: ZONE.COMMERCIAL, level: 2, size: 1, residents: 0, jobs: 12, perFloor: 6,
   },
   escritorios: {
-    name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 30, perFloor: 8,
+    name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 30, perFloor: 8, tall: true,
   },
   shopping: {
     name: 'Shopping', zone: ZONE.COMMERCIAL, level: 3, size: 2, residents: 0, jobs: 80, perFloor: 40,
@@ -96,6 +112,38 @@ export function floorsOf(info) {
   if (!info.perFloor) return 0;
   return Math.ceil((info.residents || info.jobs) / info.perFloor);
 }
+
+/** Andares de um prédio já construído (os do tipo, mais os que cresceu). */
+export function buildingFloors(b) {
+  return b.floors ?? floorsOf(BUILDINGS[b.type]);
+}
+
+/** Moradores ou vagas de um prédio construído, contando os andares a mais. */
+export function capacityOf(b) {
+  const info = BUILDINGS[b.type];
+  const base = info.residents || info.jobs;
+  if (b.floors === undefined) return base;
+  return base + (b.floors - floorsOf(info)) * info.perFloor;
+}
+
+/** Até quantos andares um prédio do tipo `info` cresce na densidade dada. */
+export function maxFloorsFor(info, density) {
+  if (!info.tall) return floorsOf(info);
+  return Math.max(floorsOf(info), DENSITY_INFO[density].maxFloors);
+}
+
+/**
+ * Valor do terreno exigido para o andar `floor` de um prédio que cresce: o
+ * do nível 3 no primeiro andar a mais, subindo até TOWER_LAND_VALUE no
+ * andar mais alto possível (o limite da densidade alta).
+ */
+export function landValueForFloor(info, floor) {
+  const base = floorsOf(info);
+  const top = DENSITY_INFO[DENSITY.HIGH].maxFloors;
+  const from = LAND_VALUE_FOR_LEVEL[info.zone][3];
+  return from + ((floor - base) / Math.max(1, top - base)) * (TOWER_LAND_VALUE - from);
+}
+export const TOWER_LAND_VALUE = 0.9;
 
 export const UTILITY_TYPES = Object.keys(BUILDINGS).filter((id) => BUILDINGS[id].utility);
 

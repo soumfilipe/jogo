@@ -10,18 +10,20 @@
 // o estado e por isso só rodam em horários fixos da simulação.
 
 import {
-  ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE,
+  ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE, capacityOf,
 } from '../world/catalog.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { footprint, removeBuilding, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
 
 export const RESOURCES = ['power', 'water'];
 
-/** Consumo de um tipo de prédio: { power, water }. */
-export function consumption(info) {
+/**
+ * Consumo de um tipo de prédio: { power, water }. `people` é a capacidade
+ * (padrão: a do tipo; um prédio que cresceu andares passa a dele).
+ */
+export function consumption(info, people = info.residents || info.jobs) {
   if (info.utility || !info.zone) return { power: 0, water: 0 };
   const per = CONSUMPTION[info.zone];
-  const people = info.residents || info.jobs;
   return { power: Math.ceil(people * per.power), water: Math.ceil(people * per.water) };
 }
 
@@ -58,7 +60,7 @@ export function computeUtilities(state, rt) {
         sources[res].push(rt.access.get(b.id));
       }
     } else if (b.abandoned === undefined) {
-      consumers.push({ b, net, need: consumption(info) });
+      consumers.push({ b, net, need: consumption(info, capacityOf(b)) });
       if (net) entry(net);
     }
   }

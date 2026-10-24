@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  5,                 // versão do FORMATO (para migrações)
+//   "version":  6,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -16,8 +16,8 @@ import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 5;
-export const GAME_VERSION = '0.6.0';
+export const SAVE_VERSION = 6;
+export const GAME_VERSION = '0.7.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const SAVE_CODE_PREFIX = 'JOGO1:';
@@ -98,6 +98,15 @@ const MIGRATIONS = {
   4: (save) => {
     packLists(save.data);
     save.version = 5;
+    return save;
+  },
+  // v5 -> v6: densidade das zonas. Tudo o que já estava zoneado vira densidade
+  // média, que é como as zonas se comportavam antes.
+  5: (save) => {
+    const { width, height } = save.data.map;
+    // 1 = DENSITY.MEDIUM (este módulo não depende do catálogo).
+    save.data.map.density = { $typed: 'Uint8Array', length: width * height, rle: [width * height, 1] };
+    save.version = 6;
     return save;
   },
 };
