@@ -10,10 +10,11 @@ import { designFor, mixHex } from './designs.js';
 // Altura de uma fileira de janelas, em "andares".
 const WINDOW_ROW = 9 / 32;
 const DAY_GLASS = 'rgba(255, 255, 255, 0.38)';
-// Altura máxima de um prédio, em andares (TILE_H cada), contando telhado e
-// antenas, com folga. O renderizador usa para saber até onde um prédio
-// pode cobrir os tiles atrás dele.
-export const MAX_FLOORS = 9;
+// Altura máxima de um prédio, em unidades de TILE_H, contando telhado e
+// antenas, com folga para os ícones (o mais alto é a chaminé da usina a
+// carvão, ~5,2). O renderizador usa para saber até onde um prédio pode cobrir
+// os tiles atrás dele; um teste confere que todo projeto cabe.
+export const MAX_FLOORS = 6;
 
 /**
  * Geometria do prédio na tela: as partes projetadas, o centro de cada janela
@@ -116,9 +117,10 @@ function projectBlock(part, P) {
     }
   }
 
-  if (part.windows && part.h >= 0.2) {
-    const usable = part.h - (part.roof ? 0.04 : 0.12);
-    const rows = Math.max(1, Math.floor(usable / WINDOW_ROW));
+  if (part.windows && (part.floors || part.h >= 0.2)) {
+    // Com andares no projeto, uma fileira por andar; sem, quantas couberem.
+    const usable = part.floors ? part.floors.count * part.floors.h : part.h - (part.roof ? 0.04 : 0.12);
+    const rows = part.floors ? part.floors.count : Math.max(1, Math.floor(usable / WINDOW_ROW));
     const cols = part.windows.cols;
     const centers = [];
     const rowLift = (r) => a + (r + 0.5) * (usable / rows);

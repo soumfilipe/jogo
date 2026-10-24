@@ -1,7 +1,7 @@
 // Painel de inspeção: mostra um prédio (com moradores/funcionários) ou um
 // cidadão individual (casa, emprego, rotina e o que está fazendo agora).
 
-import { BUILDINGS, MAX_LEVEL, SHIFTS } from '../world/catalog.js';
+import { BUILDINGS, MAX_LEVEL, SHIFTS, floorsOf } from '../world/catalog.js';
 import { formatClock } from '../core/time.js';
 import { upgradeBlockers } from '../systems/growth.js';
 
@@ -52,6 +52,7 @@ function renderBuilding(el, b, state, rt) {
     <p class="muted"><span class="stars" title="Nível ${info.level}">${stars}</span> · nível ${info.level}${info.size > 1 ? ` · ${info.size}×${info.size}` : ''}</p>
     <dl>
       <dt>${info.residents ? 'Moradores' : 'Funcionários'}</dt><dd>${people.length} / ${capacity}</dd>
+      <dt>Andares</dt><dd>${floorsOf(info)} (${info.perFloor} por andar)</dd>
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
       <dt>Poluição</dt><dd>${pct(rt.pollution[b.tile])}</dd>
       <dt>Acesso a estrada</dt><dd>${access ? 'Sim' : NO}</dd>

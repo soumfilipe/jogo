@@ -134,6 +134,27 @@ chaminés, silos, portas de carga, letreiro, toldo, estacionamento) e cores. Cad
 prédio usa um dos 20, sorteado pelo id — sempre o mesmo, e nada disso vai para
 o save. `src/render/buildings.js` desenha as partes de cada projeto.
 
+### Andares: 1 cidadão = 1 pessoa
+
+A altura de um prédio sai da capacidade dele: cada tipo diz quantas pessoas
+cabem num andar (`perFloor` no catálogo) e o prédio tem só os andares
+necessários (`floorsOf`). Cada fileira de janelas é um andar.
+
+| Tipo | Por andar | Andares |
+| --- | --- | --- |
+| Casa / Sobrado | 4 | 1 / 2 |
+| Prédio de apartamentos | 4 | 4 |
+| Condomínio (2×2) | 8 | 6 |
+| Loja / Mercado | 5 / 6 | 1 / 2 |
+| Escritórios | 8 | 4 |
+| Shopping (2×2) | 40 | 2 |
+| Fábrica / Indústria / Galpão | 10 / 18 / 70 | 1 (pé-direito alto) |
+| Complexo industrial | 15 | 2 |
+
+As formas repartem os andares entre as partes (a base de um escalonado fica
+com a maioria; uma lâmina, mais estreita, ganha um andar a mais). Térreos de
+loja, pódios e o escritório anexo das fábricas são extras de acabamento.
+
 ## Noite e luzes
 
 Entre 17h30 e 6h30 a cidade escurece e as janelas acendem e apagam sozinhas

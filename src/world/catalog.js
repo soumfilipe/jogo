@@ -15,65 +15,54 @@ export const ZONE_INFO = {
 //   size:      lado do terreno ocupado, em tiles (1 ou 2)
 //   residents: quantos cidadãos moram
 //   jobs:      quantas vagas de emprego
-//   style.height: altura de referência em "andares" (1 = altura de meio tile);
-//                 a aparência de cada prédio vem dos projetos em
-//                 src/render/designs.js (20 por tipo)
+//   perFloor:  quantas pessoas cabem num andar; o número de andares sai da
+//              capacidade, 1 pessoa = 1 cidadão (ver floorsOf). A aparência
+//              de cada prédio vem dos projetos em src/render/designs.js (20
+//              por tipo)
 //
 // Os ids 'casa', 'loja' e 'fabrica' existem desde o formato de save 2 e não
 // podem ser renomeados (saves antigos guardam o id do tipo).
 export const BUILDINGS = {
   // --- Residencial -----------------------------------------------------------
   casa: {
-    name: 'Casa', zone: ZONE.RESIDENTIAL, level: 1, size: 1, residents: 4, jobs: 0,
-    style: { height: 0.6 },
+    name: 'Casa', zone: ZONE.RESIDENTIAL, level: 1, size: 1, residents: 4, jobs: 0, perFloor: 4,
   },
   sobrado: {
-    name: 'Sobrado', zone: ZONE.RESIDENTIAL, level: 2, size: 1, residents: 8, jobs: 0,
-    style: { height: 1.2 },
+    name: 'Sobrado', zone: ZONE.RESIDENTIAL, level: 2, size: 1, residents: 8, jobs: 0, perFloor: 4,
   },
   apartamentos: {
-    name: 'Prédio de apartamentos', zone: ZONE.RESIDENTIAL, level: 3, size: 1, residents: 16, jobs: 0,
-    style: { height: 3 },
+    name: 'Prédio de apartamentos', zone: ZONE.RESIDENTIAL, level: 3, size: 1, residents: 16, jobs: 0, perFloor: 4,
   },
   condominio: {
-    name: 'Condomínio', zone: ZONE.RESIDENTIAL, level: 3, size: 2, residents: 48, jobs: 0,
-    style: { height: 5 },
+    name: 'Condomínio', zone: ZONE.RESIDENTIAL, level: 3, size: 2, residents: 48, jobs: 0, perFloor: 8,
   },
 
   // --- Comercial -------------------------------------------------------------
   loja: {
-    name: 'Loja', zone: ZONE.COMMERCIAL, level: 1, size: 1, residents: 0, jobs: 5,
-    style: { height: 0.8 },
+    name: 'Loja', zone: ZONE.COMMERCIAL, level: 1, size: 1, residents: 0, jobs: 5, perFloor: 5,
   },
   mercado: {
-    name: 'Mercado', zone: ZONE.COMMERCIAL, level: 2, size: 1, residents: 0, jobs: 12,
-    style: { height: 1.3 },
+    name: 'Mercado', zone: ZONE.COMMERCIAL, level: 2, size: 1, residents: 0, jobs: 12, perFloor: 6,
   },
   escritorios: {
-    name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 30,
-    style: { height: 4 },
+    name: 'Escritórios', zone: ZONE.COMMERCIAL, level: 3, size: 1, residents: 0, jobs: 30, perFloor: 8,
   },
   shopping: {
-    name: 'Shopping', zone: ZONE.COMMERCIAL, level: 3, size: 2, residents: 0, jobs: 80,
-    style: { height: 1.6 },
+    name: 'Shopping', zone: ZONE.COMMERCIAL, level: 3, size: 2, residents: 0, jobs: 80, perFloor: 40,
   },
 
   // --- Industrial ------------------------------------------------------------
   fabrica: {
-    name: 'Fábrica', zone: ZONE.INDUSTRIAL, level: 1, size: 1, residents: 0, jobs: 10,
-    style: { height: 1.1 },
+    name: 'Fábrica', zone: ZONE.INDUSTRIAL, level: 1, size: 1, residents: 0, jobs: 10, perFloor: 10,
   },
   industria: {
-    name: 'Indústria', zone: ZONE.INDUSTRIAL, level: 2, size: 1, residents: 0, jobs: 18,
-    style: { height: 1.6 },
+    name: 'Indústria', zone: ZONE.INDUSTRIAL, level: 2, size: 1, residents: 0, jobs: 18, perFloor: 18,
   },
   complexo: {
-    name: 'Complexo industrial', zone: ZONE.INDUSTRIAL, level: 3, size: 1, residents: 0, jobs: 30,
-    style: { height: 2.2 },
+    name: 'Complexo industrial', zone: ZONE.INDUSTRIAL, level: 3, size: 1, residents: 0, jobs: 30, perFloor: 15,
   },
   galpao: {
-    name: 'Galpão logístico', zone: ZONE.INDUSTRIAL, level: 3, size: 2, residents: 0, jobs: 70,
-    style: { height: 1.4 },
+    name: 'Galpão logístico', zone: ZONE.INDUSTRIAL, level: 3, size: 2, residents: 0, jobs: 70, perFloor: 70,
   },
 
   // --- Serviços públicos (colocados pelo jogador) ----------------------------
@@ -83,25 +72,30 @@ export const BUILDINGS = {
   //   utility.needsWater: precisa encostar em rio ou lago
   usina_carvao: {
     name: 'Usina a carvão', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 20,
-    style: { height: 1.4 },
     utility: { power: 3000, water: 0, cost: 12_000, upkeep: 400, pollution: 14 },
   },
   usina_solar: {
     name: 'Usina solar', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 4,
-    style: { height: 0.4 },
     utility: { power: 1200, water: 0, cost: 20_000, upkeep: 150, pollution: 0 },
   },
   bomba_agua: {
     name: "Bomba d'água", zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
-    style: { height: 0.8 },
     utility: { power: 0, water: 2500, cost: 6_000, upkeep: 200, pollution: 0, needsWater: true },
   },
   poco: {
     name: 'Poço artesiano', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 2,
-    style: { height: 1.2 },
     utility: { power: 0, water: 700, cost: 3_500, upkeep: 90, pollution: 0 },
   },
 };
+
+/**
+ * Andares de um prédio das zonas: só os necessários para a capacidade dele
+ * (0 para os serviços públicos, que não têm perFloor).
+ */
+export function floorsOf(info) {
+  if (!info.perFloor) return 0;
+  return Math.ceil((info.residents || info.jobs) / info.perFloor);
+}
 
 export const UTILITY_TYPES = Object.keys(BUILDINGS).filter((id) => BUILDINGS[id].utility);
 
