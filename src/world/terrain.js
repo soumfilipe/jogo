@@ -1,6 +1,6 @@
 // Geração do terreno a partir da semente: ruído de valor em várias oitavas.
 
-import { TERRAIN } from './catalog.js';
+import { FOREST, TERRAIN } from './catalog.js';
 import { hash2 } from '../core/rng.js';
 
 export function generateTerrain(width, height, seed) {
@@ -17,6 +17,23 @@ export function generateTerrain(width, height, seed) {
     }
   }
   return terrain;
+}
+
+/**
+ * Densidade inicial das matas (1 a FOREST.maxDensity; 0 fora delas): suave no
+ * espaço, com clareiras e trechos fechados.
+ */
+export function generateForest(terrain, width, height, seed) {
+  const forest = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const tile = y * width + x;
+      if (terrain[tile] !== TERRAIN.FOREST) continue;
+      const d = valueNoise(x / 7, y / 7, seed + 31) * 0.7 + valueNoise(x / 2.5, y / 2.5, seed + 57) * 0.3;
+      forest[tile] = Math.min(FOREST.maxDensity, 1 + Math.floor(d * 5.5));
+    }
+  }
+  return forest;
 }
 
 function fractalNoise(x, y, seed, scale) {

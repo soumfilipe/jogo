@@ -177,7 +177,8 @@ jogo pausado:
 - **Florestas** (`src/render/nature.js`): a densidade da mata varia pelo mapa
   (de 1 a 6 árvores por tile, com clareiras e trechos fechados), com pinheiros,
   árvores de copa redonda (algumas em tons de outono) e arbustos. Há árvores
-  soltas na borda da mata e, raramente, no campo aberto.
+  soltas na borda da mata e, raramente, no campo aberto. A densidade fica no
+  save (`map.forest`), porque as matas crescem (ver abaixo).
 - **Água**: mais clara perto da margem e mais escura no fundo, espuma na beira,
   faixas de onda que clareiam em sequência e brilhos que piscam.
 
@@ -233,6 +234,12 @@ trabalho, ainda dentro do lote, não aparece.
   energia e água, crescimento, imigração e contratação a cada hora; efeitos da
   falta de energia/água e subida de nível uma vez por dia; orçamento
   (impostos, manutenção, parcelas) a cada mês.
+- **Florestas crescem** (`src/systems/forest.js`, `FOREST` no catálogo): a cada
+  tick, com 5% de chance, até 5 tiles sorteados crescem. Mata fica mais densa
+  (até 6 árvores) e grama encostada numa mata com 3 ou mais árvores vira mata
+  nova. Só em tiles verdes sem estrada, zona ou prédio; num mapa 256×256 a área
+  de mata cresce uns 15% por ano. Só o trecho em volta do tile que cresceu é
+  redesenhado.
 - **Rotas**: A* sobre as estradas, com cache e no máximo 100 cálculos por tick
   (o resto espera na fila, em estado "Saindo…").
 
@@ -276,7 +283,7 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 5,                 // versão do formato (migrações em src/save/format.js)
+  "version": 6,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",

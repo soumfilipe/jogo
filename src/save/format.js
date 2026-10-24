@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  5,                 // versão do FORMATO (para migrações)
+//   "version":  6,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -14,9 +14,10 @@
 
 import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
+import { generateForest } from '../world/terrain.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const GAME_VERSION = '0.6.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -98,6 +99,15 @@ const MIGRATIONS = {
   4: (save) => {
     packLists(save.data);
     save.version = 5;
+    return save;
+  },
+  // v5 -> v6: florestas crescem. A densidade da mata, antes só visual
+  // (derivada da semente), vira uma camada do mapa salva no estado.
+  5: (save) => {
+    const map = save.data.map;
+    const terrain = decodeState(map.terrain);
+    map.forest = encodeState(generateForest(terrain, map.width, map.height, save.data.seed));
+    save.version = 6;
     return save;
   },
 };

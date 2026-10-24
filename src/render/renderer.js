@@ -9,7 +9,7 @@
 //
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
-import { BUILDINGS, TERRAIN, ZONE, ZONE_INFO } from '../world/catalog.js';
+import { BUILDINGS, FOREST, TERRAIN, ZONE, ZONE_INFO } from '../world/catalog.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
@@ -18,7 +18,7 @@ import { MAX_FLOORS, addSilhouette, drawBuilding, windowSize } from './buildings
 import { TILE_H, TILE_W } from './iso.js';
 import { addCar, carColor, moverPose } from './movers.js';
 import { LIGHT_COLORS, darkness, isLit, windowSchedules } from './lights.js';
-import { TRUNK, forestDensity, treesFor, waterDepth } from './nature.js';
+import { TRUNK, treesFor, waterDepth } from './nature.js';
 import { Smog } from './smog.js';
 
 // As luzes são redesenhadas a cada tantos minutos de jogo (e quando a câmera
@@ -418,7 +418,7 @@ export class Renderer {
     }
     this.drawnOrder = null;
 
-    const { width, height, terrain, road, zone } = state.map;
+    const { width, height, terrain, forest, road, zone } = state.map;
     const z = cam.zoom;
     const paths = new Map();
     const roadLines = new Path2D();
@@ -444,7 +444,7 @@ export class Renderer {
         color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
       } else if (terrain[tile] === TERRAIN.SAND) color = SAND;
       else if (terrain[tile] === TERRAIN.FOREST) {
-        color = FOREST_GROUNDS[Math.min(3, Math.floor(forestDensity(x, y, state.seed) * 4))];
+        color = FOREST_GROUNDS[Math.min(3, Math.floor(Math.max(0, forest[tile] - 1) * 4 / FOREST.maxDensity))];
       }
       else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
 

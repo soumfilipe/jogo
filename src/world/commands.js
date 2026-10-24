@@ -13,7 +13,7 @@
 //   { type: 'repay', id }                (quita o empréstimo de uma vez)
 
 import { BUILDINGS, COSTS, TERRAIN, ZONE } from './catalog.js';
-import { addBuilding, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
+import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
 import { isBuildable } from './world.js';
 import { repayLoan, setTax, takeLoan } from '../systems/economy.js';
 
@@ -84,7 +84,7 @@ export function applyCommand(state, rt, cmd) {
     if (cmd.type === 'road') {
       road[tile] = 1;
       zone[tile] = ZONE.NONE;
-      if (terrain[tile] === TERRAIN.FOREST) terrain[tile] = TERRAIN.GRASS;
+      if (terrain[tile] === TERRAIN.FOREST) clearForest(state, tile);
       roadsChanged = true;
     } else if (cmd.type === 'zone') {
       zone[tile] = cmd.zone;
@@ -95,7 +95,7 @@ export function applyCommand(state, rt, cmd) {
         road[tile] = 0;
         roadsChanged = true;
       } else if (terrain[tile] === TERRAIN.FOREST) {
-        terrain[tile] = TERRAIN.GRASS;
+        clearForest(state, tile);
       } else {
         zone[tile] = ZONE.NONE;
       }
