@@ -13,10 +13,11 @@ import { BUILDINGS, TERRAIN, ZONE, ZONE_INFO } from '../world/catalog.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
-import { visibleRange, worldToScreen } from './camera.js';
-import { addSilhouette, buildingGeometry, drawBuilding, windowSize } from './buildings.js';
+import { screenToWorld, visibleRange, worldToScreen } from './camera.js';
+import { MAX_FLOORS, addSilhouette, drawBuilding, windowSize } from './buildings.js';
+import { TILE_H, TILE_W } from './iso.js';
 import { addCar, carColor, moverPose } from './movers.js';
-import { LIGHT_COLORS, darkness, isWindowLit } from './lights.js';
+import { LIGHT_COLORS, darkness, isLit, windowSchedules } from './lights.js';
 import { TRUNK, forestDensity, treesFor, waterDepth } from './nature.js';
 import { Smog } from './smog.js';
 
@@ -43,6 +44,10 @@ const MAP_REDRAW_MIN_MS = 400;
 const AMBIENT_INTERVAL_MS = 80;
 // ...e em resolução menor (smog e ondas são suaves; poupa muito preenchimento).
 const AMBIENT_SCALE = 0.5;
+// Redesenho parcial: folga em volta de cada trecho alterado (px) e, se os
+// trechos somarem mais que esta fração do cache, redesenha tudo de uma vez.
+const DIRTY_PAD = 24;
+const DIRTY_MAX_AREA = 0.35;
 
 const GRASS = ['#7db460', '#7ab15d', '#80b763'];
 // Da margem (claro, esverdeado) para o fundo (escuro).
@@ -90,6 +95,11 @@ export class Renderer {
     // Contornos dos prédios visíveis (para esconder carros atrás deles),
     // indexados por posição na tela. Montados junto com a camada estática.
     this.occluders = new OccluderGrid();
+    // Prédios desenhados no cache: id -> { depth, x, g (geometria), outline }.
+    // As luzes reaproveitam a geometria em vez de recalcular prédio a prédio.
+    this.drawn = new Map();
+    this.drawnOrder = null; // os mesmos, de trás para frente (montado quando preciso)
+    this.drawnRt = null;
     // Água vista no cache: faixas de onda (Path2D) e posições para os brilhos.
     this.water = { waves: [], glints: [] };
     this.smog = new Smog();
@@ -108,6 +118,8 @@ export class Renderer {
     this.forceRedraw = false;
     this.zoomChangedAt = 0;
     this.dpr = 1;
+    // Tempo (ms) de cada camada no último quadro; 0 quando não foi refeita.
+    this.stats = { static: 0, partial: 0, lights: 0, ambient: 0, movers: 0, total: 0 };
   }
 
   resize(cam) {
@@ -141,6 +153,8 @@ export class Renderer {
   render(state, rt, cam, overlay = {}) {
     const mode = overlay.mapMode ? MAP_MODES[overlay.mapMode] : null;
     const now = performance.now();
+    const stats = this.stats;
+    stats.static = stats.partial = stats.lights = stats.ambient = 0;
     if (cam.zoom !== this.lastZoom) {
       this.lastZoom = cam.zoom;
       this.zoomChangedAt = now;
@@ -151,7 +165,20 @@ export class Renderer {
     const outOfCache = view && (view.k !== 1 ? !zooming : Math.abs(view.tx + this.margin) > this.margin || Math.abs(view.ty + this.margin) > this.margin);
     const mapChanged = rt.mapVersion !== this.drawnMapVersion &&
       (this.forceRedraw || now - this.staticDrawnAt >= MAP_REDRAW_MIN_MS);
-    if (key !== this.staticBaseKey || !view || outOfCache || mapChanged) {
+    const full = key !== this.staticBaseKey || !view || outOfCache || rt !== this.drawnRt;
+    const rects = !full && mapChanged && !this.forceRedraw ? this.#dirtyRects(rt) : null;
+    if (rects) {
+      // Só alguns prédios mudaram: redesenha os trechos deles.
+      this.drawnMapVersion = rt.mapVersion;
+      this.staticDrawnAt = now;
+      stats.partial = rects.length;
+      if (rects.length) {
+        this.#drawStatic(state, rt, this.cacheCam, mode, rects);
+        this.lightsKey = '';
+      }
+      stats.static = performance.now() - now;
+    } else if (full || mapChanged) {
+      this.drawnRt = rt;
       this.staticBaseKey = key;
       // Identifica o desenho atual do cache (as luzes dependem dele).
       this.staticKey = `${key}:${rt.mapVersion}:${now}`;
@@ -160,6 +187,9 @@ export class Renderer {
       this.forceRedraw = false;
       this.cacheCam = { ...cam, viewW: cam.viewW + 2 * this.margin, viewH: cam.viewH + 2 * this.margin };
       this.#drawStatic(state, rt, this.cacheCam, mode);
+      rt.dirtyAll = false;
+      rt.dirtyTiles.length = 0;
+      stats.static = performance.now() - now;
       this.lightsKey = '';
       view = this.#cacheTransform(cam);
     }
@@ -200,7 +230,9 @@ export class Renderer {
     if (this.ambientKey !== this.staticKey || now - this.ambientAt >= AMBIENT_INTERVAL_MS) {
       this.ambientKey = this.staticKey;
       this.ambientAt = now;
+      const t = performance.now();
       this.#drawAmbient(state, rt, now / 1000, dark, !mode);
+      stats.ambient = performance.now() - t;
     }
     blit(this.ambientCanvas);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -218,7 +250,9 @@ export class Renderer {
         if (lightsKey !== this.lightsKey && (cacheChanged || now - this.lightsDrawnAt >= LIGHTS_MIN_INTERVAL_MS)) {
           this.lightsKey = lightsKey;
           this.lightsDrawnAt = now;
+          const t = performance.now();
           this.#drawLights(state, rt, this.cacheCam, minute);
+          stats.lights = performance.now() - t;
         }
         ctx.globalAlpha = Math.min(1, dark * 1.6);
         blit(this.lightsCanvas);
@@ -234,15 +268,55 @@ export class Renderer {
       const size = BUILDINGS[selectedBuilding.type].size;
       this.#outlineTile(ctx, state, cam, selectedBuilding.tile, '#ffffff', 2, size);
     }
+    const tm = performance.now();
     this.#drawMovers(ctx, state, rt, cam, overlay.selected?.citizen, !mode);
+    stats.movers = performance.now() - tm;
     if (overlay.hover) {
       this.#outlineTile(ctx, state, cam, overlay.hover.y * state.map.width + overlay.hover.x, 'rgba(255,255,255,0.8)', 1.5);
     }
+    stats.total = performance.now() - now;
   }
 
   /** Redesenha o mapa no próximo quadro (depois de uma ação do jogador). */
   invalidate() {
     this.forceRedraw = true;
+  }
+
+  /**
+   * Retângulos (nas coordenadas do cache) dos trechos do mapa alterados desde
+   * o último desenho, ou null se é melhor redesenhar tudo.
+   */
+  #dirtyRects(rt) {
+    if (rt.dirtyAll) return null;
+    const cam = this.cacheCam;
+    const width = cam.mapWidth;
+    const z = cam.zoom;
+    const list = rt.dirtyTiles;
+    const rects = [];
+    let area = 0;
+    for (let i = 0; i < list.length; i += 2) {
+      const x = list[i] % width;
+      const y = Math.floor(list[i] / width);
+      const s = list[i + 1];
+      const [, top] = worldToScreen(cam, x, y);
+      const [right] = worldToScreen(cam, x + s, y);
+      const [, bottom] = worldToScreen(cam, x + s, y + s);
+      const [left] = worldToScreen(cam, x, y + s);
+      // Para cima, até a altura do prédio mais alto possível (e os ícones).
+      const r = {
+        // Em pixels inteiros: o recorte não deixa emendas visíveis.
+        x0: Math.max(0, Math.floor(left - DIRTY_PAD)),
+        y0: Math.max(0, Math.floor(top - MAX_FLOORS * TILE_H * z - DIRTY_PAD)),
+        x1: Math.min(cam.viewW, Math.ceil(right + DIRTY_PAD)),
+        y1: Math.min(cam.viewH, Math.ceil(bottom + DIRTY_PAD)),
+      };
+      if (r.x1 <= r.x0 || r.y1 <= r.y0) continue; // fora do cache
+      rects.push(r);
+      area += (r.x1 - r.x0) * (r.y1 - r.y0);
+    }
+    list.length = 0;
+    if (area > DIRTY_MAX_AREA * cam.viewW * cam.viewH) return null;
+    return rects;
   }
 
   /**
@@ -260,47 +334,55 @@ export class Renderer {
     };
   }
 
-  // Desenha as janelas acesas, prédio a prédio de trás para frente. Antes das
-  // janelas de cada prédio, o contorno dele é recortado da camada: assim as
-  // luzes dos prédios de trás ficam escondidas atrás dos da frente.
+  // Desenha as janelas acesas, de trás para frente. Antes das janelas de cada
+  // diagonal, os contornos dos prédios dela são recortados da camada: assim
+  // as luzes dos prédios de trás ficam escondidas atrás dos da frente.
   #drawLights(state, rt, cam, minute) {
     const ctx = this.lightsCtx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.lightsCanvas.width, this.lightsCanvas.height);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    const width = state.map.width;
-    const range = visibleRange(cam);
+    // Mesmos prédios, geometria e ordem do último desenho do cache.
+    if (!this.drawnOrder) {
+      this.drawnOrder = [...this.drawn.values()].sort((a, b) => a.depth - b.depth || a.x - b.x);
+    }
     const [w, wh] = windowSize(cam.zoom);
-    for (let d = range.x0 + range.y0; d <= range.x1 + range.y1; d++) {
-      const xStart = Math.max(range.x0, d - range.y1);
-      const xEnd = Math.min(range.x1, d - range.y0);
-      for (let x = xStart; x <= xEnd; x++) {
-        const tile = (d - x) * width + x;
-        const id = rt.buildingAt[tile];
-        if (!id) continue;
+    // Uma diagonal por vez: primeiro recorta os contornos de todos os prédios
+    // dela, depois acende as janelas deles, agrupadas por cor (poucos fills).
+    const order = this.drawnOrder;
+    for (let i = 0; i < order.length;) {
+      const depth = order[i].depth;
+      const outlines = new Path2D();
+      const byColor = new Map();
+      for (; i < order.length && order[i].depth === depth; i++) {
+        const entry = order[i];
+        const { id, g, outline } = entry;
         const b = rt.buildingById.get(id);
-        if (tile !== frontTile(state, b)) continue;
-
-        const g = buildingGeometry(cam, b.tile % width, Math.floor(b.tile / width), b);
-        const outline = new Path2D();
-        addSilhouette(outline, g);
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillStyle = '#000';
-        ctx.fill(outline);
-        ctx.globalCompositeOperation = 'source-over';
+        if (!b) continue;
+        outlines.addPath(outline);
         if (g.windows.length === 0) continue;
-
         const occupancy = buildingOccupancy(rt, b, g.info);
         if (occupancy <= 0) continue;
-        const lit = new Path2D();
-        const glow = new Path2D();
-        g.windows.forEach(([wx, wy], k) => {
-          if (!isWindowLit(b, g.info, k, minute, occupancy)) return;
-          lit.rect(wx - w / 2, wy - wh / 2, w, wh);
-          glow.rect(wx - w, wy - wh, w * 2, wh * 2);
-        });
-        ctx.fillStyle = LIGHT_COLORS[g.info.zone];
+        // Horários sorteados uma vez por prédio desenhado, não a cada redesenho.
+        entry.schedules ??= windowSchedules(b, g.info, g.windows.length);
+        const color = LIGHT_COLORS[g.info.zone];
+        let paths = byColor.get(color);
+        if (!paths) byColor.set(color, (paths = { lit: new Path2D(), glow: new Path2D() }));
+        const { windows } = g;
+        for (let k = 0; k < windows.length; k++) {
+          if (!isLit(entry.schedules, k, minute, occupancy)) continue;
+          const [wx, wy] = windows[k];
+          paths.lit.rect(wx - w / 2, wy - wh / 2, w, wh);
+          paths.glow.rect(wx - w, wy - wh, w * 2, wh * 2);
+        }
+      }
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000';
+      ctx.fill(outlines);
+      ctx.globalCompositeOperation = 'source-over';
+      for (const [color, { lit, glow }] of byColor) {
+        ctx.fillStyle = color;
         ctx.globalAlpha = 0.18;
         ctx.fill(glow);
         ctx.globalAlpha = 1;
@@ -311,69 +393,87 @@ export class Renderer {
 
   // -------------------------------------------------------------------------
 
-  #drawStatic(state, rt, cam, mode) {
+  // Desenha a camada estática. Sem `rects`, o cache inteiro; com `rects`
+  // (retângulos nas coordenadas do cache), só o que encosta neles: o resto da
+  // imagem fica como estava. É assim que prédios crescendo aparecem sem
+  // redesenhar a cidade toda.
+  #drawStatic(state, rt, cam, mode, rects = null) {
     const ctx = this.staticCtx;
+    const partial = rects !== null;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#1b2a3a';
-    ctx.fillRect(0, 0, this.staticCanvas.width, this.staticCanvas.height);
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (partial) {
+      ctx.save();
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.beginPath();
+      for (const r of rects) ctx.rect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+      ctx.clip();
+      ctx.fillStyle = '#1b2a3a';
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#1b2a3a';
+      ctx.fillRect(0, 0, this.staticCanvas.width, this.staticCanvas.height);
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      this.occluders.clear();
+      this.drawn.clear();
+    }
+    this.drawnOrder = null;
 
     const { width, height, terrain, road, zone } = state.map;
-    const range = visibleRange(cam);
+    const z = cam.zoom;
     const paths = new Map();
-    this.occluders.clear();
     const roadLines = new Path2D();
     const foam = new Path2D();
     const depth = waterDepth(state);
     const isWater = (tx, ty) => tx < 0 || ty < 0 || tx >= width || ty >= height || terrain[ty * width + tx] === TERRAIN.WATER;
-    const waves = Array.from({ length: WAVE_GROUPS }, () => new Path2D());
+    // Ondas e brilhos só são recolhidos no desenho completo (a água não muda
+    // nos redesenhos parciais).
+    const waves = partial ? null : Array.from({ length: WAVE_GROUPS }, () => new Path2D());
     const glints = [];
-    const z = cam.zoom;
     // Pequena sobreposição evita frestas entre losangos vizinhos.
     const pad = 0.5;
 
-    for (let y = range.y0; y <= range.y1; y++) {
-      for (let x = range.x0; x <= range.x1; x++) {
-        const tile = y * width + x;
-        let color;
-        if (road[tile]) color = ROAD;
-        else if (mode && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
-          color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
+    const ground = (x, y) => {
+      const tile = y * width + x;
+      let color;
+      if (road[tile]) color = ROAD;
+      else if (mode && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
+        color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
+      }
+      else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]];
+      else if (terrain[tile] === TERRAIN.WATER) {
+        color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
+      } else if (terrain[tile] === TERRAIN.SAND) color = SAND;
+      else if (terrain[tile] === TERRAIN.FOREST) {
+        color = FOREST_GROUNDS[Math.min(3, Math.floor(forestDensity(x, y, state.seed) * 4))];
+      }
+      else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
+
+      let path = paths.get(color);
+      if (!path) paths.set(color, (path = new Path2D()));
+      const [tx, ty] = worldToScreen(cam, x, y);
+      const hw = 32 * z + pad;
+      const hh = 16 * z + pad / 2;
+      path.moveTo(tx, ty - pad / 2);
+      path.lineTo(tx + hw, ty + hh);
+      path.lineTo(tx, ty + 2 * hh);
+      path.lineTo(tx - hw, ty + hh);
+      // Sem closePath: com dezenas de milhares de losangos no mesmo caminho,
+      // closePath fica lento no Chromium; o fill fecha cada contorno sozinho.
+
+      if (road[tile] && z >= 0.5) addRoadMarkings(roadLines, state, cam, x, y);
+
+      if (terrain[tile] === TERRAIN.WATER && !road[tile]) {
+        // Espuma nas bordas que encostam em terra.
+        const T = [tx, ty];
+        const R = [tx + 32 * z, ty + 16 * z];
+        const B = [tx, ty + 32 * z];
+        const L = [tx - 32 * z, ty + 16 * z];
+        for (const [nx, ny, a, b] of [[x, y - 1, T, R], [x + 1, y, R, B], [x, y + 1, B, L], [x - 1, y, L, T]]) {
+          if (isWater(nx, ny)) continue;
+          foam.moveTo(a[0], a[1]);
+          foam.lineTo(b[0], b[1]);
         }
-        else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]];
-        else if (terrain[tile] === TERRAIN.WATER) {
-          color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
-        } else if (terrain[tile] === TERRAIN.SAND) color = SAND;
-        else if (terrain[tile] === TERRAIN.FOREST) {
-          color = FOREST_GROUNDS[Math.min(3, Math.floor(forestDensity(x, y, state.seed) * 4))];
-        }
-        else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
-
-        let path = paths.get(color);
-        if (!path) paths.set(color, (path = new Path2D()));
-        const [tx, ty] = worldToScreen(cam, x, y);
-        const hw = 32 * z + pad;
-        const hh = 16 * z + pad / 2;
-        path.moveTo(tx, ty - pad / 2);
-        path.lineTo(tx + hw, ty + hh);
-        path.lineTo(tx, ty + 2 * hh);
-        path.lineTo(tx - hw, ty + hh);
-        // Sem closePath: com dezenas de milhares de losangos no mesmo caminho,
-        // closePath fica lento no Chromium; o fill fecha cada contorno sozinho.
-
-        if (road[tile] && z >= 0.5) addRoadMarkings(roadLines, state, cam, x, y);
-
-        if (terrain[tile] === TERRAIN.WATER && !road[tile]) {
-          // Espuma nas bordas que encostam em terra.
-          const T = [tx, ty];
-          const R = [tx + 32 * z, ty + 16 * z];
-          const B = [tx, ty + 32 * z];
-          const L = [tx - 32 * z, ty + 16 * z];
-          for (const [nx, ny, a, b] of [[x, y - 1, T, R], [x + 1, y, R, B], [x, y + 1, B, L], [x - 1, y, L, T]]) {
-            if (isWater(nx, ny)) continue;
-            foam.moveTo(a[0], a[1]);
-            foam.lineTo(b[0], b[1]);
-          }
+        if (waves) {
           // Ondas: faixas diagonais que clareiam em sequência (ver #drawWater).
           const group = Math.floor((x + y * 0.6) / 3 + hash2(x, y, 5) * 0.8) % WAVE_GROUPS;
           const wave = waves[group];
@@ -384,9 +484,35 @@ export class Renderer {
           if (glints.length < 6000) glints.push([tx, ty + 16 * z, hash2(x, y, 6), hash2(x, y, 7)]);
         }
       }
+    };
+
+    // Tiles do chão (em qualquer ordem) e tiles com objetos, de trás para
+    // frente: soma x+y crescente e, na mesma diagonal, x crescente.
+    let groundTiles;
+    let objectTiles;
+    if (partial) {
+      groundTiles = tilesUnder(cam, rects, width, height, 0, 0);
+      // Prédios altos de tiles mais abaixo e prédios 2x2 ao lado também
+      // podem encostar nos retângulos.
+      objectTiles = [...tilesUnder(cam, rects, width, height, MAX_FLOORS * TILE_H * z, TILE_W * z)]
+        .sort((a, b) => diag(a, width) - diag(b, width) || a - b);
+      for (const tile of groundTiles) ground(tile % width, Math.floor(tile / width));
+    } else {
+      const range = visibleRange(cam);
+      for (let y = range.y0; y <= range.y1; y++) {
+        for (let x = range.x0; x <= range.x1; x++) ground(x, y);
+      }
+      objectTiles = [];
+      for (let d = range.x0 + range.y0; d <= range.x1 + range.y1; d++) {
+        const xStart = Math.max(range.x0, d - range.y1);
+        const xEnd = Math.min(range.x1, d - range.y0);
+        for (let x = xStart; x <= xEnd; x++) objectTiles.push((d - x) * width + x);
+      }
     }
-    this.water = { waves, glints, zoom: z };
-    for (const [color, path] of paths) {
+    if (waves) this.water = { waves, glints, zoom: z };
+    // Losangos vizinhos se sobrepõem um pouco; numa ordem fixa de cores, a
+    // borda sai igual no desenho completo e no parcial.
+    for (const [color, path] of [...paths].sort((p, q) => (p[0] < q[0] ? -1 : 1))) {
       ctx.fillStyle = color;
       ctx.fill(path);
     }
@@ -401,45 +527,64 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    // Objetos com altura, de trás para frente (soma x+y crescente). Prédios
-    // grandes são desenhados quando o laço chega no tile da frente deles.
-    // Nos mapas, ficam translúcidos para o mapa aparecer por baixo.
+    // Objetos com altura, de trás para frente. Prédios grandes são desenhados
+    // quando chega a vez do tile da frente deles. Nos mapas, ficam
+    // translúcidos para o mapa aparecer por baixo.
     ctx.globalAlpha = mode ? 0.3 : 1;
     const treesVisible = z >= 0.25 && !mode;
-    for (let d = range.x0 + range.y0; d <= range.x1 + range.y1; d++) {
-      const xStart = Math.max(range.x0, d - range.y1);
-      const xEnd = Math.min(range.x1, d - range.y0);
-      // Árvores da diagonal agrupadas por cor e desenhadas no fim dela.
-      const trees = treesVisible ? new TreeBatch() : null;
-      for (let x = xStart; x <= xEnd; x++) {
-        const y = d - x;
-        const tile = y * width + x;
-        const id = rt.buildingAt[tile];
-        if (id) {
-          const b = rt.buildingById.get(id);
-          if (tile === frontTile(state, b)) {
-            const bx = b.tile % width;
-            const by = Math.floor(b.tile / width);
-            const g = drawBuilding(ctx, cam, bx, by, b);
-            this.occluders.add(d, g);
-            if (b.abandoned !== undefined) {
-              // Abandonado: escurecido e sem cor.
-              const outline = new Path2D();
-              addSilhouette(outline, g);
-              ctx.fillStyle = 'rgba(38, 34, 30, 0.6)';
-              ctx.fill(outline);
-            } else if (!mode) {
-              const service = rt.service?.get(b.id);
-              if (service && (!service.power || !service.water)) drawServiceBadges(ctx, g, service, z);
-            }
-          }
-        } else if (trees && !road[tile] && terrain[tile] !== TERRAIN.WATER) {
-          for (const tree of treesFor(state, x, y)) trees.add(cam, x, y, tree);
+    // Árvores da mesma diagonal agrupadas por cor e desenhadas no fim dela.
+    let trees = null;
+    let treesDiag = -1;
+    for (const tile of objectTiles) {
+      const x = tile % width;
+      const y = (tile - x) / width;
+      const d = x + y;
+      if (trees && d !== treesDiag) {
+        trees.flush(ctx);
+        trees = null;
+      }
+      const id = rt.buildingAt[tile];
+      if (id) {
+        const b = rt.buildingById.get(id);
+        if (tile !== frontTile(state, b)) continue;
+        const g = drawBuilding(ctx, cam, b.tile % width, Math.floor(b.tile / width), b);
+        const outline = new Path2D();
+        addSilhouette(outline, g);
+        // Guardado para as luzes e para esconder os carros atrás do prédio.
+        this.occluders.remove(id);
+        this.drawn.set(id, { id, depth: d, x, g, outline });
+        this.occluders.add(id, d, g, outline);
+        if (b.abandoned !== undefined) {
+          // Abandonado: escurecido e sem cor.
+          ctx.fillStyle = 'rgba(38, 34, 30, 0.6)';
+          ctx.fill(outline);
+        } else if (!mode) {
+          const service = rt.service?.get(b.id);
+          if (service && (!service.power || !service.water)) drawServiceBadges(ctx, g, service, z);
+        }
+      } else if (treesVisible && !road[tile] && terrain[tile] !== TERRAIN.WATER) {
+        const list = treesFor(state, x, y);
+        if (list.length === 0) continue;
+        if (!trees) {
+          trees = new TreeBatch();
+          treesDiag = d;
+        }
+        for (const tree of list) trees.add(cam, x, y, tree);
+      }
+    }
+    if (trees) trees.flush(ctx);
+    ctx.globalAlpha = 1;
+
+    if (partial) {
+      ctx.restore();
+      // Prédios que sumiram (demolidos, desabados) saem dos registros.
+      for (const id of this.drawn.keys()) {
+        if (!rt.buildingById.has(id)) {
+          this.drawn.delete(id);
+          this.occluders.remove(id);
         }
       }
-      if (trees) trees.flush(ctx);
     }
-    ctx.globalAlpha = 1;
   }
 
   // Camada de ambiente, nas coordenadas do cache: ondas e brilhos na água
@@ -501,52 +646,62 @@ export class Renderer {
   // diagonal do mapa, os prédios dela recortam os carros já desenhados atrás
   // deles. Assim um carro atrás de um prédio fica escondido.
   #drawMovers(ctx, state, rt, cam, selected, occlude) {
-    const byDepth = new Map();
+    const cars = []; // { pose, color } de cada carro visível
     const carBoxes = []; // [x, y, profundidade] de cada carro, na tela
     const margin = 20;
     for (const id of rt.movers) {
       const c = rt.citizenById.get(id);
+      // Descarta os que estão fora da tela antes de calcular a pose.
+      const [cx, cy] = worldToScreen(cam, c.x, c.y);
+      if (cx < -margin || cy < -margin || cx > cam.viewW + margin || cy > cam.viewH + margin) continue;
       const pose = moverPose(state, c);
       if (!pose) continue;
-      const [sx, sy] = worldToScreen(cam, pose.x, pose.y);
-      if (sx < -margin || sy < -margin || sx > cam.viewW + margin || sy > cam.viewH + margin) continue;
-      carBoxes.push([sx, sy, pose.depth]);
-      let cars = byDepth.get(pose.depth);
-      if (!cars) byDepth.set(pose.depth, (cars = new Map()));
-      const color = carColor(c);
-      let path = cars.get(color);
-      if (!path) cars.set(color, (path = new Path2D()));
-      addCar(path, cam, pose);
+      cars.push({ pose, color: carColor(c) });
+      carBoxes.push([cx, cy, pose.depth]);
     }
 
-    if (byDepth.size > 0) {
+    if (cars.length > 0) {
       const mctx = this.moversCtx;
       mctx.setTransform(1, 0, 0, 1, 0, 0);
       mctx.clearRect(0, 0, this.moversCanvas.width, this.moversCanvas.height);
       mctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      mctx.fillStyle = '#000';
 
       // Só os prédios que encostam num carro que está atrás deles precisam
       // recortar a camada (os contornos estão nas coordenadas do cache).
       const { k, tx, ty } = this.view;
       const hiding = occlude ? this.occluders.hiding(carBoxes, (x) => (x - tx) / k, (y) => (y - ty) / k, 14 * cam.zoom / k) : new Map();
-      const depths = new Set([...byDepth.keys(), ...hiding.keys()]);
-      for (const d of [...depths].sort((a, b) => a - b)) {
-        const outlines = hiding.get(d);
-        if (outlines) {
+      // Entre dois recortes seguidos, todos os carros vão juntos: uma faixa
+      // de profundidades por recorte, e um Path2D por cor em cada faixa.
+      const cuts = [...hiding.keys()].sort((a, b) => a - b);
+      const bands = Array.from({ length: cuts.length + 1 }, () => new Map());
+      for (const { pose, color } of cars) {
+        // Quantos recortes vêm antes (ou na mesma profundidade) deste carro.
+        let lo = 0;
+        let hi = cuts.length;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (cuts[mid] <= pose.depth) lo = mid + 1;
+          else hi = mid;
+        }
+        const band = bands[lo];
+        let path = band.get(color);
+        if (!path) band.set(color, (path = new Path2D()));
+        addCar(path, cam, pose);
+      }
+      bands.forEach((band, i) => {
+        if (i > 0) {
           mctx.setTransform(k * this.dpr, 0, 0, k * this.dpr, tx * this.dpr, ty * this.dpr);
           mctx.globalCompositeOperation = 'destination-out';
-          for (const outline of outlines) mctx.fill(outline);
+          mctx.fillStyle = '#000';
+          for (const outline of hiding.get(cuts[i - 1])) mctx.fill(outline);
           mctx.globalCompositeOperation = 'source-over';
           mctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
         }
-        const cars = byDepth.get(d);
-        if (!cars) continue;
-        for (const [color, path] of cars) {
+        for (const [color, path] of band) {
           mctx.fillStyle = color;
           mctx.fill(path);
         }
-      }
+      });
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(this.moversCanvas, 0, 0);
@@ -578,6 +733,43 @@ function buildingOccupancy(rt, b, info) {
     return home / info.residents;
   }
   return rt.workers.get(b.id).size > 0 ? 0.9 : 0;
+}
+
+const diag = (tile, width) => (tile % width) + Math.floor(tile / width);
+
+/**
+ * Tiles cujo losango encosta em algum dos retângulos (coordenadas de `cam`).
+ * Cada retângulo é antes esticado `below` px para baixo e `side` px para os
+ * lados, para pegar também os objetos altos ou largos que chegam até ele.
+ */
+function tilesUnder(cam, rects, width, height, below, side) {
+  const tiles = new Set();
+  const half = (TILE_W / 2) * cam.zoom;
+  const full = TILE_H * cam.zoom;
+  for (const r of rects) {
+    const x0r = r.x0 - side;
+    const x1r = r.x1 + side;
+    const y1r = r.y1 + below;
+    const corners = [
+      screenToWorld(cam, x0r, r.y0), screenToWorld(cam, x1r, r.y0),
+      screenToWorld(cam, x0r, y1r), screenToWorld(cam, x1r, y1r),
+    ];
+    const xs = corners.map((c) => c[0]);
+    const ys = corners.map((c) => c[1]);
+    const tx0 = Math.max(0, Math.floor(Math.min(...xs)) - 1);
+    const ty0 = Math.max(0, Math.floor(Math.min(...ys)) - 1);
+    const tx1 = Math.min(width - 1, Math.ceil(Math.max(...xs)));
+    const ty1 = Math.min(height - 1, Math.ceil(Math.max(...ys)));
+    for (let y = ty0; y <= ty1; y++) {
+      for (let x = tx0; x <= tx1; x++) {
+        // A caixa acima é inclinada; confere o losango de verdade.
+        const [sx, sy] = worldToScreen(cam, x, y);
+        if (sx + half < x0r || sx - half > x1r || sy + full < r.y0 || sy > y1r) continue;
+        tiles.add(y * width + x);
+      }
+    }
+  }
+  return tiles;
 }
 
 function diamond(path, cam, x, y, inset, size = 1) {
@@ -662,14 +854,16 @@ const OCCLUDER_CELL = 64;
 class OccluderGrid {
   constructor() {
     this.cells = new Map();
+    this.byId = new Map();
   }
 
   clear() {
     this.cells.clear();
+    this.byId.clear();
   }
 
-  /** Guarda o prédio de geometria `g`, desenhado na diagonal `depth`. */
-  add(depth, g) {
+  /** Guarda o prédio `id` de geometria `g` e contorno `path`, na diagonal `depth`. */
+  add(id, depth, g, path) {
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
@@ -684,16 +878,27 @@ class OccluderGrid {
       }
     }
     if (x0 === Infinity) return;
-    const path = new Path2D();
-    addSilhouette(path, g);
-    const entry = { depth, path, x0, y0, x1, y1 };
+    const entry = { depth, path, x0, y0, x1, y1, keys: [] };
     for (let cx = Math.floor(x0 / OCCLUDER_CELL); cx <= Math.floor(x1 / OCCLUDER_CELL); cx++) {
       for (let cy = Math.floor(y0 / OCCLUDER_CELL); cy <= Math.floor(y1 / OCCLUDER_CELL); cy++) {
         const key = cx * 65536 + cy;
         let list = this.cells.get(key);
         if (!list) this.cells.set(key, (list = []));
         list.push(entry);
+        entry.keys.push(key);
       }
+    }
+    this.byId.set(id, entry);
+  }
+
+  remove(id) {
+    const entry = this.byId.get(id);
+    if (!entry) return;
+    this.byId.delete(id);
+    for (const key of entry.keys) {
+      const list = this.cells.get(key);
+      const i = list.indexOf(entry);
+      if (i >= 0) list.splice(i, 1);
     }
   }
 

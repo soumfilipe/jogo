@@ -5,7 +5,7 @@
 import {
   BUILDINGS, DAYS_BETWEEN_UPGRADES, LAND_VALUE_FOR_LEVEL, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, ZONE,
 } from '../world/catalog.js';
-import { addBuilding, findAccessRoad, vacancies } from '../world/runtime.js';
+import { addBuilding, findAccessRoad, touchMap, vacancies } from '../world/runtime.js';
 import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
@@ -101,7 +101,7 @@ export function upgradeBuildings(state, rt) {
     reserve(state, rt, access, extra);
     b.type = pick(state.rng, LEVELS[info.zone][next]);
     b.upgradedAt = tick;
-    rt.mapVersion++;
+    touchMap(rt, b.tile, info.size);
   }
 }
 

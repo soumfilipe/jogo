@@ -97,7 +97,7 @@ function newCity(name) {
 newCity('Nova Cidade');
 saves.startAutosave(AUTOSAVE_MS);
 
-startLoop({
+const loopStats = startLoop({
   getSpeed: () => speed,
   tick: () => tick(state, rt),
   render: (dt) => {
@@ -133,6 +133,7 @@ window.jogo = {
   },
   advance: (ticks) => advance(state, rt, ticks),
   renderer,
+  loop: loopStats,
   setSpeed,
 };
 
