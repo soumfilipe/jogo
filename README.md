@@ -200,14 +200,22 @@ trabalho, ainda dentro do lote, não aparece.
   quando a roda para.
 - Mudanças feitas pelo jogador aparecem na hora; as da simulação (prédios
   crescendo) são redesenhadas no máximo a cada 0,4 s.
+- **Redesenho parcial**: a simulação marca os trechos que mudaram (`touchMap`:
+  prédio novo, demolido, que subiu de nível, abandonado ou que ganhou/perdeu
+  energia ou água) e só esses retângulos do cache são redesenhados (~2 ms, em
+  vez de 60–100 ms do mapa inteiro numa cidade de 10 mil habitantes). Ações do
+  jogador e mudanças nas ruas redesenham tudo.
 - As luzes das janelas são refeitas a cada 15 minutos de jogo, no máximo a cada
-  0,3 s de tempo real.
+  0,3 s de tempo real, reaproveitando a geometria dos prédios do último desenho
+  e os horários das janelas (sorteados uma vez por prédio).
 - Para esconder carros atrás dos prédios, só são recortados os prédios que
   encostam num carro que está atrás deles (busca numa grade da tela).
 - Caminhos com muitos contornos não usam `closePath` (o `fill` fecha sozinho):
   no Chromium isso deixava o redesenho de mapas grandes até 30 vezes mais lento.
 - No console do navegador, `jogo.state`, `jogo.rt`, `jogo.cam`, `jogo.renderer`,
   `jogo.advance(ticks)` e `jogo.applyCommand(cmd)` ajudam a depurar.
+  `jogo.loop` (ms de simulação e de desenho no último quadro) e
+  `jogo.renderer.stats` (ms de cada camada) servem para medir desempenho.
 
 ## Como a simulação funciona
 
@@ -260,13 +268,13 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 4,                 // versão do formato (migrações em src/save/format.js)
+  "version": 5,                 // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
     "name": "Vila Nova",
     "autosave": false,
-    "gameVersion": "0.5.0",
+    "gameVersion": "0.6.0",
     "createdAt": "…", "updatedAt": "…",
     "playTimeSeconds": 120,
     "summary": { "population": 985, "buildings": 342, "money": 38635,
@@ -278,8 +286,13 @@ módulos JavaScript em `file://`.)
 ```
 
 Dentro de `data`, as camadas do mapa (typed arrays) viram
-`{ "$typed": "Uint8Array", "length": 65536, "rle": [qtd, valor, …] }`. O arquivo é
-gravado como JSON compacto.
+`{ "$typed": "Uint8Array", "length": 65536, "rle": [qtd, valor, …] }`.
+
+Prédios e cidadãos são gravados em colunas (`src/save/table.js`): o nome de
+cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
+estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
+letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
+manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
 
 ### Mudando o formato
 
@@ -303,6 +316,7 @@ src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa
 src/ui/                 painel de inspeção e painel de orçamento
 src/save/format.js      formato do save: criar, validar, checksum, migrações, RLE
+src/save/table.js       prédios e cidadãos em colunas, rotas como passos
 src/save/backends.js    onde gravar: arquivos (servidor) ou navegador
 src/save/SaveManager.js salvar, carregar, automático, exportar/importar
 test/                   testes (node --test)
