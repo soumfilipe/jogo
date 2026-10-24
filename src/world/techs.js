@@ -1199,3 +1199,7 @@ for (const t of TECHS) for (const r of t.requires) UNLOCKS.get(r)?.push(t.id);
 // Prédio do catálogo -> tecnologia que o libera.
 export const BUILDING_TECH = {};
 for (const t of TECHS) for (const e of t.effects) if (e.unlock) BUILDING_TECH[e.unlock] = t.id;
+
+// Nível de prédio -> tecnologia que o libera ('residential:3' -> 'zoneamento').
+export const LEVEL_TECH = {};
+for (const t of TECHS) for (const e of t.effects) if (e.level) LEVEL_TECH[e.level.join(':')] = t.id;
