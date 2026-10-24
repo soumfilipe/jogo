@@ -418,8 +418,11 @@ estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
 
-Saves de antes da pesquisa (formato 8) abrem no primeiro marco, só com as
-tecnologias iniciais; usinas solares que já existiam continuam funcionando.
+Saves de antes da pesquisa (formato 8) abrem no primeiro marco, com as
+tecnologias iniciais mais as de tudo o que a cidade já tinha (e os requisitos
+delas): uma cidade com apartamentos ganha o código de zoneamento, uma com
+usina solar ganha a usina solar, e o mundo avança até o marco da mais recente.
+Assim nada do que a cidade já podia construir fica bloqueado.
 
 Saves de antes das empresas (formato 7) abrem normalmente: a migração marca o
 save, e ao carregar cada prédio comercial e industrial ganha empresas em todos

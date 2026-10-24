@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUILDINGS, ECONOMY, RESEARCH, TERRAIN } from '../src/world/catalog.js';
+import { BUILDINGS, ECONOMY, RESEARCH, TERRAIN, ZONE } from '../src/world/catalog.js';
 import { START_TECHS, TECHS, TECH_BY_ID } from '../src/world/techs.js';
 import { createWorld } from '../src/world/world.js';
 import { addBuilding } from '../src/world/runtime.js';
@@ -9,7 +9,7 @@ import { advance, prepare } from '../src/systems/simulation.js';
 import {
   closeResearchMonth, completeAffordable, createResearch, effectiveCost, researchOutput, target,
 } from '../src/systems/research.js';
-import { mod } from '../src/systems/mods.js';
+import { levelUnlocked, mod } from '../src/systems/mods.js';
 import { monthlyBudget } from '../src/systems/economy.js';
 import { createSave, readSave, checksum } from '../src/save/format.js';
 import { TICKS_PER_MONTH } from '../src/core/time.js';
@@ -122,18 +122,44 @@ test('cidade rodando com instituto e verba pesquisa de verdade (e de forma deter
   assert.deepEqual(run().research, a.research);
 });
 
-test('save v4 ganha a pesquisa do primeiro marco', () => {
+/** O estado salvo como se fosse do formato 8 (antes da pesquisa), já lido de volta. */
+function asV8(state) {
+  const v8 = createSave(state, { id: 'v8' });
+  delete v8.data.research;
+  v8.version = 8;
+  v8.checksum = checksum(v8.data);
+  return readSave(JSON.stringify(v8)).state;
+}
+
+test('save v8 simples começa no primeiro marco, só com as iniciais', () => {
   const { state } = testCity();
-  const v4 = createSave(state, { id: 'v4' });
-  delete v4.data.research;
-  v4.version = 4;
-  v4.checksum = checksum(v4.data);
-  const { state: migrated } = readSave(JSON.stringify(v4));
+  const migrated = asV8(state);
+  assert.equal(migrated.legacyResearch, true);
+  const rt = prepare(migrated);
+  assert.equal(migrated.legacyResearch, undefined, 'roda uma vez só');
   assert.deepEqual(new Set(migrated.research.done), new Set(START_TECHS));
   assert.equal(migrated.research.world, 1910);
-  const rt = prepare(migrated);
   assert.ok(rt.unlocked.has('usina_carvao'));
   assert.ok(!rt.unlocked.has('usina_solar'));
+});
+
+test('save v8 de cidade avançada mantém o que ela já podia construir', () => {
+  const { state, rt, fill } = lab();
+  addBuilding(state, rt, 'apartamentos', 6 * 30 + 10);
+  addBuilding(state, rt, 'usina_solar', 6 * 30 + 2);
+  const migrated = asV8(state);
+  const rt2 = prepare(migrated);
+  for (const id of ['zoneamento', 'usina_solar', 'fotovoltaica', 'transistor']) {
+    assert.ok(migrated.research.done.includes(id), id);
+  }
+  assert.ok(rt2.unlocked.has('usina_solar'));
+  assert.ok(levelUnlocked(rt2, ZONE.RESIDENTIAL, 3));
+  assert.equal(migrated.research.world, 1973, 'o mundo vai ao marco da usina solar (4)');
+  assert.ok(!migrated.research.done.includes('led'), 'nada além do que a cidade usa');
+  // Ao salvar de novo e carregar, não concede mais nada.
+  const { state: again } = readSave(JSON.stringify(createSave(migrated, { id: 'de-novo' })));
+  assert.equal(again.legacyResearch, undefined);
+  assert.deepEqual(again.research, migrated.research);
 });
 
 test('salvar e carregar mantém a pesquisa e os modificadores', () => {
