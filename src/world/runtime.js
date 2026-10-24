@@ -2,7 +2,7 @@
 // (buildRuntime) e mantidos atualizados pelas funções deste módulo. Qualquer
 // mudança em prédios, cidadãos ou estradas deve passar por aqui.
 
-import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN } from './catalog.js';
+import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN, ZONE, capacityOf } from './catalog.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -12,6 +12,9 @@ export function buildRuntime(state) {
     buildingAt: new Int32Array(width * height), // id do prédio em cada tile (0 = nenhum)
     residents: new Map(), // id do prédio -> Set de ids de cidadãos
     workers: new Map(), //   id do prédio -> Set de ids de cidadãos
+    companyById: new Map(),
+    companiesIn: new Map(), // id do prédio -> empresas dele, do andar mais baixo ao mais alto
+    companyWorkers: new Map(), // id da empresa -> Set de ids de cidadãos
     departures: new Map(), // minuto do dia -> Set de ids de cidadãos
     movers: new Set(), //    cidadãos andando agora
     roadComponent: new Int32Array(width * height), // rede de estradas de cada tile (0 = sem)
@@ -29,6 +32,7 @@ export function buildRuntime(state) {
   };
 
   for (const b of state.buildings) indexBuilding(state, rt, b);
+  for (const co of state.companies) indexCompany(rt, co);
   for (const c of state.citizens) indexCitizen(rt, c);
   recomputeRoads(state, rt, { reroute: false });
   return rt;
@@ -78,6 +82,7 @@ export function removeBuilding(state, rt, id) {
     if (citizen.state !== 'casa') sendHome(state, rt, citizen);
     setJob(rt, citizen, null);
   }
+  for (const co of [...(rt.companiesIn.get(id) || [])]) removeCompany(state, rt, co.id);
 
   state.buildings.splice(state.buildings.indexOf(building), 1);
   rt.buildingById.delete(id);
@@ -93,6 +98,7 @@ function indexBuilding(state, rt, b) {
   for (const t of footprint(state, b)) rt.buildingAt[t] = b.id;
   rt.residents.set(b.id, new Set());
   rt.workers.set(b.id, new Set());
+  rt.companiesIn.set(b.id, []);
 }
 
 /** Derruba a mata de um tile (vira grama). */
@@ -122,14 +128,74 @@ export function frontTile(state, b) {
 }
 
 // Prédio abandonado não recebe moradores nem contrata.
+// Nas zonas comercial e industrial, só contratam as empresas: andar vago não
+// tem vagas.
 export function vacancies(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return BUILDINGS[b.type].residents - rt.residents.get(b.id).size;
+  if (!BUILDINGS[b.type].residents) return 0;
+  return capacityOf(b) - rt.residents.get(b.id).size;
 }
 
 export function openJobs(rt, b) {
   if (b.abandoned !== undefined) return 0;
-  return BUILDINGS[b.type].jobs - rt.workers.get(b.id).size;
+  const info = BUILDINGS[b.type];
+  if (!info.jobs) return 0;
+  if (!usesCompanies(info)) return capacityOf(b) - rt.workers.get(b.id).size;
+  let open = 0;
+  for (const co of rt.companiesIn.get(b.id)) open += Math.max(0, companyJobs(rt, co) - rt.companyWorkers.get(co.id).size);
+  return open;
+}
+
+// ---------------------------------------------------------------------------
+// Empresas (ver systems/companies.js)
+// ---------------------------------------------------------------------------
+
+/** Prédios cujas vagas vêm de empresas: os das zonas comercial e industrial. */
+export function usesCompanies(info) {
+  return info.zone === ZONE.COMMERCIAL || info.zone === ZONE.INDUSTRIAL;
+}
+
+/** Vagas de uma empresa: os andares dela vezes as pessoas por andar do prédio. */
+export function companyJobs(rt, co) {
+  return co.floors * BUILDINGS[rt.buildingById.get(co.building).type].perFloor;
+}
+
+/** Vagas de todas as empresas do prédio (andares alugados). */
+export function leasedJobs(rt, b) {
+  let jobs = 0;
+  for (const co of rt.companiesIn.get(b.id)) jobs += companyJobs(rt, co);
+  return jobs;
+}
+
+export function addCompany(state, rt, company) {
+  company.id = state.nextId++;
+  state.companies.push(company);
+  indexCompany(rt, company);
+  return company;
+}
+
+/** Fecha a empresa: os funcionários ficam desempregados e o andar, vago. */
+export function removeCompany(state, rt, id) {
+  const co = rt.companyById.get(id);
+  if (!co) return;
+  for (const cid of [...rt.companyWorkers.get(id)]) {
+    const citizen = rt.citizenById.get(cid);
+    if (citizen.state !== 'casa') sendHome(state, rt, citizen);
+    setJob(rt, citizen, null);
+  }
+  state.companies.splice(state.companies.indexOf(co), 1);
+  rt.companyById.delete(id);
+  rt.companyWorkers.delete(id);
+  const list = rt.companiesIn.get(co.building);
+  list.splice(list.indexOf(co), 1);
+}
+
+function indexCompany(rt, co) {
+  rt.companyById.set(co.id, co);
+  rt.companyWorkers.set(co.id, new Set());
+  const list = rt.companiesIn.get(co.building);
+  list.push(co);
+  list.sort((a, b) => a.floor - b.floor);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,25 +224,32 @@ function indexCitizen(rt, c) {
   rt.residents.get(c.home).add(c.id);
   if (c.job !== null) {
     rt.workers.get(c.job).add(c.id);
+    if (c.company != null) rt.companyWorkers.get(c.company).add(c.id);
     addDeparture(rt, c.departWork, c.id);
     addDeparture(rt, c.departHome, c.id);
   }
   if (c.state === 'viajando') rt.movers.add(c.id);
 }
 
-/** Define (ou remove, com null) o emprego do cidadão e seus horários. */
-export function setJob(rt, citizen, jobId, departWork = 0, departHome = 0) {
+/**
+ * Define (ou remove, com null) o emprego do cidadão e seus horários. `company`
+ * é a empresa em que trabalha dentro do prédio (null nos serviços públicos).
+ */
+export function setJob(rt, citizen, jobId, departWork = 0, departHome = 0, company = null) {
   if (citizen.job !== null) {
     rt.workers.get(citizen.job)?.delete(citizen.id);
+    if (citizen.company != null) rt.companyWorkers.get(citizen.company)?.delete(citizen.id);
     rt.departures.get(citizen.departWork)?.delete(citizen.id);
     rt.departures.get(citizen.departHome)?.delete(citizen.id);
   }
   citizen.job = jobId;
+  citizen.company = jobId === null ? null : company;
   citizen.departWork = jobId === null ? null : departWork;
   citizen.departHome = jobId === null ? null : departHome;
   if (jobId === null) citizen.shift = null;
   if (jobId !== null) {
     rt.workers.get(jobId).add(citizen.id);
+    if (company !== null) rt.companyWorkers.get(company).add(citizen.id);
     addDeparture(rt, departWork, citizen.id);
     addDeparture(rt, departHome, citizen.id);
   }

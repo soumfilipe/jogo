@@ -9,6 +9,8 @@
 // zoom 1):
 //   { kind: 'block', box: [x0, y0, x1, y1], lift, h, wall: {left, right},
 //     top, roof: {kind: 'hip'|'gable-x'|'gable-y', color, rise} | null,
+//     floors: {count, h} | null   (andares de verdade: uma fileira de
+//                                  janelas por andar, de altura h),
 //     windows: {cols, style: 'grid'|'bands'|'shop'} | null,
 //     bands: [{at, thick, color}], doors: {count, color} | null,
 //     sign: {color} | null }
@@ -16,7 +18,7 @@
 //   { kind: 'antenna', cx, cy, lift, h }
 //   { kind: 'slab', box, color, lines }      (chão: estacionamento, pátio)
 
-import { BUILDINGS, ZONE } from '../world/catalog.js';
+import { BUILDINGS, ZONE, buildingFloors, floorsOf } from '../world/catalog.js';
 import { createRng, hash2, random } from '../core/rng.js';
 
 export const VARIANTS = 20;
@@ -54,19 +56,24 @@ const METAL = wall('#b9bcc2', '#9a9da3');
 
 const cache = new Map();
 
-/** Projeto do prédio `b` (um dos VARIANTS do tipo dele). */
+/** Projeto do prédio `b` (um dos VARIANTS do tipo dele, com os andares dele). */
 export function designFor(b) {
-  return design(b.type, Math.floor(hash2(b.id, 13) * VARIANTS));
+  return design(b.type, Math.floor(hash2(b.id, 13) * VARIANTS), buildingFloors(b));
 }
 
-export function design(type, index) {
-  const key = `${type}:${index}`;
+/**
+ * Projeto `index` do tipo, com `floors` andares (padrão: os do tipo). O
+ * sorteio depende só do tipo e do índice: um prédio que ganha andares
+ * continua com a mesma forma e as mesmas cores, só mais alto.
+ */
+export function design(type, index, floors = floorsOf(BUILDINGS[type])) {
+  const key = `${type}:${index}:${floors}`;
   let d = cache.get(key);
   if (!d) {
     const info = BUILDINGS[type];
-    const rng = createRng(hashString(key) ^ 0x9e3779b9);
+    const rng = createRng(hashString(`${type}:${index}`) ^ 0x9e3779b9);
     const r = makeRandom(rng);
-    const parts = info.utility ? UTILITY_GENERATORS[type](r) : GENERATORS[info.zone](info, r);
+    const parts = info.utility ? UTILITY_GENERATORS[type](r) : GENERATORS[info.zone](info, r, floors);
     d = { parts, color: parts.find((p) => p.wall)?.wall.left ?? '#999999' };
     cache.set(key, d);
   }
@@ -86,11 +93,32 @@ function block(box, lift, h, wallColors, opts = {}) {
     kind: 'block', box, lift, h, wall: wallColors,
     top: opts.top ?? mixHex(wallColors.left, '#ffffff', 0.35),
     roof: opts.roof ?? null,
+    floors: opts.floors ?? null,
     windows: opts.windows ?? null,
     bands: opts.bands ?? [],
     doors: opts.doors ?? null,
     sign: opts.sign ?? null,
   };
+}
+
+// Altura de um andar, em unidades de meio tile, e o que sobra acima do último
+// andar: platibanda nas lajes planas, um respiro sob o telhado inclinado.
+const RES_FLOOR = 9 / 32;
+const OFFICE_FLOOR = 0.34;
+const SHOP_FLOOR = 0.45;
+const MALL_FLOOR = 0.55;
+// Galpão: pé-direito alto, para máquinas e estantes.
+const HALL_FLOOR = 0.6;
+const PARAPET = 0.1;
+const EAVES = 0.03;
+
+/**
+ * Bloco com `n` andares de altura `fh` a partir de `lift` (em andares, a
+ * altura sai deles). Com telhado inclinado, sem platibanda.
+ */
+function storeys(box, lift, n, fh, wallColors, opts = {}) {
+  const h = n * fh + (opts.roof ? EAVES : PARAPET);
+  return block(box, lift, h, wallColors, { ...opts, floors: { count: n, h: fh } });
 }
 
 /** Telhado com caimento: quatro águas ou duas águas em um dos sentidos. */
@@ -146,38 +174,39 @@ function chimney(r, x, y, lift, h, color = CHIMNEY) {
   return block([x, y, x + 0.13, y + 0.13], lift, h, color, { top: '#3d3330' });
 }
 
-// Andares das janelas: altura de uma fileira em "andares".
-const balconies = (h, color) => {
+// Sacadas: uma laje saliente entre cada par de andares.
+const balconies = (n, fh, color) => {
   const bands = [];
-  for (let at = 0.32; at < h - 0.15; at += 0.32) bands.push({ at, thick: 0.05, color });
+  for (let k = 1; k < n; k++) bands.push({ at: k * fh - 0.025, thick: 0.05, color });
   return bands;
 };
 
 const GENERATORS = {
-  [ZONE.RESIDENTIAL](info, r) {
+  [ZONE.RESIDENTIAL](info, r, n) {
     const size = info.size;
-    const base = info.style.height;
+    const fh = RES_FLOOR;
     const w = r.pick(RES_WALLS);
     const roofColor = r.pick(ROOFS);
     const i = r.range(0.08, 0.2) * (size === 1 ? 1 : 0.8);
 
     if (info.level <= 2) {
-      const h = base * r.range(0.85, 1.2);
       const cols = info.level === 1 ? 2 : r.pick([2, 3]);
       const parts = [];
       const annex = r.chance(0.4);
       // Com anexo, a casa principal fica no fundo e o anexo (garagem, varanda) na frente.
       const mainBox = annex ? [i, i, 1 - i, 0.62] : [i, i, 1 - i, 1 - i];
-      const bands = info.level === 2 && r.chance(0.5) ? [{ at: h * 0.5, thick: 0.06, color: '#f4f1ea' }] : [];
-      const main = block(mainBox, 0, h, w, { roof: pitchedRoof(r, roofColor), windows: { cols, style: 'grid' }, bands });
+      const bands = n > 1 && r.chance(0.5) ? [{ at: fh - 0.03, thick: 0.06, color: '#f4f1ea' }] : [];
+      const main = storeys(mainBox, 0, n, fh, w, { roof: pitchedRoof(r, roofColor), windows: { cols, style: 'grid' }, bands });
       parts.push(main);
+      const h = main.h;
       // A chaminé fica no fundo do telhado: vem antes do anexo, que está na frente.
-      if (r.chance(0.45)) parts.push(chimney(r, mainBox[0] + 0.12, mainBox[1] + 0.1, h, r.range(0.4, 0.6)));
+      if (r.chance(0.45)) parts.push(chimney(r, mainBox[0] + 0.12, mainBox[1] + 0.1, h, r.range(0.25, 0.4)));
       if (annex) {
         const right = r.chance(0.5);
         const box = right ? [0.45, 0.62, 1 - i, 1 - i] : [i, 0.62, 0.6, 1 - i];
         const flat = r.chance(0.5);
-        parts.push(block(box, 0, h * r.range(0.45, 0.65), r.chance(0.6) ? w : r.pick(RES_WALLS), {
+        // Garagem ou varanda: mais baixa que um andar da casa.
+        parts.push(block(box, 0, fh * r.range(0.7, 0.9), r.chance(0.6) ? w : r.pick(RES_WALLS), {
           roof: flat ? null : pitchedRoof(r, roofColor, ['gable-x', 'gable-y']),
           doors: r.chance(0.5) ? { count: 1, color: '#5a4636' } : null,
         }));
@@ -185,38 +214,43 @@ const GENERATORS = {
       return parts;
     }
 
-    // Prédios de apartamentos (1x1) e condomínios (2x2).
-    const h = base * r.range(0.8, 1.25);
+    // Prédios de apartamentos (1x1) e condomínios (2x2): n andares no total,
+    // repartidos entre as partes conforme a forma.
     const form = r.pick(size === 1 ? ['box', 'tiers', 'podium', 'slab', 'box'] : ['tower', 'twin', 'podium', 'tiers', 'slab']);
-    const balc = r.chance(0.45) ? balconies(h, mixHex(w.left, '#ffffff', 0.55)) : [];
+    const balcColor = r.chance(0.45) ? mixHex(w.left, '#ffffff', 0.55) : null;
+    const balc = (k) => (balcColor ? balconies(k, fh, balcColor) : []);
     const win = { cols: r.pick([3, 4]), style: 'grid' };
     const roofOptions = ['tank', 'ac', 'garden', 'antenna', 'solar', 'none'].concat(size > 1 ? ['helipad', 'crown'] : []);
     const S = size;
     const parts = [];
     if (form === 'box' || form === 'tower') {
       const m = form === 'tower' ? S * r.range(0.18, 0.28) : i;
-      parts.push(block([m, m, S - m, S - m], 0, h, w, { windows: win, bands: balc }));
+      parts.push(storeys([m, m, S - m, S - m], 0, n, fh, w, { windows: win, bands: balc(n) }));
     } else if (form === 'tiers') {
-      const h1 = h * r.range(0.45, 0.6);
-      parts.push(block([i, i, S - i, S - i], 0, h1, w, { windows: win, bands: balc }));
+      // Base mais larga com a maior parte dos andares; o recuo no alto.
+      const n1 = Math.max(1, Math.min(n - 1, Math.round(n * r.range(0.5, 0.7))));
+      const base = storeys([i, i, S - i, S - i], 0, n1, fh, w, { windows: win, bands: balc(n1) });
+      parts.push(base);
       const m = i + S * 0.15;
-      parts.push(block([m, m, S - m, S - m], h1, h - h1, w, { windows: win }));
+      parts.push(storeys([m, m, S - m, S - m], n1 * fh, n - n1, fh, w, { windows: win }));
     } else if (form === 'podium') {
-      const ph = r.range(0.5, 0.8);
-      parts.push(block([i * 0.6, i * 0.6, S - i * 0.6, S - i * 0.6], 0, ph, r.pick(COM_WALLS), {
-        windows: { cols: 3 * S, style: 'shop' }, bands: [{ at: ph - 0.08, thick: 0.08, color: r.pick(ACCENTS) }],
-      }));
+      // Térreo comercial mais largo e os apartamentos em cima.
+      const pod = storeys([i * 0.6, i * 0.6, S - i * 0.6, S - i * 0.6], 0, 1, SHOP_FLOOR, r.pick(COM_WALLS), {
+        windows: { cols: 3 * S, style: 'shop' }, bands: [{ at: SHOP_FLOOR - 0.04, thick: 0.08, color: r.pick(ACCENTS) }],
+      });
+      parts.push(pod);
       const m = S * r.range(0.22, 0.3);
-      parts.push(block([m, m, S - m, S - m], ph, h - ph, w, { windows: win, bands: balc }));
+      parts.push(storeys([m, m, S - m, S - m], SHOP_FLOOR, Math.max(1, n - 1), fh, w, { windows: win, bands: balc(n - 1) }));
     } else if (form === 'slab') {
+      // Lâmina: estreita, então precisa de um andar a mais.
       const alongX = r.chance(0.5);
       const box = alongX ? [i, S * 0.28, S - i, S * 0.72] : [S * 0.28, i, S * 0.72, S - i];
-      parts.push(block(box, 0, h * 0.9, w, { windows: win, bands: balc }));
+      parts.push(storeys(box, 0, n + 1, fh, w, { windows: win, bands: balc(n + 1) }));
     } else if (form === 'twin') {
-      const ha = h * r.range(0.8, 1);
-      const hb = h * r.range(0.6, 0.9);
-      parts.push(block([0.15, 0.15, 0.9, 0.9], 0, ha, w, { windows: win, bands: balc }));
-      parts.push(block([1.1, 1.1, 1.85, 1.85], 0, hb, r.chance(0.5) ? w : r.pick(RES_WALLS), { windows: win, bands: balc }));
+      // Duas torres estreitas: cada uma com os n andares (ou um a menos).
+      const nb = n - (r.chance(0.5) ? 1 : 0);
+      parts.push(storeys([0.15, 0.15, 0.9, 0.9], 0, n, fh, w, { windows: win, bands: balc(n) }));
+      parts.push(storeys([1.1, 1.1, 1.85, 1.85], 0, nb, fh, r.chance(0.5) ? w : r.pick(RES_WALLS), { windows: win, bands: balc(nb) }));
     }
     // Itens do telhado logo depois da parte em que estão (antes das partes da frente).
     const topPart = parts.reduce((a, p) => (p.lift + p.h > a.lift + a.h ? p : a));
@@ -224,56 +258,43 @@ const GENERATORS = {
     return parts;
   },
 
-  [ZONE.COMMERCIAL](info, r) {
+  [ZONE.COMMERCIAL](info, r, n) {
     const S = info.size;
-    const base = info.style.height;
     const i = r.range(0.08, 0.18);
     const accent = r.pick(ACCENTS);
     const parts = [];
 
-    if (info.level === 1) {
+    if (S === 1 && info.level <= 2) {
+      // Loja e mercado: térreo de vitrine alto e, no mercado, um andar em cima.
       const w = r.pick(COM_WALLS);
-      const h = base * r.range(0.8, 1.3);
-      parts.push(block([i, i, 1 - i, 1 - i], 0, h, w, {
-        windows: { cols: 3, style: 'shop' },
-        bands: r.chance(0.7) ? [{ at: h * 0.32, thick: 0.1, color: accent }] : [],
-        sign: r.chance(0.6) ? { color: r.pick(ACCENTS) } : null,
-      }));
-      parts.push(...rooftop(r, parts[0], ['ac', 'none', 'tank']));
-      return parts;
-    }
-
-    if (info.level === 2 && S === 1) {
-      const w = r.pick(COM_WALLS);
-      const h = base * r.range(0.8, 1.2);
-      const parking = r.chance(0.45);
+      const parking = info.level === 2 && r.chance(0.45);
       const box = parking ? (r.chance(0.5) ? [i, i, 1 - i, 0.6] : [i, i, 0.6, 1 - i]) : [i, i, 1 - i, 1 - i];
       if (parking) parts.push({ kind: 'slab', box: [0.04, 0.04, 0.96, 0.96], color: '#6b6e75', lines: true, lift: 0 });
-      parts.push(block(box, 0, h, w, {
+      const main = storeys(box, 0, n, SHOP_FLOOR, w, {
         windows: { cols: 3, style: 'shop' },
-        bands: [{ at: h * 0.3, thick: 0.1, color: accent }],
-        sign: { color: r.pick(ACCENTS) },
-      }));
-      parts.push(...rooftop(r, parts.at(-1), ['ac', 'solar', 'none']));
+        bands: info.level === 2 || r.chance(0.7) ? [{ at: SHOP_FLOOR - 0.06, thick: 0.08, color: accent }] : [],
+        sign: info.level === 2 || r.chance(0.6) ? { color: r.pick(ACCENTS) } : null,
+      });
+      parts.push(main);
+      parts.push(...rooftop(r, main, info.level === 1 ? ['ac', 'none', 'tank'] : ['ac', 'solar', 'none']));
       return parts;
     }
 
     if (S === 1) {
-      // Escritórios: torres de vidro.
+      // Escritórios: prédios de vidro com os andares que as vagas pedem.
       const w = r.pick(GLASS);
-      const h = base * r.range(0.8, 1.3);
       const style = r.pick(['bands', 'grid', 'bands']);
       const form = r.pick(['box', 'tiers', 'podium', 'box']);
       if (form === 'box') {
-        parts.push(block([i, i, 1 - i, 1 - i], 0, h, w, { windows: { cols: 3, style } }));
+        parts.push(storeys([i, i, 1 - i, 1 - i], 0, n, OFFICE_FLOOR, w, { windows: { cols: 3, style } }));
       } else if (form === 'tiers') {
-        const h1 = h * r.range(0.5, 0.7);
-        parts.push(block([i, i, 1 - i, 1 - i], 0, h1, w, { windows: { cols: 3, style } }));
-        parts.push(block([i + 0.12, i + 0.12, 1 - i - 0.12, 1 - i - 0.12], h1, h - h1, w, { windows: { cols: 2, style } }));
+        const n1 = Math.max(1, n - r.pick([1, 1, 2]));
+        parts.push(storeys([i, i, 1 - i, 1 - i], 0, n1, OFFICE_FLOOR, w, { windows: { cols: 3, style } }));
+        parts.push(storeys([i + 0.12, i + 0.12, 1 - i - 0.12, 1 - i - 0.12], n1 * OFFICE_FLOOR, Math.max(1, n - n1), OFFICE_FLOOR, w, { windows: { cols: 2, style } }));
       } else {
-        const ph = r.range(0.5, 0.9);
-        parts.push(block([0.06, 0.06, 0.94, 0.94], 0, ph, r.pick(COM_WALLS), { windows: { cols: 3, style: 'shop' } }));
-        parts.push(block([0.2, 0.2, 0.8, 0.8], ph, h - ph, w, { windows: { cols: 3, style } }));
+        // Térreo de lojas e os escritórios em cima.
+        parts.push(storeys([0.06, 0.06, 0.94, 0.94], 0, 1, SHOP_FLOOR, r.pick(COM_WALLS), { windows: { cols: 3, style: 'shop' } }));
+        parts.push(storeys([0.2, 0.2, 0.8, 0.8], SHOP_FLOOR, n, OFFICE_FLOOR, w, { windows: { cols: 3, style } }));
       }
       parts.push(...rooftop(r, parts.at(-1), ['antenna', 'crown', 'ac', 'helipad', 'none']));
       return parts;
@@ -281,47 +302,45 @@ const GENERATORS = {
 
     // Shopping 2x2: bloco largo, átrio de vidro e estacionamento.
     const w = r.pick(COM_WALLS.slice(0, 5));
-    const h = base * r.range(0.8, 1.2);
     const layout = r.pick(['front', 'side', 'full']);
     if (layout !== 'full') parts.push({ kind: 'slab', box: [0.05, 0.05, 1.95, 1.95], color: '#6b6e75', lines: true, lift: 0 });
     const box = layout === 'front' ? [0.15, 0.15, 1.85, 1.2] : layout === 'side' ? [0.15, 0.15, 1.2, 1.85] : [0.12, 0.12, 1.88, 1.88];
-    const main = block(box, 0, h, w, {
+    const main = storeys(box, 0, n, MALL_FLOOR, w, {
       windows: { cols: 5, style: 'shop' },
-      bands: [{ at: h * 0.85, thick: 0.1, color: accent }, { at: h * 0.35, thick: 0.06, color: accent }],
+      bands: [{ at: n * MALL_FLOOR - 0.04, thick: 0.1, color: accent }, { at: MALL_FLOOR - 0.04, thick: 0.06, color: accent }],
       sign: { color: r.pick(ACCENTS) },
     });
     parts.push(main);
     const cx = (box[0] + box[2]) / 2;
     const cy = (box[1] + box[3]) / 2;
-    parts.push(block([cx - 0.3, cy - 0.3, cx + 0.3, cy + 0.3], h, r.range(0.3, 0.6), r.pick(GLASS), { windows: { cols: 2, style: 'bands' } }));
+    parts.push(block([cx - 0.3, cy - 0.3, cx + 0.3, cy + 0.3], main.h, r.range(0.3, 0.5), r.pick(GLASS), { windows: { cols: 2, style: 'bands' } }));
     if (r.chance(0.5)) parts.push(...rooftop(r, main, ['ac', 'solar']));
     return parts;
   },
 
-  [ZONE.INDUSTRIAL](info, r) {
+  [ZONE.INDUSTRIAL](info, r, n) {
     const S = info.size;
-    const base = info.style.height;
     const w = r.pick(IND_WALLS);
     const stripe = r.pick(STRIPES);
     const i = r.range(0.06, 0.15);
     const parts = [];
 
     if (S === 1) {
-      const h = base * r.range(0.8, 1.2);
       const roofKind = r.pick(['flat', 'sawtooth', 'gable', 'flat']);
       const withSilos = info.level >= 2 && r.chance(0.55);
       const mainBox = withSilos ? [i, i, 0.62, 1 - i] : [i, i, 1 - i, 1 - i];
-      const main = block(mainBox, 0, h, w, {
+      const main = storeys(mainBox, 0, n, HALL_FLOOR, w, {
         windows: info.level >= 3 || r.chance(0.3) ? { cols: 3, style: 'grid' } : null,
-        bands: info.level >= 2 || r.chance(0.4) ? [{ at: h * 0.8, thick: 0.08, color: stripe }] : [],
+        bands: info.level >= 2 || r.chance(0.4) ? [{ at: n * HALL_FLOOR * 0.8, thick: 0.08, color: stripe }] : [],
         doors: { count: r.pick([1, 2]), color: '#4a4d52' },
         roof: roofKind === 'gable' ? { kind: r.pick(['gable-x', 'gable-y']), color: mixHex(w.right, '#000000', 0.15), rise: 0.35 } : null,
       });
+      const h = main.h;
       parts.push(main);
       if (roofKind === 'sawtooth') parts.push(...sawtooth(mainBox, h, w, r.chance(0.5)));
       // Chaminés no fundo do telhado, antes dos silos e do anexo, que ficam na frente.
       const chimneys = info.level === 1 ? r.pick([0, 1, 1, 2]) : r.pick([1, 2, 2, 3]);
-      for (let k = 0; k < chimneys; k++) parts.push(chimney(r, mainBox[0] + 0.08 + k * 0.17, mainBox[1] + 0.1, h, r.range(0.9, 1.6) * (1 + info.level * 0.15)));
+      for (let k = 0; k < chimneys; k++) parts.push(chimney(r, mainBox[0] + 0.08 + k * 0.17, mainBox[1] + 0.1, h, r.range(0.4, 0.75) * (1 + info.level * 0.15)));
       if (withSilos) {
         const n = r.pick([1, 2, 2, 3]);
         for (let k = 0; k < n; k++) {
@@ -329,26 +348,28 @@ const GENERATORS = {
         }
       }
       if (info.level >= 3 && !withSilos) {
-        parts.push(block([0.55, 0.55, 0.92, 0.92], 0, h * 1.5, r.pick(IND_WALLS), { windows: { cols: 2, style: 'grid' } }));
+        // Escritório da fábrica, na frente: um andar acima do galpão.
+        const floors = Math.ceil((n * HALL_FLOOR) / RES_FLOOR) + 1;
+        parts.push(storeys([0.55, 0.55, 0.92, 0.92], 0, floors, RES_FLOOR, r.pick(IND_WALLS), { windows: { cols: 2, style: 'grid' } }));
       }
       return parts;
     }
 
     // Galpão logístico 2x2: armazém comprido, docas e pátio.
-    const h = base * r.range(0.8, 1.2);
     const alongX = r.chance(0.5);
     parts.push({ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7a7d84', lines: r.chance(0.5), lift: 0 });
     const box = alongX ? [0.12, 0.12, 1.88, 1.25] : [0.12, 0.12, 1.25, 1.88];
     const roof = r.pick(['flat', 'gable', 'gable']);
-    parts.push(block(box, 0, h, w, {
-      bands: [{ at: h * 0.85, thick: 0.08, color: stripe }],
-      doors: { count: r.pick([3, 4, 5]), color: '#3e4145' },
-      roof: roof === 'gable' ? { kind: alongX ? 'gable-x' : 'gable-y', color: mixHex(w.left, '#000000', 0.1), rise: 0.4 } : null,
-    }));
+    const roofDef = roof === 'gable' ? { kind: alongX ? 'gable-x' : 'gable-y', color: mixHex(w.left, '#000000', 0.1), rise: 0.4 } : null;
+    const hall = storeys(box, 0, n, HALL_FLOOR * 1.4, w, { roof: roofDef, doors: { count: r.pick([3, 4, 5]), color: '#3e4145' } });
+    const h = hall.h;
+    hall.bands.push({ at: h * 0.85, thick: 0.08, color: stripe });
+    parts.push(hall);
     if (roof === 'flat') parts.push(...rooftop(r, parts.at(-1), ['solar', 'ac']));
     if (r.chance(0.6)) {
       const ob = alongX ? [1.45, 1.4, 1.85, 1.85] : [1.4, 1.45, 1.85, 1.85];
-      parts.push(block(ob, 0, h * 0.8, r.pick(IND_WALLS), { windows: { cols: 2, style: 'grid' } }));
+      // Escritório da logística: dois andares baixos ao lado das docas.
+      parts.push(storeys(ob, 0, 2, RES_FLOOR, r.pick(IND_WALLS), { windows: { cols: 2, style: 'grid' } }));
     }
     return parts;
   },

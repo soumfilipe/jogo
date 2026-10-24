@@ -1,8 +1,9 @@
 // Demanda RCI (residencial, comercial, industrial), em "pessoas" ou "vagas".
 // É derivada do estado, então fica no runtime e é recalculada a cada hora.
 
-import { BUILDINGS, ZONE } from '../world/catalog.js';
+import { BUILDINGS, ZONE, capacityOf } from '../world/catalog.js';
 import { canWork } from '../agents/citizens.js';
+import { leasedJobs, usesCompanies } from '../world/runtime.js';
 import { taxDemandShift } from './economy.js';
 
 export function computeDemand(state, rt) {
@@ -13,10 +14,12 @@ export function computeDemand(state, rt) {
   for (const b of state.buildings) {
     if (b.abandoned !== undefined) continue; // abandonado não tem casa nem vaga
     const info = BUILDINGS[b.type];
-    housing += info.residents;
-    if (info.zone === ZONE.COMMERCIAL) commercialJobs += info.jobs;
-    else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += info.jobs;
-    else otherJobs += info.jobs;
+    // Comércio e indústria: só contam as vagas das empresas (andar vago não emprega).
+    const people = usesCompanies(info) ? leasedJobs(rt, b) : capacityOf(b);
+    if (info.residents) housing += people;
+    else if (info.zone === ZONE.COMMERCIAL) commercialJobs += people;
+    else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += people;
+    else otherJobs += people;
   }
 
   const population = state.citizens.length;

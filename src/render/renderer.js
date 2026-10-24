@@ -9,7 +9,7 @@
 //
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
-import { BUILDINGS, FOREST, TERRAIN, ZONE, ZONE_INFO } from '../world/catalog.js';
+import { BUILDINGS, DENSITY, FOREST, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
@@ -60,11 +60,17 @@ const FOREST_GROUNDS = ['#6aa452', '#609b4b', '#578f45', '#4e843f'];
 const SAND = '#d9c98f';
 const ROAD = '#5c5f68';
 const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
-const ZONE_TINT = {
-  [ZONE.RESIDENTIAL]: mix(GRASS[0], ZONE_INFO[ZONE.RESIDENTIAL].color, 0.45),
-  [ZONE.COMMERCIAL]: mix(GRASS[0], ZONE_INFO[ZONE.COMMERCIAL].color, 0.45),
-  [ZONE.INDUSTRIAL]: mix(GRASS[0], ZONE_INFO[ZONE.INDUSTRIAL].color, 0.45),
-};
+// Cor dos lotes vazios por zona e densidade: quanto mais densa, mais forte.
+const DENSITY_TINT = { [DENSITY.LOW]: 0.28, [DENSITY.MEDIUM]: 0.45, [DENSITY.HIGH]: 0.65 };
+const ZONE_TINT = {};
+for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL]) {
+  ZONE_TINT[zone] = {};
+  for (const [density, amount] of Object.entries(DENSITY_TINT)) {
+    // A indústria não tem densidade: sempre a cor média.
+    const t = zone === ZONE.INDUSTRIAL ? DENSITY_TINT[DENSITY.MEDIUM] : amount;
+    ZONE_TINT[zone][density] = mix(GRASS[0], ZONE_INFO[zone].color, t);
+  }
+}
 // Mapas (sobreposições): cor do chão conforme um valor de 0 a 1 do runtime.
 // O valor é arredondado em faixas para manter o agrupamento por cor.
 export const MAP_MODES = {
@@ -439,7 +445,7 @@ export class Renderer {
       else if (mode && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
         color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
       }
-      else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]];
+      else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]][state.map.density[tile]];
       else if (terrain[tile] === TERRAIN.WATER) {
         color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
       } else if (terrain[tile] === TERRAIN.SAND) color = SAND;
@@ -725,14 +731,16 @@ export class Renderer {
 
 // ---------------------------------------------------------------------------
 
-// Fração de gente no prédio: moradores em casa, ou se tem alguém trabalhando.
+// Fração de gente no prédio: moradores em casa, ou funcionários das empresas.
 function buildingOccupancy(rt, b, info) {
   if (info.residents) {
     let home = 0;
     for (const id of rt.residents.get(b.id)) if (rt.citizenById.get(id).state === 'casa') home++;
-    return home / info.residents;
+    return home / capacityOf(b);
   }
-  return rt.workers.get(b.id).size > 0 ? 0.9 : 0;
+  // Comércio e indústria: acende na proporção de quem trabalha lá (andar vago
+  // fica escuro).
+  return Math.min(0.9, rt.workers.get(b.id).size / capacityOf(b));
 }
 
 const diag = (tile, width) => (tile % width) + Math.floor(tile / width);

@@ -1,11 +1,14 @@
 // Crescimento: prédios surgem em tiles zoneados com acesso a estrada quando
 // há demanda, sobem de nível quando estão lotados num terreno valorizado,
+// depois ganham andares (os tipos `tall`) até o limite da densidade da zona,
 // e moradores se mudam para casas com vaga.
 
 import {
-  BUILDINGS, DAYS_BETWEEN_UPGRADES, LAND_VALUE_FOR_LEVEL, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, ZONE,
+  BUILDINGS, DAYS_BETWEEN_UPGRADES, DENSITY, DENSITY_INFO, LAND_VALUE_FOR_LEVEL, LARGE_BUILDINGS, LEVELS,
+  MAX_LEVEL, ZONE, buildingFloors, capacityOf, landValueForFloor, maxFloorsFor,
 } from '../world/catalog.js';
-import { addBuilding, findAccessRoad, touchMap, vacancies } from '../world/runtime.js';
+import { addBuilding, findAccessRoad, touchMap, usesCompanies, vacancies } from '../world/runtime.js';
+import { fitCompanies, foundCompanies, vacantFloors } from './companies.js';
 import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
@@ -60,68 +63,132 @@ export function growBuildings(state, rt) {
       remaining[key] >= Math.min(capacity(BUILDINGS[large]) / 4, 8) &&
       rt.landValue[tile] >= largeLandValue(z) &&
       isFreeBlock(state, rt, tile, BUILDINGS[large].size, z) &&
+      allowsLarge(state, tile, BUILDINGS[large]) &&
       fits(state, rt, access, consumption(BUILDINGS[large])) &&
       chance(state.rng, LARGE_CHANCE)
     ) {
       type = large;
     }
-    addBuilding(state, rt, type, tile);
+    const b = addBuilding(state, rt, type, tile);
+    if (usesCompanies(BUILDINGS[type])) foundCompanies(state, rt, b);
     reserve(state, rt, access, consumption(BUILDINGS[type]));
     remaining[key] -= capacity(BUILDINGS[type]);
   }
 }
 
 /**
- * Sobe de nível prédios 1x1 lotados, com terreno valorizado, desde que a
- * demanda da zona não seja negativa. O upgrade não "gasta" demanda: as vagas
- * ou moradias novas é que puxam o resto da cidade a crescer junto.
+ * Faz crescer prédios lotados num terreno valorizado, desde que a demanda da
+ * zona não seja negativa: 1x1 sobem de nível e, no nível máximo, os tipos
+ * `tall` ganham um andar por vez, até o limite da densidade da zona. Crescer
+ * não "gasta" demanda: as vagas ou moradias novas é que puxam o resto da
+ * cidade a crescer junto.
  */
 export function upgradeBuildings(state, rt) {
   const tick = state.time.tick;
 
   for (const b of state.buildings) {
+    const step = nextStep(state, b);
+    if (!step || step.limited) continue;
     const info = BUILDINGS[b.type];
-    if (info.utility || info.size !== 1 || info.level >= MAX_LEVEL) continue;
     if (tick - (b.upgradedAt ?? b.builtAt) < DAYS_BETWEEN_UPGRADES * TICKS_PER_DAY) continue;
     if (rt.demand[DEMAND_KEY[info.zone]] < 0) continue;
 
     if (b.abandoned !== undefined || !isServed(rt, b)) continue;
-    const occupied = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
-    if (occupied < capacity(info)) continue;
-    const next = info.level + 1;
-    if (rt.landValue[b.tile] < LAND_VALUE_FOR_LEVEL[info.zone][next]) continue;
-    // O nível seguinte consome mais: precisa caber na rede.
+    if (occupied(rt, b) < capacityOf(b)) continue;
+    if (rt.landValue[b.tile] < step.landValue) continue;
+    // O passo seguinte consome mais: precisa caber na rede.
     const access = rt.access.get(b.id);
-    const nextNeed = consumption(BUILDINGS[LEVELS[info.zone][next][0]]);
-    const now = consumption(info);
-    const extra = { power: nextNeed.power - now.power, water: nextNeed.water - now.water };
+    const now = consumption(info, capacityOf(b));
+    const extra = { power: step.need.power - now.power, water: step.need.water - now.water };
     if (!fits(state, rt, access, extra)) continue;
     if (!chance(state.rng, UPGRADE_CHANCE)) continue;
 
     reserve(state, rt, access, extra);
-    b.type = pick(state.rng, LEVELS[info.zone][next]);
+    if (step.floor) {
+      b.floors = step.floor;
+    } else {
+      b.type = pick(state.rng, LEVELS[info.zone][step.level]);
+      delete b.floors;
+      fitCompanies(state, rt, b);
+    }
     b.upgradedAt = tick;
     touchMap(rt, b.tile, info.size);
   }
 }
 
-/** O que falta para o prédio subir de nível (para o painel de inspeção). */
-export function upgradeBlockers(state, rt, b) {
+/**
+ * Próximo passo de crescimento do prédio:
+ *   { level, label, landValue, need }   sobe para o nível `level`
+ *   { floor, label, landValue, need }   ganha o andar número `floor`
+ *   { limited: densidade }              só cresceria numa densidade maior
+ *   null                                chegou ao máximo
+ */
+function nextStep(state, b) {
   const info = BUILDINGS[b.type];
-  if (info.utility || info.size !== 1 || info.level >= MAX_LEVEL) return null;
-  const next = info.level + 1;
-  const needed = LAND_VALUE_FOR_LEVEL[info.zone][next];
-  const occupied = info.residents ? rt.residents.get(b.id).size : rt.workers.get(b.id).size;
+  if (info.utility) return null;
+  const density = densityOf(state, info, b.tile);
+  if (info.size === 1 && info.level < MAX_LEVEL) {
+    const level = info.level + 1;
+    if (level > DENSITY_INFO[density].maxLevel) return { limited: DENSITY_INFO[density] };
+    return {
+      level,
+      label: `nível ${level}`,
+      landValue: LAND_VALUE_FOR_LEVEL[info.zone][level],
+      need: consumption(BUILDINGS[LEVELS[info.zone][level][0]]),
+    };
+  }
+  if (!info.tall) return null;
+  const floor = buildingFloors(b) + 1;
+  if (floor > maxFloorsFor(info, density)) {
+    return floor <= maxFloorsFor(info, DENSITY.HIGH) ? { limited: DENSITY_INFO[density] } : null;
+  }
+  return {
+    floor,
+    label: `${floor}º andar`,
+    landValue: landValueForFloor(info, floor),
+    need: consumption(info, capacityOf(b) + info.perFloor),
+  };
+}
+
+/**
+ * O que falta para o prédio crescer (para o painel de inspeção): null no
+ * máximo, { limited } quando só a densidade da zona impede, ou
+ * { next, label, blockers }.
+ */
+export function upgradeBlockers(state, rt, b) {
+  const step = nextStep(state, b);
+  if (!step || step.limited) return step;
+  const info = BUILDINGS[b.type];
   const blockers = [];
   const service = rt.service?.get(b.id);
   if (service && !service.power) blockers.push('energia');
   if (service && !service.water) blockers.push('água');
-  if (occupied < capacity(info)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
-  if (rt.landValue[b.tile] < needed) {
-    blockers.push(`valor do terreno ${pct(needed)} (agora ${pct(rt.landValue[b.tile])})`);
+  if (usesCompanies(info) && vacantFloors(rt, b).length) blockers.push('alugar os andares vagos');
+  else if (occupied(rt, b) < capacityOf(b)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
+  if (rt.landValue[b.tile] < step.landValue) {
+    blockers.push(`valor do terreno ${pct(step.landValue)} (agora ${pct(rt.landValue[b.tile])})`);
   }
   if (rt.demand[DEMAND_KEY[info.zone]] < 0) blockers.push('demanda na zona');
-  return { next, blockers };
+  return { next: step.level ?? step.floor, label: step.label, blockers };
+}
+
+const occupied = (rt, b) => (BUILDINGS[b.type].residents ? rt.residents.get(b.id) : rt.workers.get(b.id)).size;
+
+/** Densidade que vale para um prédio no tile: a indústria não tem limite. */
+function densityOf(state, info, tile) {
+  return info.zone === ZONE.INDUSTRIAL ? DENSITY.HIGH : state.map.density[tile];
+}
+
+/** Prédios grandes só nascem onde todo o terreno permite o nível máximo. */
+function allowsLarge(state, tile, info) {
+  const width = state.map.width;
+  for (let dy = 0; dy < info.size; dy++) {
+    for (let dx = 0; dx < info.size; dx++) {
+      const density = densityOf(state, info, tile + dy * width + dx);
+      if (DENSITY_INFO[density].maxLevel < MAX_LEVEL) return false;
+    }
+  }
+  return true;
 }
 
 const pct = (v) => `${Math.round(v * 100)}%`;

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BUILDINGS, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, TERRAIN, ZONE,
+  BUILDINGS, DENSITY, LARGE_BUILDINGS, LEVELS, MAX_LEVEL, TERRAIN, ZONE, floorsOf, maxFloorsFor,
 } from '../src/world/catalog.js';
 import { createWorld } from '../src/world/world.js';
 import { addBuilding, footprint, removeCitizen } from '../src/world/runtime.js';
@@ -35,7 +35,7 @@ test('catálogo: cada zona tem os três níveis e um prédio grande', () => {
   for (const [id, info] of Object.entries(BUILDINGS)) {
     if (info.utility) continue;
     assert.ok(info.residents > 0 !== info.jobs > 0, `${id}: mora ou trabalha`);
-    assert.ok(info.style.height > 0, `${id}: altura`);
+    assert.ok(info.perFloor > 0, `${id}: pessoas por andar`);
   }
 });
 
@@ -139,6 +139,7 @@ test('numa cidade rodando, os níveis aparecem sozinhos', () => {
 
 test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () => {
   const { design, designFor, VARIANTS } = await import('../src/render/designs.js');
+  const { MAX_FLOORS } = await import('../src/render/buildings.js');
   assert.equal(VARIANTS, 20);
   for (const type of Object.keys(BUILDINGS).filter((t) => !BUILDINGS[t].utility)) {
     const seen = new Set();
@@ -150,6 +151,11 @@ test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () 
         const [x0, y0, x1, y1] = part.box;
         const size = BUILDINGS[type].size;
         assert.ok(x0 >= 0 && y0 >= 0 && x1 <= size && y1 <= size && x0 < x1 && y0 < y1, `${type} #${i}: parte fora do lote`);
+        // Faixas (sacadas, letreiros) dentro da altura da própria parte.
+        for (const band of part.bands) assert.ok(band.at + band.thick <= part.h, `${type} #${i}: faixa acima da parte`);
+        // O renderizador só redesenha até MAX_FLOORS acima do lote.
+        const rise = part.roof ? part.roof.rise : 0;
+        assert.ok(part.lift + part.h + rise < MAX_FLOORS, `${type} #${i}: mais alto que MAX_FLOORS`);
       }
       seen.add(JSON.stringify(d));
     }
@@ -157,4 +163,37 @@ test('20 projetos diferentes para cada tipo (zona, nível e tamanho)', async () 
   }
   // O mesmo prédio sempre usa o mesmo projeto.
   assert.equal(designFor({ id: 77, type: 'casa' }), designFor({ id: 77, type: 'casa' }));
+
+  // Prédios que crescem: do primeiro ao último andar cabem em MAX_FLOORS, e
+  // cada andar a mais deixa o projeto mais alto, com a mesma cor.
+  for (const type of Object.keys(BUILDINGS).filter((t) => BUILDINGS[t].tall)) {
+    for (let i = 0; i < VARIANTS; i++) {
+      let last = 0;
+      for (let f = floorsOf(BUILDINGS[type]); f <= maxFloorsFor(BUILDINGS[type], DENSITY.HIGH); f++) {
+        const d = design(type, i, f);
+        const top = Math.max(...d.parts.map((p) => (p.lift || 0) + (p.h || 0) + (p.roof ? p.roof.rise : 0)));
+        assert.ok(top < MAX_FLOORS, `${type} #${i} com ${f} andares: mais alto que MAX_FLOORS`);
+        assert.ok(top > last, `${type} #${i}: ${f} andares não ficou mais alto`);
+        assert.equal(d.color, design(type, i).color);
+        last = top;
+      }
+    }
+  }
+});
+
+test('1 cidadão = 1 pessoa: os andares saem da capacidade', async () => {
+  const { design, VARIANTS } = await import('../src/render/designs.js');
+  assert.equal(floorsOf(BUILDINGS.casa), 1);
+  assert.equal(floorsOf(BUILDINGS.escritorios), 4);
+  assert.equal(floorsOf(BUILDINGS.usina_solar), 0);
+  for (const type of ['casa', 'sobrado', 'apartamentos', 'escritorios']) {
+    const n = floorsOf(BUILDINGS[type]);
+    for (let i = 0; i < VARIANTS; i++) {
+      // Andares ocupados (sem térreo de loja), somando as partes empilhadas
+      // da torre principal: nunca menos que o necessário, no máximo um a mais.
+      const floors = design(type, i).parts.filter((p) => p.floors && p.windows?.style !== 'shop');
+      const stacked = Math.max(...floors.map((p) => floors.filter((q) => q.lift < p.lift + 1e-9).reduce((a, q) => a + q.floors.count, 0)));
+      assert.ok(stacked >= n - 1 && stacked <= n + 1, `${type} #${i}: ${stacked} andares, esperado ~${n}`);
+    }
+  }
 });

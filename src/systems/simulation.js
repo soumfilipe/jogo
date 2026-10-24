@@ -9,6 +9,7 @@ import { growBuildings, moveIn, upgradeBuildings } from './growth.js';
 import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
 import { applyUtilityEffects, computeUtilities } from './utilities.js';
+import { convertLegacyJobs, openCompanies, reviewCompanies } from './companies.js';
 import { growForests } from './forest.js';
 
 export function tick(state, rt) {
@@ -29,10 +30,13 @@ export function tick(state, rt) {
     // lotados sobem de nível (têm prioridade sobre lotes novos).
     if (t % TICKS_PER_DAY === 0) {
       applyUtilityEffects(state, rt);
+      reviewCompanies(state, rt);
       computeUtilities(state, rt);
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
     }
+    // Andares vagos são alugados antes de surgirem prédios novos.
+    openCompanies(state, rt);
     growBuildings(state, rt);
     moveIn(state, rt);
     assignJobs(state, rt);
@@ -50,6 +54,7 @@ export function advance(state, rt, ticks) {
 /** Monta os índices derivados de um estado (novo ou recém-carregado). */
 export function prepare(state) {
   const rt = buildRuntime(state);
+  convertLegacyJobs(state, rt);
   computeDemand(state, rt);
   computeUtilities(state, rt);
   computeLandValue(state, rt); // para os mapas e o painel; a simulação recalcula antes de usar

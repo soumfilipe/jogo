@@ -2,7 +2,7 @@
 // typed arrays), sem classes, para o save ser uma cópia direta.
 
 import { createRng } from '../core/rng.js';
-import { ECONOMY, TERRAIN } from './catalog.js';
+import { DENSITY, ECONOMY, TERRAIN } from './catalog.js';
 import { generateForest, generateTerrain } from './terrain.js';
 
 export const DEFAULT_MAP_SIZE = 256;
@@ -35,10 +35,13 @@ export function createWorld({
       terrain,
       forest: generateForest(terrain, width, height, seed), // densidade da mata (0 = sem)
       zone: new Uint8Array(width * height),
+      // Densidade de cada tile zoneado (DENSITY no catálogo).
+      density: new Uint8Array(width * height).fill(DENSITY.MEDIUM),
       road: new Uint8Array(width * height),
     },
-    buildings: [], // { id, type, tile, builtAt }
+    buildings: [], // { id, type, tile, builtAt, floors? } (floors: só se cresceu andares)
     citizens: [], //  ver src/agents/citizens.js
+    companies: [], // { id, name, sector, building, floor, floors, foundedAt, understaffedDays? }
     pathQueue: [], // ids de cidadãos esperando o cálculo de rota
     // Energia e água importadas da região (só em saves anteriores aos serviços
     // públicos; acaba quando o jogador constrói a primeira usina/bomba).
