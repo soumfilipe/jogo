@@ -72,6 +72,9 @@ const saves = new SaveManager({
   onEvent: handleSaveEvent,
 });
 $('storage-mode').textContent = `Saves: ${saves.backend.label}`;
+if (saves.backend.migrated) {
+  status(`${saves.backend.migrated} save(s) movidos do localStorage para o IndexedDB`);
+}
 
 // ---------------------------------------------------------------------------
 // Partida
@@ -134,6 +137,7 @@ window.jogo = {
   advance: (ticks) => advance(state, rt, ticks),
   renderer,
   loop: loopStats,
+  saves,
   setSpeed,
 };
 
