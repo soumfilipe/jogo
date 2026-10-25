@@ -131,10 +131,12 @@ const MIGRATIONS = {
     return save;
   },
   // v8 -> v9: pesquisa. A cidade começa no primeiro marco, só com as
-  // tecnologias iniciais. Prédios que hoje dependem de pesquisa (como a usina
-  // solar) continuam funcionando; só não dá para construir novos.
+  // tecnologias iniciais, e a marca legacyResearch: ao carregar, ela recebe
+  // também as tecnologias de tudo o que já tinha (ver grantLegacyResearch em
+  // systems/research.js), para não perder o que podia construir.
   8: (save) => {
     save.data.research = createResearch(1);
+    save.data.legacyResearch = true;
     save.version = 9;
     return save;
   },

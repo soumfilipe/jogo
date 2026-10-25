@@ -23,7 +23,7 @@
 
 import { BUILDINGS, RESEARCH, ZONE } from '../world/catalog.js';
 import {
-  AREA_IDS, MARCOS, START_TECHS, TECHS, TECH_BY_ID, WORLD_END, marcoAt,
+  AREA_IDS, BUILDING_TECH, LEVEL_TECH, MARCOS, START_TECHS, TECHS, TECH_BY_ID, WORLD_END, marcoAt,
 } from '../world/techs.js';
 import { MONTHS_PER_YEAR } from '../core/time.js';
 import { computeMods, mod } from './mods.js';
@@ -45,6 +45,35 @@ export function createResearch(startMarco = 1) {
     done: TECHS.filter((t) => done.has(t.id)).map((t) => t.id),
     lastMonth: zeros(),
   };
+}
+
+/**
+ * Save de antes da pesquisa (marca legacyResearch, ver a migração 8 -> 9):
+ * conclui as tecnologias de tudo o que a cidade já tem (usinas, níveis de
+ * prédio) e os requisitos delas, e leva o relógio do mundo até o marco da
+ * mais recente. Assim a cidade continua podendo construir o que já tinha.
+ */
+export function grantLegacyResearch(state) {
+  if (!state.legacyResearch) return;
+  delete state.legacyResearch;
+  const keys = { [ZONE.RESIDENTIAL]: 'residential', [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial' };
+  const needed = new Set();
+  for (const b of state.buildings) {
+    const info = BUILDINGS[b.type];
+    const tech = info.utility ? BUILDING_TECH[b.type] : LEVEL_TECH[`${keys[info.zone]}:${info.level}`];
+    if (tech) needed.add(tech);
+  }
+  const done = new Set(state.research.done);
+  const grant = (id) => {
+    if (done.has(id)) return;
+    done.add(id);
+    for (const r of TECH_BY_ID.get(id).requires) grant(r);
+  };
+  for (const id of needed) grant(id);
+  // Mantém a ordem da árvore e o relógio no marco da mais recente.
+  state.research.done = TECHS.filter((t) => done.has(t.id)).map((t) => t.id);
+  const latest = Math.max(...state.research.done.map((id) => TECH_BY_ID.get(id).order));
+  state.research.world = Math.max(state.research.world, marcoAt(latest).from);
 }
 
 // ---------------------------------------------------------------------------

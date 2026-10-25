@@ -9,7 +9,7 @@ import { growBuildings, moveIn, upgradeBuildings } from './growth.js';
 import { computeLandValue } from './landvalue.js';
 import { closeMonth } from './economy.js';
 import { computeMods } from './mods.js';
-import { closeResearchMonth } from './research.js';
+import { closeResearchMonth, grantLegacyResearch } from './research.js';
 import { applyUtilityEffects, computeUtilities } from './utilities.js';
 import { convertLegacyJobs, openCompanies, reviewCompanies } from './companies.js';
 import { growForests } from './forest.js';
@@ -60,6 +60,7 @@ export function advance(state, rt, ticks) {
 /** Monta os índices derivados de um estado (novo ou recém-carregado). */
 export function prepare(state) {
   const rt = buildRuntime(state);
+  grantLegacyResearch(state);
   computeMods(state, rt);
   convertLegacyJobs(state, rt);
   computeDemand(state, rt);

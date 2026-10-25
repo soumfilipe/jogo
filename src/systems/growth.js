@@ -15,7 +15,7 @@ import { TICKS_PER_DAY } from '../core/time.js';
 import { createCitizen } from '../agents/citizens.js';
 import { isBuildable } from '../world/world.js';
 import { levelUnlocked, mod } from './mods.js';
-import { TECHS } from '../world/techs.js';
+import { LEVEL_TECH, TECH_BY_ID } from '../world/techs.js';
 
 const DEMAND_KEY = {
   [ZONE.RESIDENTIAL]: 'residential',
@@ -138,7 +138,9 @@ function nextStep(state, rt, b) {
   if (info.size === 1 && info.level < MAX_LEVEL) {
     const level = info.level + 1;
     if (level > DENSITY_INFO[density].maxLevel) return { limited: DENSITY_INFO[density] };
-    if (!levelUnlocked(rt, info.zone, level)) return { locked: LEVEL_TECH_NAME[`${DEMAND_KEY[info.zone]}:${level}`], level };
+    if (!levelUnlocked(rt, info.zone, level)) {
+      return { locked: TECH_BY_ID.get(LEVEL_TECH[`${DEMAND_KEY[info.zone]}:${level}`])?.name ?? 'pesquisa', level };
+    }
     return {
       level,
       label: `nível ${level}`,
@@ -159,9 +161,6 @@ function nextStep(state, rt, b) {
   };
 }
 
-// Nome da tecnologia que libera cada nível ('residential:3' -> 'Código de zoneamento').
-const LEVEL_TECH_NAME = {};
-for (const t of TECHS) for (const e of t.effects) if (e.level) LEVEL_TECH_NAME[e.level.join(':')] = t.name;
 
 /**
  * O que falta para o prédio crescer (para o painel de inspeção): null no
