@@ -1,5 +1,7 @@
 # Jogo
 
+[![Testes](https://github.com/soumfilipe/jogo/actions/workflows/testes.yml/badge.svg)](https://github.com/soumfilipe/jogo/actions/workflows/testes.yml)
+
 Jogo de construção de cidades (no estilo de [POLIS](https://polis-game.com/)) feito
 em JavaScript puro, que roda no navegador **localmente** e grava o progresso em
 **arquivos de save**.
