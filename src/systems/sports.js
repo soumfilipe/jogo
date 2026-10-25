@@ -15,6 +15,10 @@
 //               fixtures: [{ id, round, day, home, away (índices em teams),
 //               score: [casa, fora] | null, attendance? }], table: [{ pts, w,
 //               d, l, f, a }] (na ordem de teams), done }]
+//            Nas modalidades individuais (atletismo, ginástica, natação), cada
+//            fixture é uma etapa com todos os times: home = sede, away = null e
+//            score = a classificação da etapa (índices em teams, do 1º ao
+//            último); na tabela, w/d/l contam ouros, pratas e bronzes.
 //   history: últimas temporadas dos clubes da cidade [{ season, sport, club,
 //               name, division, position, teams, promoted, relegated, prize }]
 //   offers:  propostas de clubes de fora pelos craques [{ id, club, player,
@@ -37,7 +41,7 @@
 // uma ou duas semanas no dia de jogo. Os jogos são sorteados à meia-noite: o
 // público do jogo em casa anda até o local à tarde (ver tourism.js).
 
-import { SPORTS } from '../world/catalog.js';
+import { BUILDINGS, SPORTS } from '../world/catalog.js';
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '../core/time.js';
 import { chance, pick, random, randomInt } from '../core/rng.js';
 import { familyOf, removeCitizen, sendHome, setJob } from '../world/runtime.js';
@@ -165,7 +169,7 @@ export function foundClub(state, rt, cmd) {
   if (!unlockedSports(rt).includes(cmd.sport)) return { ok: false, cost: 0, reason: `${kind.name} ainda não está liberado pela pesquisa.` };
   const b = rt.buildingById.get(cmd.home);
   if (!b || !kind.venues.includes(b.type)) {
-    return { ok: false, cost: 0, reason: `Um clube de ${kind.name.toLowerCase()} joga em ${kind.venues.map((v) => (v === 'campo_futebol' ? 'campo de futebol' : v === 'estadio' ? 'estádio' : 'ginásio')).join(' ou ')}.` };
+    return { ok: false, cost: 0, reason: `Um clube de ${kind.name.toLowerCase()} joga em ${kind.venues.map((v) => BUILDINGS[v].name.toLowerCase()).join(' ou ')}.` };
   }
   if (activeClubs(state).some((c) => c.home === b.id && c.sport === cmd.sport)) return { ok: false, cost: 0, reason: `Esse local já tem um clube de ${kind.name.toLowerCase()}.` };
   if (SPORTS.foundCost > state.economy.money) return { ok: false, cost: SPORTS.foundCost, reason: `Dinheiro insuficiente (custa $${SPORTS.foundCost.toLocaleString('pt-BR')}).` };
@@ -273,11 +277,19 @@ export function newSeason(state, rt, sport, year) {
       [teams[i], teams[j]] = [teams[j], teams[i]];
     }
     const n = teams.length + (teams.length % 2);
-    const rounds = 2 * (n - 1);
+    const rounds = kind.individual ? SPORTS.meets : 2 * (n - 1);
     const start = seasonStart(sport, year);
     const first = start + ((kind.weekday - (start % 7)) + 7) % 7;
     const days = (kind.season[1] - kind.season[0] + 1) * 30;
     const every = 7 * Math.max(1, Math.floor((days - (first - start)) / rounds / 7));
+    const table = teams.map(() => ({ pts: 0, w: 0, d: 0, l: 0, f: 0, a: 0 }));
+    if (kind.individual) {
+      // Etapas: todos competem no mesmo dia; a sede gira entre os times.
+      const fixtures = [];
+      for (let r = 0; r < rounds; r++) fixtures.push({ id: sports.nextId++, round: r, day: first + r * every, home: r % teams.length, away: null, score: null });
+      sports.leagues.push({ id: sports.nextId++, sport, division: d, season: year, teams, fixtures, table, done: false });
+      continue;
+    }
     // Rodízio (método do círculo): turno e, no returno, os mandos trocados.
     const order = [...Array(n).keys()];
     const fixtures = [];
@@ -293,10 +305,7 @@ export function newSeason(state, rt, sport, year) {
       order.splice(1, 0, order.pop());
     }
     fixtures.sort((a, b) => a.day - b.day || a.id - b.id);
-    sports.leagues.push({
-      id: sports.nextId++, sport, division: d, season: year, teams, fixtures,
-      table: teams.map(() => ({ pts: 0, w: 0, d: 0, l: 0, f: 0, a: 0 })), done: false,
-    });
+    sports.leagues.push({ id: sports.nextId++, sport, division: d, season: year, teams, fixtures, table, done: false });
   }
 }
 
@@ -322,8 +331,11 @@ export function drawScore(rng, sport, home, away) {
     return s;
   }
   if (kind.score === 'pontos') {
-    const noise = () => (random(rng) + random(rng) + random(rng) + random(rng) - 2) * 12;
-    const s = [Math.round(75 + 30 * diff + noise()), Math.round(75 - 30 * diff + noise())];
+    // Basquete (pontos) e críquete (corridas): base e quanto a diferença de força pesa.
+    const base = kind.base ?? 75;
+    const spread = kind.spread ?? 30;
+    const noise = () => (random(rng) + random(rng) + random(rng) + random(rng) - 2) * 12 * (base / 75);
+    const s = [Math.round(base + spread * diff + noise()), Math.round(base - spread * diff + noise())];
     while (s[0] === s[1]) {
       s[0] += randomInt(rng, 3, 12); // prorrogação
       s[1] += randomInt(rng, 3, 12);
@@ -356,6 +368,47 @@ function attendance(state, rt, club, strength) {
   return Math.round(Math.min(capacity, pool * (0.3 + club.fans) * (0.5 + strength) * jitter));
 }
 
+/** Jogo ou etapa em casa: público, ingressos no caixa do clube e a taxa da prefeitura. */
+function gate(state, rt, club, fx, strength) {
+  fx.attendance = attendance(state, rt, club, strength);
+  const revenue = fx.attendance * SPORTS.ticket;
+  club.cash += Math.round(revenue * (1 - SPORTS.cityShare));
+  state.economy.sportsIncome = (state.economy.sportsIncome ?? 0) + Math.round(revenue * SPORTS.cityShare);
+}
+
+/** Etapa de modalidade individual: todos os times competem; a ordem dá pontos e medalhas. */
+function playMeet(state, rt, league, fx) {
+  const sports = state.sports;
+  const rng = state.rng;
+  const kind = SPORTS.kinds[league.sport];
+  const perf = league.teams.map((team, i) => teamStrength(state, rt, team) + (i === fx.home ? 0.02 : 0) + (random(rng) - 0.5) * 2 * SPORTS.meetNoise);
+  fx.score = league.teams.map((_, i) => i).sort((x, y) => perf[y] - perf[x] || x - y);
+  fx.score.forEach((i, pos) => {
+    const t = league.table[i];
+    t.pts += SPORTS.meetPoints[pos] ?? 0;
+    if (pos === 0) t.w++;
+    else if (pos === 1) t.d++;
+    else if (pos === 2) t.l++;
+  });
+  const host = league.teams[fx.home];
+  const hostClub = host.club !== undefined ? sports.clubs.find((c) => c.id === host.club) : null;
+  if (hostClub && !hostClub.closed) gate(state, rt, hostClub, fx, perf[fx.home]);
+  fx.score.forEach((i, pos) => {
+    const club = league.teams[i].club !== undefined ? sports.clubs.find((c) => c.id === league.teams[i].club) : null;
+    if (!club || club.closed) return;
+    club.fans = round3(clamp(club.fans + (pos < 3 ? 0.01 * (1 - club.fans) : pos >= 5 ? -0.005 : 0), 0.05, 1));
+    if (pos >= 3) return;
+    const star = squad(state, rt, club).sort((a, b) => b.skill - a.skill || a.id - b.id)[0];
+    const venue = rt.buildingById.get(club.home);
+    report(state, {
+      kind: 'medalha', sport: league.sport, club: club.name, name: star?.name ?? club.name, event: pick(rng, kind.events),
+      position: pos + 1, round: fx.round + 1, tile: venue?.tile ?? null,
+      // Onde foi a etapa: a cidade (sede da casa) ou a cidade da rival.
+      host: host.club !== undefined ? state.city.name : teamName(state, host).split(' de ').slice(1).join(' de ') || teamName(state, host),
+    });
+  });
+}
+
 function playMatch(state, rt, league, fx) {
   const sports = state.sports;
   const home = league.teams[fx.home];
@@ -380,12 +433,7 @@ function playMatch(state, rt, league, fx) {
   else if (h < a) (th.l++, ta.w++);
   else (th.d++, ta.d++);
 
-  if (homeClub && !homeClub.closed) {
-    fx.attendance = attendance(state, rt, homeClub, sh);
-    const revenue = fx.attendance * SPORTS.ticket;
-    homeClub.cash += Math.round(revenue * (1 - SPORTS.cityShare));
-    state.economy.sportsIncome = (state.economy.sportsIncome ?? 0) + Math.round(revenue * SPORTS.cityShare);
-  }
+  if (homeClub && !homeClub.closed) gate(state, rt, homeClub, fx, sh);
   for (const [club, mine, theirs, isHome] of [[homeClub, h, a, true], [awayClub, a, h, false]]) {
     if (!club || club.closed) continue;
     club.fans = round3(clamp(club.fans + (mine > theirs ? 0.01 * (1 - club.fans) : mine < theirs ? -0.008 : 0), 0.05, 1));
@@ -402,6 +450,8 @@ export function standings(league) {
   return league.teams.map((_, i) => i).sort((x, y) => {
     const a = league.table[x];
     const b = league.table[y];
+    // Individuais desempatam por ouros e pratas; coletivos, por saldo e gols pró.
+    if (SPORTS.kinds[league.sport].individual) return b.pts - a.pts || b.w - a.w || b.d - a.d || x - y;
     return b.pts - a.pts || (b.f - b.a) - (a.f - a.a) || b.f - a.f || x - y;
   });
 }
@@ -478,7 +528,8 @@ export function runSportsOfDay(state, rt) {
   }
   for (const league of sports.leagues) {
     if (league.done) continue;
-    for (const fx of league.fixtures) if (fx.day === now && !fx.score) playMatch(state, rt, league, fx);
+    const play = SPORTS.kinds[league.sport].individual ? playMeet : playMatch;
+    for (const fx of league.fixtures) if (fx.day === now && !fx.score) play(state, rt, league, fx);
     if (league.fixtures.every((f) => f.score)) endSeason(state, rt, league);
   }
   // Ficam as ligas desta temporada e da anterior (para o painel).

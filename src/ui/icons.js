@@ -129,6 +129,8 @@ export const ICONS = {
   museu: '<path class="t" d="M3 9 12 3.5 21 9z"/><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9M3 18h18M2 21h20"/>',
   campo_futebol: '<rect x="2.5" y="5" width="19" height="14" rx="1"/><path d="M12 5v14M2.5 9h3v6h-3M21.5 9h-3v6h3"/><circle cx="12" cy="12" r="2.8"/>',
   estadio: '<ellipse cx="12" cy="9" rx="9.5" ry="5.5"/><ellipse class="t" cx="12" cy="9" rx="5.5" ry="2.6"/><path d="M2.5 9v6c0 3.2 4.3 5.5 9.5 5.5s9.5-2.3 9.5-5.5V9"/>',
+  pista_atletismo: '<rect x="2.5" y="6" width="19" height="12" rx="6"/><rect class="t" x="7" y="9.5" width="10" height="5" rx="2.5"/>',
+  parque_aquatico: '<path d="M2 16c1.7 0 1.7 1.5 3.3 1.5S7 16 8.7 16s1.7 1.5 3.3 1.5 1.7-1.5 3.3-1.5 1.7 1.5 3.4 1.5S20.3 16 22 16"/><path d="M5 14V5.5a2 2 0 0 1 4 0M13 14V5.5a2 2 0 0 1 4 0M5 8h8M5 11.5h8"/>',
   parque_tematico: '<path d="M2 18c2.5 0 3-10 6-10s3.5 8 6.5 8S18 6 22 6"/><path d="M4 21v-3.5M8 21V8M12 21v-6M16 21v-6M20 21V7"/>',
   hotel: '<path d="M3 5v16M3 15h18v6M21 15v-3a3 3 0 0 0-3-3h-7v6"/><circle class="t" cx="7" cy="11.5" r="2"/>',
   arena_eventos: '<rect class="t" x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7"/>',

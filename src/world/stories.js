@@ -281,6 +281,14 @@ export const STORIES = {
       ['O resultado deixou tudo em aberto na tabela.', 'Os dois times saíram de campo reclamando da arbitragem.'],
     ],
   },
+  medalha: {
+    h: ['{atleta} leva {medalha} {prova}', '{modalidade}: {medalha} para o {clube}', 'Pódio: {clube} em {posicao}º na etapa'],
+    s: [
+      ['{atleta}, do {clube}, ficou com {a_medalha} {prova} na {etapa}ª etapa do campeonato de {modalidade}, em {sede}.'],
+      ['O clube terminou a etapa em {posicao}º lugar.'],
+      ['A torcida espera mais medalhas nas próximas etapas.', 'O técnico disse que o treino está dando resultado.'],
+    ],
+  },
   escolinha: {
     h: ['{clube} abre a categoria {categoria}', 'Escolinha do {clube} recebe a {categoria}'],
     s: [

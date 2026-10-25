@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SPORTS } from '../src/world/catalog.js';
+import { BUILDINGS, SPORTS } from '../src/world/catalog.js';
 import { applyCommand, rectTiles } from '../src/world/commands.js';
 import { advance, prepare } from '../src/systems/simulation.js';
 import { completeTech } from '../src/systems/research.js';
@@ -377,4 +377,76 @@ test('save: v18 ganha escolinha e mercado; salvar com proposta aberta e base che
   const { state: old } = readSave(JSON.stringify(v18));
   assert.deepEqual(old.sports.offers, []);
   assert.ok(old.sports.clubs.every((x) => x.academy === 0 && Array.isArray(x.youth)));
+});
+
+/** Cidade com pista de atletismo e parque aquático (e as pesquisas). */
+function venuesCity(seed = 5) {
+  const { state, rt } = testCity({ seed });
+  state.economy.money = 5_000_000;
+  applyCommand(state, rt, { type: 'bulldoze', tiles: rectTiles(S, 18, 8, 20, 10) });
+  applyCommand(state, rt, { type: 'bulldoze', tiles: rectTiles(S, 26, 18, 27, 19) });
+  assert.match(applyCommand(state, rt, { type: 'place', building: 'pista_atletismo', tile: 18 * S + 26 }).reason, /tecnologia/);
+  completeTech(state, rt, 'educacao_fisica');
+  completeTech(state, rt, 'parque_tematico');
+  assert.ok(applyCommand(state, rt, { type: 'place', building: 'pista_atletismo', tile: 18 * S + 26 }).ok);
+  assert.ok(applyCommand(state, rt, { type: 'place', building: 'parque_aquatico', tile: 8 * S + 18 }).ok);
+  advance(state, rt, TICKS_PER_DAY * 12);
+  return {
+    state, rt,
+    track: state.buildings.find((b) => b.type === 'pista_atletismo'),
+    pool: state.buildings.find((b) => b.type === 'parque_aquatico'),
+  };
+}
+
+test('pista e parque aquático: liberados pela pesquisa; clubes de atletismo e de natação', () => {
+  const { state, rt, track, pool } = venuesCity();
+  assert.match(applyCommand(state, rt, { type: 'club', sport: 'atletismo', home: pool.id }).reason, /pista de atletismo/);
+  assert.ok(applyCommand(state, rt, { type: 'club', sport: 'atletismo', home: track.id }).ok);
+  assert.ok(applyCommand(state, rt, { type: 'club', sport: 'natacao', home: pool.id }).ok);
+  const [run, swim] = state.sports.clubs;
+  assert.equal(squad(state, rt, run).length, SPORTS.kinds.atletismo.squad);
+  assert.equal(squad(state, rt, swim).length, SPORTS.kinds.natacao.squad);
+  assert.ok(BUILDINGS.parque_aquatico.utility.tourism.weekend > 0, 'parque aquático chama turistas');
+  assert.ok(pool && track);
+});
+
+test('etapas: 8 por temporada com a sede girando; pontos e medalhas fecham; o mais forte pontua mais', () => {
+  const { state, rt, track } = venuesCity(6);
+  applyCommand(state, rt, { type: 'club', sport: 'atletismo', home: track.id });
+  const club = state.sports.clubs[0];
+  for (const c of squad(state, rt, club)) c.skill = 0.95;
+  newSeason(state, rt, 'atletismo', 1);
+  const league = state.sports.leagues[0];
+  assert.equal(league.fixtures.length, SPORTS.meets);
+  assert.ok(league.fixtures.every((f) => f.away === null && f.day % 7 === SPORTS.kinds.atletismo.weekday));
+  assert.deepEqual(league.fixtures.map((f) => f.home), league.fixtures.map((f) => f.round % league.teams.length));
+  const start = today(state) + 1;
+  for (const f of league.fixtures) f.day = start + f.round;
+  const { state: copy } = readSave(JSON.stringify(createSave(state, { id: 'etapa' })));
+  const rcopy = prepare(copy);
+  untilDay(state, rt, start + SPORTS.meets);
+  untilDay(copy, rcopy, start + SPORTS.meets);
+  assert.deepEqual(copy.sports, state.sports, 'salvar antes das etapas e carregar dá o mesmo resultado');
+
+  assert.equal(league.done, true);
+  assert.ok(league.fixtures.every((f) => f.score.length === league.teams.length));
+  const t = league.table;
+  assert.equal(t.reduce((s, x) => s + x.pts, 0), SPORTS.meets * SPORTS.meetPoints.reduce((s, p) => s + p, 0));
+  for (const medal of ['w', 'd', 'l']) assert.equal(t.reduce((s, x) => s + x[medal], 0), SPORTS.meets);
+  const pos = standings(league).findIndex((i) => league.teams[i].club === club.id);
+  assert.equal(pos, 0, 'o time muito mais forte vence');
+  assert.equal(club.division, 1);
+  assert.equal(state.sports.history.at(-1).position, 1);
+  assert.ok(state.news.pending.some((n) => n.kind === 'medalha') || state.news.items.some((i) => i.cat === 'esporte' && /ouro/.test(i.body)));
+  assert.ok(league.fixtures.some((f) => league.teams[f.home].club === club.id && f.attendance > 0), 'público na etapa em casa');
+});
+
+test('críquete: placar em corridas, sem empate na prorrogação; pontos 2 e 0', () => {
+  const rng = createRng(4);
+  for (let i = 0; i < 200; i++) {
+    const s = drawScore(rng, 'criquete', 0.5, 0.45);
+    assert.ok(s[0] > 60 && s[0] < 300 && s[1] > 60 && s[1] < 300, String(s));
+    assert.notEqual(s[0], s[1]);
+  }
+  assert.deepEqual(matchPoints('criquete', [180, 150]), [2, 0]);
 });

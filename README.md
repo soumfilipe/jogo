@@ -320,6 +320,19 @@ Regras em `src/systems/sports.js`; números em `SPORTS` no catálogo.
 - Os resultados, títulos, acessos e rebaixamentos viram notícia (filtro
   **Esporte** no painel de notícias).
 
+### Modalidades individuais, críquete, pista e parque aquático
+
+- **Atletismo** (na **pista de atletismo**, com *Educação física escolar*), **ginástica
+  artística** (no ginásio) e **natação** (no **parque aquático**, com *Parque
+  temático*): a temporada tem **8 etapas** em vez de jogos.
+  - Todos os times competem no mesmo dia, numa sede que gira.
+  - A colocação dá pontos (10, 8, 6, 5, 4, 3, 2, 1) e medalhas (ouro, prata e bronze).
+  - A tabela soma pontos e medalhas; sobem e caem os mesmos dois de cada ponta.
+  - Etapa sediada pela cidade tem público e torcida andando até o local; pódio da cidade vira notícia.
+- **Críquete**: coletivo no campo do clube ou no estádio, aos domingos às 10h, com placar em
+  corridas e sem empate.
+- O **parque aquático** (3×3) também chama turistas, mais nos fins de semana.
+
 ### Base e mercado
 
 - **Escolinha**: cada clube pode abrir até três categorias, pagas pela prefeitura:

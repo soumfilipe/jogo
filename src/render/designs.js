@@ -977,6 +977,28 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  pista_atletismo(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7fb069', lift: 0 }];
+    // Pista vermelha em volta do gramado, com uma arquibancada pequena.
+    parts.push({ kind: 'slab', box: [0.12, 0.3, 1.88, 1.7], color: '#c0703f', lines: true, lift: 0.01 });
+    parts.push({ kind: 'slab', box: [0.38, 0.55, 1.62, 1.45], color: '#4f9a48', lift: 0.02 });
+    const c = r.pick(['#3f6fc0', '#2c3e50', '#c0392b']);
+    parts.push(block([0.3, 1.74, 1.7, 1.92], 0, 0.3, wall(c, mixHex(c, '#000000', 0.2))));
+    return parts;
+  },
+
+  parque_aquatico(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#d9c79a', lift: 0 }];
+    // Piscinas, um tobogã em espiral (torre e discos) e um quiosque.
+    parts.push({ kind: 'slab', box: [0.2, 0.2, 1.6, 1.4], color: '#5fb7d8', lines: true, lift: 0.01 });
+    parts.push({ kind: 'slab', box: [0.3, 1.7, 1.4, 2.8], color: '#7fd0ea', lift: 0.01 });
+    parts.push({ kind: 'cylinder', cx: 2.3, cy: 0.8, r: 0.18, lift: 0, h: 1.4, color: '#e8b931', top: '#f7dc6f' });
+    const colors = ['#e05a47', '#3f6fc0', '#16a085'];
+    for (let k = 0; k < 3; k++) parts.push({ kind: 'cylinder', cx: 2.3, cy: 0.8, r: 0.4 - k * 0.08, lift: 0.35 + k * 0.4, h: 0.06, color: r.pick(colors), top: colors[k] });
+    parts.push(block([1.8, 2.0, 2.7, 2.7], 0, 0.45, wall('#f0e6d2', '#d4c8b0'), { roof: { kind: 'hip', color: '#e05a47', rise: 0.25 }, doors: { count: 1, color: '#6f4e37' } }));
+    return parts;
+  },
+
   estadio(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#9a9a8a', lift: 0 }];
     const c = r.pick(['#c0392b', '#2c3e50', '#3f6fc0', '#3d8f5a']);
