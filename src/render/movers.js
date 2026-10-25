@@ -1,6 +1,7 @@
 // Como os cidadãos em viagem aparecem na tela: carrinhos coloridos andando
-// pela mão direita da rua. É só desenho: a posição simulada (c.x, c.y) fica
-// no meio da rua e não muda.
+// pela mão direita da rua (ônibus, BRT e VLT maiores, na cor da linha; o
+// metrô anda por baixo e não aparece). É só desenho: a posição simulada
+// (c.x, c.y) fica no meio da rua e não muda.
 
 import { hash2 } from '../core/rng.js';
 import { worldToScreen } from './camera.js';
@@ -14,8 +15,13 @@ export const CAR_COLORS = [
 const LANE_OFFSET = 0.2;
 const CAR_LENGTH = 0.26;
 const CAR_WIDTH = 0.14;
+const BUS_LENGTH = 0.5;
+
+// Cor dos veículos de cada modo de transporte público.
+export const MODE_COLORS = { onibus: '#e8b931', brt: '#c0392b', vlt: '#16a085' };
 
 export function carColor(c) {
+  if (c.mode) return MODE_COLORS[c.mode];
   return CAR_COLORS[Math.floor(hash2(c.id, 5) * CAR_COLORS.length)];
 }
 
@@ -27,7 +33,7 @@ export function moverPose(state, c) {
   const { width, road } = state.map;
   const tx = Math.floor(c.x);
   const ty = Math.floor(c.y);
-  if (!road[ty * width + tx]) return null;
+  if (c.mode === 'metro' || !road[ty * width + tx]) return null;
 
   const next = c.path[Math.min(c.step + 1, c.path.length - 1)];
   const nx = (next % width) + 0.5;
@@ -45,14 +51,15 @@ export function moverPose(state, c) {
   dx /= norm;
   dy /= norm;
   // Com y crescendo "para baixo", a direita de (dx, dy) é (-dy, dx).
-  return { x: c.x - dy * LANE_OFFSET, y: c.y + dx * LANE_OFFSET, dx, dy, depth: tx + ty };
+  const length = c.mode ? BUS_LENGTH : CAR_LENGTH;
+  return { x: c.x - dy * LANE_OFFSET, y: c.y + dx * LANE_OFFSET, dx, dy, length, depth: tx + ty };
 }
 
 /** Adiciona ao `path` o carrinho (um retângulo no chão, alinhado à rua). */
 export function addCar(path, cam, pose) {
-  const { x, y, dx, dy } = pose;
-  const lx = dx * CAR_LENGTH / 2;
-  const ly = dy * CAR_LENGTH / 2;
+  const { x, y, dx, dy, length = CAR_LENGTH } = pose;
+  const lx = dx * length / 2;
+  const ly = dy * length / 2;
   const wx = -dy * CAR_WIDTH / 2;
   const wy = dx * CAR_WIDTH / 2;
   const corners = [

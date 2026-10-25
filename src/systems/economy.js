@@ -15,6 +15,7 @@ import { BUILDINGS, ECONOMY, TAX_ZONES, ZONE } from '../world/catalog.js';
 import { jobsOf, mod, utilityOutput, utilityUpkeep } from './mods.js';
 import { researchOutput } from './research.js';
 import { policiesCost } from './policies.js';
+import { freightFactor } from './logistics.js';
 
 const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial' };
 
@@ -38,7 +39,9 @@ export function monthlyBudget(state, rt) {
       }
     }
     const key = ZONE_KEY[info.zone];
-    if (key && b.abandoned === undefined) jobsFilled[key] += workers * mod(rt, `income.${key}.${info.level}`) * mod(rt, `income.${key}`);
+    if (key && b.abandoned === undefined) {
+      jobsFilled[key] += workers * mod(rt, `income.${key}.${info.level}`) * mod(rt, `income.${key}`) * freightFactor(rt, b);
+    }
   }
 
   let roadTiles = 0;
@@ -50,8 +53,10 @@ export function monthlyBudget(state, rt) {
     commercial: Math.round(jobsFilled.commercial * ECONOMY.incomePerJob * taxes.commercial * all),
     industrial: Math.round(jobsFilled.industrial * ECONOMY.incomePerJob * taxes.industrial * all),
     statal: Math.round(statal),
+    // Passagens do transporte público juntadas neste mês (ver transit.js).
+    fares: Math.round(state.economy.fares ?? 0),
   };
-  income.total = income.residential + income.commercial + income.industrial + income.statal;
+  income.total = income.residential + income.commercial + income.industrial + income.statal + income.fares;
 
   const expenses = {
     roads: Math.round(roadTiles * mod(rt, 'roadUpkeep', ECONOMY.roadUpkeepPerMonth) * mod(rt, 'maintenance')),
@@ -70,6 +75,7 @@ export function closeMonth(state, rt) {
   const budget = monthlyBudget(state, rt);
   const economy = state.economy;
   economy.money += budget.net;
+  economy.fares = 0; // as passagens do mês já entraram na receita
 
   for (const loan of economy.loans) {
     const interest = Math.round(loan.balance * monthlyRate(loan));

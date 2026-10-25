@@ -797,6 +797,93 @@ const UTILITY_GENERATORS = {
     parts.push({ kind: 'antenna', cx: 0.5, cy: 0.5, lift: 2.5, h: 0.8 });
     return parts;
   },
+
+  base_samu() {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#7a7d84', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.88, 0.55], 0, 0.7, wall('#f4f5f6', '#d6d9dd'), {
+      doors: { count: 2, color: '#c23b3b' }, windows: { cols: 3, style: 'grid' }, bands: [{ at: 0.6, thick: 0.06, color: '#c23b3b' }],
+    }));
+    // Ambulâncias no pátio.
+    for (const x of [0.18, 0.55]) parts.push(block([x, 0.66, x + 0.28, 0.86], 0, 0.18, wall('#f4f5f6', '#e6e2da'), { top: '#e05a47' }));
+    return parts;
+  },
+
+  ponto_onibus(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 0.96, 0.96], color: '#5b5f66', lines: true, lift: 0 }];
+    // Garagem com ônibus estacionados.
+    parts.push(block([0.1, 0.1, 0.9, 0.4], 0, 0.6, wall('#d9dde2', '#b9bec7'), { doors: { count: 3, color: '#2c3e50' } }));
+    const color = r.pick(['#e8b931', '#3f6fc0', '#3d8f5a', '#c23b3b']);
+    for (const x of [0.12, 0.42, 0.72]) parts.push(block([x, 0.5, x + 0.18, 0.9], 0, 0.22, wall(color, mixHex(color, '#000000', 0.2)), { top: '#e6e2da' }));
+    return parts;
+  },
+
+  estacao_brt() {
+    const parts = [{ kind: 'slab', box: [0.04, 0.3, 0.96, 0.7], color: '#c0703f', lift: 0 }];
+    // Estação-tubo de vidro sobre a plataforma.
+    parts.push(block([0.1, 0.38, 0.9, 0.62], 0.05, 0.4, wall('#9fc3e0', '#7ea3c2'), { top: '#3d8f5a', windows: { cols: 5, style: 'bands' } }));
+    return parts;
+  },
+
+  estacao_vlt() {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 0.96, 0.96], color: '#9a9a8a', lift: 0 }];
+    // Trilhos, plataforma coberta e o bonde.
+    parts.push({ kind: 'slab', box: [0.04, 0.42, 0.96, 0.58], color: '#6b5a4a', lines: true, lift: 0.01 });
+    parts.push(block([0.1, 0.12, 0.9, 0.32], 0, 0.06, wall('#d9dde2', '#b9bec7')));
+    parts.push(block([0.12, 0.14, 0.88, 0.3], 0.45, 0.04, wall('#3f6fc0', '#2f5aa0'), { top: '#4f8ff7' }));
+    for (const x of [0.15, 0.85]) parts.push({ kind: 'cylinder', cx: x, cy: 0.22, r: 0.025, lift: 0.06, h: 0.39, color: '#5b5f66', top: '#5b5f66' });
+    parts.push(block([0.08, 0.44, 0.92, 0.56], 0.02, 0.24, wall('#f4f5f6', '#c23b3b'), { top: '#e6e2da', windows: { cols: 6, style: 'bands' } }));
+    return parts;
+  },
+
+  estacao_metro() {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#b5b0a6', lift: 0 }];
+    // Só o acesso aparece: a estação fica embaixo.
+    parts.push(block([0.2, 0.2, 0.8, 0.6], 0, 0.45, wall('#9fc3e0', '#7ea3c2'), { top: '#5b7fa8', doors: { count: 1, color: '#2c3e50' } }));
+    parts.push(block([0.62, 0.68, 0.78, 0.84], 0, 0.9, wall('#c23b3b', '#a03024'), { top: '#f4f5f6' }));
+    return parts;
+  },
+
+  patio_ferroviario(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8a826f', lift: 0 }];
+    for (const y of [0.25, 0.65, 1.05]) parts.push({ kind: 'slab', box: [0.04, y, 1.96, y + 0.16], color: '#6b5a4a', lines: true, lift: 0.01 });
+    // Vagões de carga nos trilhos e um armazém.
+    for (const [x, y] of [[0.15, 0.25], [0.75, 0.25], [0.4, 0.65], [1.3, 1.05]]) {
+      const c = r.pick(IND_WALLS);
+      parts.push(block([x, y + 0.01, x + 0.5, y + 0.15], 0.02, 0.22, c));
+    }
+    parts.push(block([0.2, 1.35, 1.8, 1.85], 0, 0.8, r.pick(IND_WALLS), { roof: { kind: 'gable-x', color: '#6f5b4b', rise: 0.3 }, doors: { count: 3, color: '#5c5f68' } }));
+    return parts;
+  },
+
+  porto(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8c8f94', lift: 0 }];
+    // Pilhas de contêineres e um guindaste.
+    const colors = ['#c23b3b', '#3f6fc0', '#d9822b', '#3d8f5a', '#e8b931'];
+    for (let i = 0; i < 6; i++) {
+      const x = 0.15 + (i % 3) * 0.45;
+      const y = 0.2 + Math.floor(i / 3) * 0.4;
+      const c = r.pick(colors);
+      parts.push(block([x, y, x + 0.38, y + 0.3], 0, 0.2 * (1 + Math.floor(r.range(0, 3))), wall(c, mixHex(c, '#000000', 0.2))));
+    }
+    parts.push(block([1.55, 0.2, 1.65, 0.3], 0, 2.0, wall('#e8b931', '#c9a020')));
+    parts.push(block([1.55, 1.1, 1.65, 1.2], 0, 2.0, wall('#e8b931', '#c9a020')));
+    parts.push(block([1.5, 0.15, 1.7, 1.25], 2.0, 0.12, wall('#e8b931', '#c9a020')));
+    parts.push(block([0.15, 1.35, 1.2, 1.85], 0, 0.6, r.pick(IND_WALLS), { doors: { count: 2, color: '#5c5f68' } }));
+    return parts;
+  },
+
+  centro_distribuicao(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5b5f66', lines: true, lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.88, 1.25], 0, 1.0, r.pick([wall('#e9edf2', '#c8ced6'), wall('#cfc9b8', '#b0aa99')]), {
+      doors: { count: 6, color: '#5c5f68' }, bands: [{ at: 0.9, thick: 0.08, color: r.pick(STRIPES) }],
+    }));
+    // Caminhões nas docas.
+    for (const x of [0.2, 0.7, 1.2]) {
+      parts.push(block([x, 1.4, x + 0.25, 1.85], 0, 0.3, wall('#f4f5f6', '#d6d9dd')));
+      parts.push(block([x, 1.32, x + 0.25, 1.42], 0, 0.22, wall('#3f6fc0', '#2f5aa0')));
+    }
+    return parts;
+  },
 };
 
 // Telhado dente de serra: várias águas estreitas em sequência.

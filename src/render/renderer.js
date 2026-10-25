@@ -58,7 +58,8 @@ const WAVE_GROUPS = 4;
 // Chão da mata, de rala a fechada.
 const FOREST_GROUNDS = ['#6aa452', '#609b4b', '#578f45', '#4e843f'];
 const SAND = '#d9c98f';
-const ROAD = '#5c5f68';
+// Rua, avenida e via expressa (ver ROAD_TYPES): quanto mais larga, mais escura.
+const ROAD_COLORS = [null, '#5c5f68', '#4c4f57', '#3d4047'];
 const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
 // Cor dos lotes vazios por zona e densidade: quanto mais densa, mais forte.
 const DENSITY_TINT = { [DENSITY.LOW]: 0.28, [DENSITY.MEDIUM]: 0.45, [DENSITY.HIGH]: 0.65 };
@@ -87,6 +88,8 @@ export const MAP_MODES = {
   saude: { name: 'Saúde', layer: 'healthMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
   crime: { name: 'Segurança', label: 'Crime', layer: 'crimeMap', from: '#8e1b1b', mid: '#f1c40f', to: '#2ecc71' },
   satisfacao: { name: 'Satisfação', layer: 'satisfactionMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  // Trânsito: só as ruas mudam de cor (verde livre, vermelho parado).
+  transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
 };
 const MAP_STEPS = 10;
 
@@ -448,8 +451,10 @@ export class Renderer {
     const ground = (x, y) => {
       const tile = y * width + x;
       let color;
-      if (road[tile]) color = ROAD;
-      else if (mode && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
+      const traffic = road[tile] && mode?.roads ? rt[mode.layer]?.[tile] : undefined;
+      if (traffic !== undefined && !Number.isNaN(traffic)) color = mode.colors[Math.round(traffic * MAP_STEPS)];
+      else if (road[tile]) color = ROAD_COLORS[road[tile]];
+      else if (mode && !mode.roads && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
         color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
       }
       else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]][state.map.density[tile]];

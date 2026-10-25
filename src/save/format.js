@@ -22,7 +22,7 @@ import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { hash2 } from '../core/rng.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -175,6 +175,12 @@ const MIGRATIONS = {
     data.health ??= { epidemicUntil: 0 };
     data.wellbeing ??= { health: 0.55, crime: 0, satisfaction: 0.5 };
     save.version = 11;
+    return save;
+  },
+  // v11 -> v12: passagens do transporte público acumuladas no mês.
+  11: (save) => {
+    save.data.economy.fares ??= 0;
+    save.version = 12;
     return save;
   },
 };

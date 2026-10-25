@@ -1,10 +1,10 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
 import { radiusOf, seatsOf } from './systems/education.js';
 import { serviceRadius } from './systems/services.js';
 
 const SERVICE_NAMES = { saude: 'saúde', policia: 'menos crime', bombeiros: 'apaga incêndios', lazer: 'lazer' };
-import { applyCommand, costs, lineTiles, planCommand, rectTiles } from './world/commands.js';
+import { applyCommand, costs, lineTiles, planCommand, rectTiles, roadCost, roadUnlocked } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
 import { advance, prepare, tick } from './systems/simulation.js';
@@ -33,7 +33,10 @@ const canvas = $('map');
 // Ferramentas: `shape` define como o arraste seleciona tiles.
 const TOOLS = [
   { id: 'inspect', name: 'Inspecionar', key: 'v' },
-  { id: 'road', name: 'Estrada', key: 'e', shape: 'line', color: 'rgba(255,255,255,0.35)' },
+  { id: 'road', name: 'Estrada', key: 'e', shape: 'line', road: 1, color: 'rgba(255,255,255,0.35)' },
+  // Avenida e via expressa: sobre uma rua, melhoram ela (paga só a diferença).
+  { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57' },
+  { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047' },
   ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL].map((zone) => ({
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
@@ -58,7 +61,12 @@ const TOOLS = [
     ['posto_saude', 'Vacinação', '#4f8ff7', 'services'], ['caps', 'CAPS', '#8e44ad', 'services'],
     ['delegacia', 'Delegacia', '#2c3e50', 'services'], ['guarda_municipal', 'Guarda', '#16a085', 'services'],
     ['central_cameras', 'Câmeras', '#5b7fa8', 'services'], ['quartel_bombeiros', 'Bombeiros', '#c0392b', 'services'],
+    ['base_samu', 'SAMU', '#e05a47', 'services'],
     ['parque', 'Praça', '#7fb069', 'leisure'], ['cinema', 'Cinema', '#8e44ad', 'leisure'], ['ginasio', 'Ginásio', '#3f6fc0', 'leisure'],
+    ['ponto_onibus', 'Ônibus', '#e8b931', 'transit'], ['estacao_brt', 'BRT', '#c0392b', 'transit'],
+    ['estacao_vlt', 'VLT', '#16a085', 'transit'], ['estacao_metro', 'Metrô', '#9fc3e0', 'transit'],
+    ['patio_ferroviario', 'Pátio', '#8a826f', 'freight'], ['porto', 'Porto', '#3f6fc0', 'freight'],
+    ['centro_distribuicao', 'Distribuição', '#cfc9b8', 'freight'],
   ].map(([building, label, swatch, group], i) => ({
     id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch, group,
     separatorBefore: i === 0,
@@ -69,7 +77,7 @@ const TOOLS = [
 function toolCost(t) {
   if (t.building) return `$${utilityCost(rt, t.building).toLocaleString('pt-BR')}`;
   const c = costs(rt);
-  if (t.id === 'road') return `$${round(c.road)}/tile`;
+  if (t.road) return `$${round(roadCost(rt, t.road))}/tile`;
   if (t.zone) return `$${round(c.zone)}/tile`;
   if (t.id === 'bulldoze') return 'varia';
   return '';
@@ -322,10 +330,13 @@ function utilityTitle(id) {
 }
 
 /** Tecnologia que falta para um prédio, em texto curto ("Usina solar, marco 4"). */
-function lockText(building) {
-  const tech = TECH_BY_ID.get(BUILDING_TECH[building]);
+function lockText(t) {
+  const tech = TECH_BY_ID.get(t.road ? ROAD_TYPES[t.road].tech : BUILDING_TECH[t.building]);
   return `${tech.name} · marco ${tech.marco}`;
 }
+
+/** A ferramenta ainda depende de pesquisa? */
+const toolLocked = (t) => (t.building ? !isUnlocked(rt, t.building) : t.road ? !roadUnlocked(rt, t.road) : false);
 
 // Liberações e preços mudam com a pesquisa: atualiza os botões.
 let toolsKey = '';
@@ -335,7 +346,7 @@ function refreshTools() {
   toolsKey = key;
   for (const t of TOOLS) {
     const buttons = document.querySelectorAll(`[data-tool="${t.id}"]`);
-    const locked = t.building && !isUnlocked(rt, t.building);
+    const locked = toolLocked(t);
     for (const button of buttons) {
       const mobile = button.closest('.sheet');
       if (!mobile) {
@@ -344,10 +355,10 @@ function refreshTools() {
         continue;
       }
       button.disabled = Boolean(locked);
-      button.querySelector('small').textContent = locked ? `🔒 ${lockText(t.building)}` : toolCost(t);
+      button.querySelector('small').textContent = locked ? `🔒 ${lockText(t)}` : toolCost(t);
     }
   }
-  if (tool.building && !isUnlocked(rt, tool.building)) selectTool(TOOLS[0]);
+  if (toolLocked(tool)) selectTool(TOOLS[0]);
 }
 
 function selectTool(t) {
@@ -434,7 +445,7 @@ function announceEvents() {
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
-const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j' };
+const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j', transito: 'm' };
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);
@@ -535,7 +546,7 @@ function toolCommand() {
   const tiles = tool.shape === 'line'
     ? lineTiles(width, start.x, start.y, hover.x, hover.y)
     : rectTiles(width, start.x, start.y, hover.x, hover.y);
-  if (tool.id === 'road') return { type: 'road', tiles };
+  if (tool.road) return { type: 'road', road: tool.road, tiles };
   if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
   return usesDensity(tool) ? { type: 'zone', zone: tool.zone, density, tiles } : { type: 'zone', zone: tool.zone, tiles };
 }

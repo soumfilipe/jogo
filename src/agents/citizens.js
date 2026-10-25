@@ -15,12 +15,15 @@
 //   x, y:  posição em tiles (contínua),
 //   path:  tiles da viagem atual | null,   step: índice no path
 //   edu, field, school, stage, study: escolaridade e estudo (ver systems/education.js)
+//   mode:  transporte da viagem atual ('onibus', 'brt', 'vlt', 'metro'; null = carro)
 // }
 //
 // Crianças moram com a família e estudam; trabalham dos 18 aos 64 anos (ver
 // systems/demography.js), menos quem estuda em tempo integral.
 
-import { BUILDINGS, CITIZEN_SPEED, SECTORS, SHIFTS } from '../world/catalog.js';
+import { BUILDINGS, CITIZEN_SPEED, SECTORS, SHIFTS, TRAFFIC } from '../world/catalog.js';
+import { congestionFactor, countOccupancy, roadSpeed } from '../systems/traffic.js';
+import { chooseMode, payFare } from '../systems/transit.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { pick, random, randomInt } from '../core/rng.js';
 import {
@@ -71,6 +74,7 @@ export function createCitizen(state, rt, home, { age, edu = 1, lastName } = {}) 
     y,
     path: null,
     step: 0,
+    mode: null,
   });
 }
 
@@ -155,7 +159,10 @@ function processPathQueue(state, rt) {
       continue;
     }
     const [x, y] = tileCenter(state, from.tile);
-    Object.assign(c, { state: 'viajando', path: [from.tile, ...route, to.tile], step: 0, x, y });
+    // Transporte público, se a casa e o trabalho estão no raio de estações do mesmo modo.
+    const mode = chooseMode(rt, from, to);
+    if (mode) payFare(state, mode);
+    Object.assign(c, { state: 'viajando', path: [from.tile, ...route, to.tile], step: 0, x, y, mode });
     rt.movers.add(c.id);
   }
 }
@@ -181,11 +188,20 @@ function evictOldest(map, count) {
 }
 
 function moveCitizens(state, rt) {
-  const width = state.map.width;
+  if (rt.movers.size === 0) return;
+  const { width, road } = state.map;
   const speed = mod(rt, 'citizenSpeed', CITIZEN_SPEED);
+  // Ocupação das ruas no começo do tick: a velocidade de cada um depende só
+  // dela (e não da ordem em que os viajantes andam).
+  countOccupancy(state, rt);
   for (const id of rt.movers) {
     const c = rt.citizenById.get(id);
-    let budget = speed;
+    const tile = Math.floor(c.y) * width + Math.floor(c.x);
+    const type = road[tile];
+    const mode = c.mode ? TRAFFIC.modes[c.mode] : null;
+    let factor = mode ? mode.speed : 1;
+    if (type) factor *= roadSpeed(rt, type) * (mode?.ignoresTraffic ? 1 : congestionFactor(rt, tile, type));
+    let budget = speed * factor;
     while (budget > 0 && c.step < c.path.length - 1) {
       const next = c.path[c.step + 1];
       const nx = (next % width) + 0.5;
@@ -207,6 +223,7 @@ function moveCitizens(state, rt) {
     if (c.step >= c.path.length - 1) {
       c.state = c.dest;
       c.dest = null;
+      c.mode = null;
       c.path = null;
       c.step = 0;
       rt.movers.delete(id);

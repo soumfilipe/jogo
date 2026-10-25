@@ -247,6 +247,47 @@ export const BUILDINGS = {
     name: 'Ginásio poliesportivo', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 10,
     utility: { power: 0, water: 0, cost: 12_000, upkeep: 300, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 16, strength: 0.8 } },
   },
+  base_samu: {
+    name: 'Base do SAMU', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 8_000, upkeep: 350, pollution: 0, area: 'saude', service: { kind: 'saude', radius: 22, strength: 0.5 } },
+  },
+
+  // --- Transporte público (ver systems/transit.js) ----------------------------
+  //   utility.transit: { mode, radius } — quem mora E trabalha no raio de
+  //     estações do mesmo modo viaja nele em vez de carro.
+  ponto_onibus: {
+    name: 'Garagem de ônibus', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 12,
+    utility: { power: 0, water: 0, cost: 5_000, upkeep: 250, pollution: 3, area: 'engenharia', transit: { mode: 'onibus', radius: 10 } },
+  },
+  estacao_brt: {
+    name: 'Estação de BRT', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
+    utility: { power: 0, water: 0, cost: 9_000, upkeep: 300, pollution: 1, area: 'engenharia', transit: { mode: 'brt', radius: 12 } },
+  },
+  estacao_vlt: {
+    name: 'Estação de VLT', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
+    utility: { power: 0, water: 0, cost: 14_000, upkeep: 350, pollution: 0, area: 'engenharia', transit: { mode: 'vlt', radius: 12 } },
+  },
+  estacao_metro: {
+    name: 'Estação de metrô', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 30_000, upkeep: 600, pollution: 0, area: 'engenharia', transit: { mode: 'metro', radius: 14 } },
+  },
+
+  // --- Carga (ver systems/logistics.js) ----------------------------------------
+  //   utility.freight: { range, bonus } — terminal de carga: a indústria a até
+  //     `range` tiles de rua dele exporta a produção; `bonus` soma à receita.
+  //   utility.supply: { radius } — abastece o comércio no raio (mais receita).
+  patio_ferroviario: {
+    name: 'Pátio ferroviário de carga', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 20,
+    utility: { power: 0, water: 0, cost: 8_000, upkeep: 200, pollution: 4, area: 'abastecimento', freight: { range: 40, bonus: 0 } },
+  },
+  porto: {
+    name: 'Porto de contêineres', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
+    utility: { power: 0, water: 0, cost: 35_000, upkeep: 500, pollution: 6, needsWater: true, area: 'abastecimento', freight: { range: 80, bonus: 0.1 } },
+  },
+  centro_distribuicao: {
+    name: 'Centro de distribuição', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 30,
+    utility: { power: 0, water: 0, cost: 20_000, upkeep: 300, pollution: 2, area: 'abastecimento', freight: { range: 40, bonus: 0 }, supply: { radius: 30 } },
+  },
 };
 
 /**
@@ -341,6 +382,33 @@ export const FOREST = {
   growChance: 0.05,
   tilesPerTick: 5,
   spreadDensity: 3,
+};
+
+// Tipos de rua (o valor de state.map.road: 0 é sem rua). `speed` multiplica a
+// velocidade dos carros, `capacity` é quantos carros cabem num tile antes de
+// engarrafar, `cost` é o preço por tile (a avenida e a via expressa vêm da
+// pesquisa) e `noise` é o barulho que ela faz em volta (desvaloriza o terreno).
+export const ROAD_TYPES = {
+  1: { id: 'rua', name: 'Rua', speed: 1, capacity: 3, cost: 10, noise: 0 },
+  2: { id: 'avenida', name: 'Avenida', speed: 1.4, capacity: 6, cost: 25, noise: 0.03, tech: 'via_expressa' },
+  3: { id: 'expressa', name: 'Via expressa', speed: 2, capacity: 10, cost: 60, noise: 0.08, tech: 'via_expressa' },
+};
+
+// Trânsito (ver systems/traffic.js): acima da capacidade do tile, os carros
+// andam mais devagar: velocidade ÷ (1 + slowdown × excesso).
+export const TRAFFIC = {
+  slowdown: 1.5,
+  // Peso de um passageiro de transporte público nas ruas (o ônibus leva muitos).
+  busShare: 0.15,
+  // Velocidade de cada modo de transporte público (o metrô não pega trânsito).
+  modes: {
+    onibus: { name: 'Ônibus', speed: 1, ignoresTraffic: false, fare: 0.04 },
+    brt: { name: 'BRT', speed: 1.3, ignoresTraffic: true, fare: 0.05 },
+    vlt: { name: 'VLT', speed: 1.4, ignoresTraffic: true, fare: 0.05 },
+    metro: { name: 'Metrô', speed: 2, ignoresTraffic: true, fare: 0.06 },
+  },
+  // Poluição de um carro parado num tile (somada à da indústria no mapa).
+  carPollution: 0.1,
 };
 
 export const COSTS = {

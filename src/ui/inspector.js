@@ -6,6 +6,8 @@ import {
 } from '../world/catalog.js';
 import { minEduFor, radiusOf, seatsOf } from '../systems/education.js';
 import { serviceRadius } from '../systems/services.js';
+import { transitRadius } from '../systems/transit.js';
+import { EXPORT, freightFactor } from '../systems/logistics.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
@@ -74,6 +76,7 @@ function renderBuilding(el, b, state, rt) {
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
       <dt>Poluição</dt><dd>${pct(rt.pollution[b.tile])}</dd>
       <dt>Acesso a estrada</dt><dd>${access ? 'Sim' : NO}</dd>
+      ${freightRow(rt, b)}
       ${service ? `<dt>Energia</dt><dd>${service.power ? 'Sim' : NO}</dd>
       <dt>Água</dt><dd>${service.water ? 'Sim' : NO}</dd>` : ''}
       ${b.unservedDays ? `<dt>Dias sem serviço</dt><dd>${b.unservedDays}</dd>` : ''}
@@ -87,6 +90,20 @@ function renderBuilding(el, b, state, rt) {
 }
 
 const NO = '<b style="color:#ff8a80">Não</b>';
+const MODE_TEXT = { onibus: 'de ônibus', brt: 'de BRT', vlt: 'de VLT', metro: 'de metrô' };
+
+// Carga: a indústria escoa por um terminal; o comércio pode ser abastecido.
+function freightRow(rt, b) {
+  const zone = BUILDINGS[b.type].zone;
+  const f = freightFactor(rt, b);
+  if (zone === ZONE.INDUSTRIAL) {
+    return `<dt>Carga</dt><dd>${f < 1
+      ? `<b style="color:#ff8a80">sem terminal ao alcance (receita ${pct(f)})</b>`
+      : `escoa por terminal${f > 1 ? ` (+${pct(f - 1)} pelo porto)` : ''}`}</dd>`;
+  }
+  if (zone === ZONE.COMMERCIAL && f > 1) return `<dt>Abastecimento</dt><dd>centro de distribuição (+${pct(EXPORT.supplied)})</dd>`;
+  return '';
+}
 const NO_STAFF = '<b style="color:#ff8a80">sem funcionários, não atende</b>';
 const SERVICE_TEXT = { saude: 'saúde', policia: 'policiamento', bombeiros: 'bombeiros', lazer: 'lazer' };
 
@@ -140,6 +157,9 @@ function renderUtility(el, b, state, rt) {
       ${u.school ? `<dt>Alunos</dt><dd>${rt.students.get(b.id).size} / ${seatsOf(rt, b.type)} (${esc(EDUCATION.stages[u.school.stage].name.toLowerCase())})</dd>
       <dt>Atende</dt><dd>casas a até ${radiusOf(rt, b.type)} tiles</dd>` : ''}
       ${u.library ? `<dt>Estudantes</dt><dd>a até ${u.library.radius} tiles estudam ${Math.round(u.library.bonus * 100)}% mais rápido</dd>` : ''}
+      ${u.transit ? `<dt>Atende</dt><dd>quem mora e trabalha a até ${transitRadius(rt, b.type)} tiles de uma estação ${MODE_TEXT[u.transit.mode]}</dd>` : ''}
+      ${u.freight ? `<dt>Carga</dt><dd>indústrias a até ${Math.round(u.freight.range * mod(rt, 'freightRange'))} tiles pela rua${u.freight.bonus ? ` (+${pct(u.freight.bonus)} na receita)` : ''}</dd>` : ''}
+      ${u.supply ? `<dt>Abastece</dt><dd>comércio a até ${u.supply.radius} tiles</dd>` : ''}
       ${u.signal ? `<dt>Sinal</dt><dd>valoriza o terreno a até ${u.signal.radius} tiles</dd>` : ''}
       ${u.service ? `<dt>Atende</dt><dd>${SERVICE_TEXT[u.service.kind]} a até ${serviceRadius(rt, b.type)} tiles${workers ? '' : ` (${NO_STAFF})`}</dd>` : ''}
       ${u.institute ? '<dt>Pesquisa</dt><dd>nas áreas com verba (painel Pesquisa)</dd>' : ''}
@@ -178,7 +198,10 @@ function renderCitizen(el, c, rt, following) {
 }
 
 function activity(c) {
-  if (c.state === 'viajando') return c.dest === 'trabalho' ? 'Indo para o trabalho' : 'Voltando para casa';
+  if (c.state === 'viajando') {
+    const how = c.mode ? ` ${MODE_TEXT[c.mode]}` : '';
+    return (c.dest === 'trabalho' ? 'Indo para o trabalho' : 'Voltando para casa') + how;
+  }
   return STATE_TEXT[c.state];
 }
 
