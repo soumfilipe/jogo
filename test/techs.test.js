@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AREA_IDS, BUILDING_TECH, EFFECTS, MARCOS, START_TECHS, SYSTEMS, TECHS, TECH_BY_ID, marcoAt,
+  AREA_IDS, BUILDING_TECH, EFFECTS, IMPLEMENTED_PHASE, MARCOS, START_TECHS, SYSTEMS, TECHS, TECH_BY_ID, marcoAt,
 } from '../src/world/techs.js';
 import { BUILDINGS } from '../src/world/catalog.js';
 
@@ -61,7 +61,7 @@ test('só pode ser pesquisado o que já tem efeito nesta versão', () => {
   const ready = TECHS.filter((t) => t.ready);
   assert.ok(ready.length >= 50, `prontas: ${ready.length}`);
   for (const t of ready) {
-    assert.equal(t.phase, 0, `${t.id} é da etapa ${t.phase}`);
+    assert.ok(t.phase <= IMPLEMENTED_PHASE, `${t.id} é da etapa ${t.phase}`);
     assert.ok(t.start || t.kind === 'Base' || t.effects.length > 0, `${t.id} sem efeito`);
   }
 });

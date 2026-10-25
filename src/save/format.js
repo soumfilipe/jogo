@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  9,                 // versão do FORMATO (para migrações)
+//   "version":  10,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -16,9 +16,13 @@ import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
 import { generateForest } from '../world/terrain.js';
 import { createResearch } from '../systems/research.js';
+import { createEducation } from '../systems/education.js';
+import { EDUCATION } from '../world/catalog.js';
+import { AREA_IDS, marcoAt } from '../world/techs.js';
+import { hash2 } from '../core/rng.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -138,6 +142,29 @@ const MIGRATIONS = {
     save.data.research = createResearch(1);
     save.data.legacyResearch = true;
     save.version = 9;
+    return save;
+  },
+  // v9 -> v10: escolaridade e demografia. Os moradores (todos adultos) ganham
+  // uma escolaridade sorteada pelo marco do mundo, como a de quem chega hoje;
+  // ninguém está estudando. A universidade começa com todos os cursos iguais.
+  9: (save) => {
+    const data = save.data;
+    const width = data.map.width;
+    const citizens = decodeTable(data.citizens, { moves: { path: width } });
+    const odds = EDUCATION.immigrants[marcoAt(data.research.world).id];
+    for (const c of citizens) {
+      if (c.edu !== undefined) continue; // já tem (save remontado de um formato mais novo)
+      let roll = hash2(c.id, 77, data.seed);
+      c.edu = odds.findIndex((p) => (roll -= p) < 0);
+      if (c.edu < 0) c.edu = 1;
+      c.field = c.edu >= 3 ? AREA_IDS[Math.floor(hash2(c.id, 78, data.seed) * AREA_IDS.length)] : null;
+      c.school = null;
+      c.stage = null;
+      c.study = 0;
+    }
+    data.citizens = encodeTable(citizens, { moves: { path: width } });
+    data.education ??= createEducation();
+    save.version = 10;
     return save;
   },
 };

@@ -14,7 +14,11 @@
 //   dest:  'trabalho' | 'casa' | null,
 //   x, y:  posição em tiles (contínua),
 //   path:  tiles da viagem atual | null,   step: índice no path
+//   edu, field, school, stage, study: escolaridade e estudo (ver systems/education.js)
 // }
+//
+// Crianças moram com a família e estudam; trabalham dos 18 aos 64 anos (ver
+// systems/demography.js), menos quem estuda em tempo integral.
 
 import { BUILDINGS, CITIZEN_SPEED, SECTORS, SHIFTS } from '../world/catalog.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
@@ -32,6 +36,7 @@ import {
 import { findRoadPath } from './pathfinding.js';
 import { isServed } from '../systems/utilities.js';
 import { mod } from '../systems/mods.js';
+import { isFullTimeStudent, minEduFor } from '../systems/education.js';
 import { FIRST_NAMES, LAST_NAMES } from './names.js';
 
 // Quantas rotas calcular por tick no máximo (o resto espera na fila).
@@ -39,12 +44,21 @@ const PATHS_PER_TICK = 100;
 const PATH_CACHE_LIMIT = 30_000;
 export const WORKING_AGE = [18, 64];
 
-export function createCitizen(state, rt, home) {
+/**
+ * Cria um cidadão morando em `home`. Opções: age (padrão: adulto de 18 a 75),
+ * edu (escolaridade, padrão fundamental) e lastName (para quem é da mesma família).
+ */
+export function createCitizen(state, rt, home, { age, edu = 1, lastName } = {}) {
   const [x, y] = tileCenter(state, home.tile);
   return addCitizen(state, rt, {
     id: 0,
-    name: `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, LAST_NAMES)}`,
-    age: randomInt(state.rng, 18, 75),
+    name: `${pick(state.rng, FIRST_NAMES)} ${lastName ?? pick(state.rng, LAST_NAMES)}`,
+    age: age ?? randomInt(state.rng, 18, 75),
+    edu,
+    field: null,
+    school: null,
+    stage: null,
+    study: 0,
     home: home.id,
     job: null,
     company: null,
@@ -61,7 +75,7 @@ export function createCitizen(state, rt, home) {
 }
 
 export function canWork(citizen) {
-  return citizen.age >= WORKING_AGE[0] && citizen.age <= WORKING_AGE[1];
+  return citizen.age >= WORKING_AGE[0] && citizen.age <= WORKING_AGE[1] && !isFullTimeStudent(citizen);
 }
 
 /**
@@ -200,45 +214,67 @@ function moveCitizens(state, rt) {
   }
 }
 
-/** Contrata desempregados, procurando a vaga alcançável mais próxima. */
+// Quanto um nível de escolaridade exigido "vale" em tiles de distância: quem
+// estudou prefere a vaga que pede o estudo dele, mesmo um pouco mais longe.
+const EDU_PREFERENCE_TILES = 40;
+
+/**
+ * Contrata desempregados. Cada um só pega vaga que peça no máximo a
+ * escolaridade dele (ver minEduFor) e prefere a que mais aproveita o estudo,
+ * e depois a mais perto.
+ */
 export function assignJobs(state, rt, budget = 200) {
   // Prédio sem energia ou água não contrata (ver systems/utilities.js).
   const workplaces = state.buildings.filter((b) => openJobs(rt, b) > 0 && rt.access.get(b.id) >= 0 && isServed(rt, b));
   if (workplaces.length === 0) return;
   const width = state.map.width;
+  const need = new Map(workplaces.map((w) => [w.id, minEduFor(rt, w.type)]));
 
-  // Vagas abertas por rede de estradas: quem mora numa rede sem vagas é
-  // pulado sem gastar o orçamento (senão trava a contratação dos outros).
+  // Vagas abertas por rede de estradas e escolaridade exigida: quem não tem
+  // vaga possível na rede é pulado sem gastar o orçamento (senão trava a
+  // contratação dos outros).
   const openByNetwork = new Map();
   for (const w of workplaces) {
     const net = rt.roadComponent[rt.access.get(w.id)];
-    openByNetwork.set(net, (openByNetwork.get(net) || 0) + openJobs(rt, w));
+    if (!openByNetwork.has(net)) openByNetwork.set(net, [0, 0, 0, 0, 0]);
+    openByNetwork.get(net)[need.get(w.id)] += openJobs(rt, w);
   }
+  const openFor = (net, edu) => {
+    const counts = openByNetwork.get(net);
+    if (!counts) return 0;
+    let n = 0;
+    for (let e = 0; e <= edu; e++) n += counts[e];
+    return n;
+  };
 
   for (const c of state.citizens) {
     if (budget <= 0) break;
     if (c.job !== null || !canWork(c) || c.state !== 'casa') continue;
+    const edu = c.edu ?? 0;
     const homeAccess = rt.access.get(c.home);
     const net = homeAccess >= 0 ? rt.roadComponent[homeAccess] : 0;
-    if (!openByNetwork.get(net)) continue;
+    if (!openFor(net, edu)) continue;
     budget--;
 
     const home = rt.buildingById.get(c.home);
     const hx = home.tile % width;
     const hy = Math.floor(home.tile / width);
     let best = null;
-    let bestDist = Infinity;
+    let bestScore = Infinity;
     for (const w of workplaces) {
-      if (openJobs(rt, w) <= 0 || !sameNetwork(rt, home.id, w.id)) continue;
+      const n = need.get(w.id);
+      if (n > edu || openJobs(rt, w) <= 0 || !sameNetwork(rt, home.id, w.id)) continue;
       const d = Math.abs((w.tile % width) - hx) + Math.abs(Math.floor(w.tile / width) - hy);
-      if (d < bestDist) {
+      const score = d - n * EDU_PREFERENCE_TILES;
+      if (score < bestScore) {
         best = w;
-        bestDist = d;
+        bestScore = score;
       }
     }
     if (best) {
       hire(state, rt, c, best);
-      openByNetwork.set(net, openByNetwork.get(net) - 1);
+      const net2 = rt.roadComponent[rt.access.get(best.id)];
+      openByNetwork.get(net2)[need.get(best.id)]--;
     }
   }
 }

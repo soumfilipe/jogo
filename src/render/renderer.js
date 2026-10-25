@@ -80,6 +80,9 @@ export const MAP_MODES = {
   // das redes com ou sem produção. O resto do mapa fica com a cor normal.
   energia: { name: 'Energia', layer: 'powerMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
   agua: { name: 'Água', layer: 'waterMap', from: '#d64541', mid: '#f1c40f', to: '#3498db' },
+  // Escolas (ensino fundamental): casas com escola com vaga no raio (azul),
+  // com escola mas sem vaga (amarelo) e sem escola (vermelho).
+  escolas: { name: 'Escolas', layer: 'schoolMap', from: '#d64541', mid: '#f1c40f', to: '#4f8ff7' },
 };
 const MAP_STEPS = 10;
 

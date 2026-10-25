@@ -147,6 +147,56 @@ export const BUILDINGS = {
     name: 'Parque tecnológico', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
     utility: { power: 0, water: 0, cost: 35_000, upkeep: 400, pollution: 0, privateResearch: ['computacao', 'social'] },
   },
+  petroquimica: {
+    name: 'Complexo petroquímico', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 80,
+    utility: { power: 0, water: 0, cost: 70_000, upkeep: 500, pollution: 22, income: 3_200, area: 'quimica' },
+  },
+  biotecnologia: {
+    name: 'Indústria de biotecnologia', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 50,
+    utility: { power: 0, water: 0, cost: 55_000, upkeep: 400, pollution: 2, income: 2_400, area: 'saude' },
+  },
+  torre_celular: {
+    name: 'Torre de celular', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 1,
+    utility: { power: 0, water: 0, cost: 4_000, upkeep: 60, pollution: 0, area: 'computacao', signal: { radius: 16, landValue: 0.05 } },
+  },
+
+  // --- Educação (escolas: ver systems/education.js) ---------------------------
+  //   utility.school: { stage, seats, radius } — etapa de ensino (EDUCATION.stages),
+  //     vagas de alunos e o raio (em tiles, da casa do aluno) que a escola atende
+  //   utility.library: { radius, bonus } — estudantes no raio avançam `bonus` mais rápido
+  creche: {
+    name: 'Creche', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
+    utility: { power: 0, water: 0, cost: 4_000, upkeep: 180, pollution: 0, area: 'educacao', school: { stage: 'creche', seats: 60, radius: 10 } },
+  },
+  escola: {
+    name: 'Escola primária', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 12,
+    utility: { power: 0, water: 0, cost: 8_000, upkeep: 350, pollution: 0, area: 'educacao', school: { stage: 'fundamental', seats: 300, radius: 12 } },
+  },
+  escola_media: {
+    name: 'Escola de ensino médio', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 20,
+    utility: { power: 0, water: 0, cost: 15_000, upkeep: 500, pollution: 0, area: 'educacao', school: { stage: 'medio', seats: 400, radius: 18 } },
+  },
+  escola_tecnica: {
+    name: 'Escola técnica', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 10_000, upkeep: 400, pollution: 0, area: 'engenharia', school: { stage: 'tecnico', seats: 150, radius: 20 } },
+  },
+  senai: {
+    name: 'Centro de aprendizagem industrial', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 12,
+    // Mantido pelas indústrias: manutenção baixa para a cidade.
+    utility: { power: 0, water: 0, cost: 12_000, upkeep: 80, pollution: 0, area: 'engenharia', school: { stage: 'tecnico', seats: 250, radius: 24 } },
+  },
+  universidade: {
+    name: 'Universidade', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 60,
+    // Também é instituição de pesquisa: os professores pesquisam nas áreas com verba.
+    utility: {
+      power: 0, water: 0, cost: 60_000, upkeep: 1_500, pollution: 0, institute: true,
+      school: { stage: 'superior', seats: 800, radius: 40 },
+    },
+  },
+  biblioteca: {
+    name: 'Biblioteca', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 4,
+    utility: { power: 0, water: 0, cost: 5_000, upkeep: 120, pollution: 0, area: 'cultura', library: { radius: 12, bonus: 0.1 } },
+  },
 };
 
 /**
@@ -171,10 +221,14 @@ export function capacityOf(b) {
   return base + (b.floors - floorsOf(info)) * info.perFloor;
 }
 
-/** Até quantos andares um prédio do tipo `info` cresce na densidade dada. */
-export function maxFloorsFor(info, density) {
+/**
+ * Até quantos andares um prédio do tipo `info` cresce na densidade dada.
+ * `extra`: andares a mais na densidade alta, liberados pela pesquisa (aço
+ * estrutural e estrutura tubular: os "níveis 4 e 5").
+ */
+export function maxFloorsFor(info, density, extra = 0) {
   if (!info.tall) return floorsOf(info);
-  return Math.max(floorsOf(info), DENSITY_INFO[density].maxFloors);
+  return Math.max(floorsOf(info), DENSITY_INFO[density].maxFloors + (density === DENSITY.HIGH ? extra : 0));
 }
 
 /**
@@ -186,7 +240,8 @@ export function landValueForFloor(info, floor) {
   const base = floorsOf(info);
   const top = DENSITY_INFO[DENSITY.HIGH].maxFloors;
   const from = LAND_VALUE_FOR_LEVEL[info.zone][3];
-  return from + ((floor - base) / Math.max(1, top - base)) * (TOWER_LAND_VALUE - from);
+  // Acima do limite da densidade alta (arranha-céus), vale o valor de torre.
+  return Math.min(TOWER_LAND_VALUE, from + ((floor - base) / Math.max(1, top - base)) * (TOWER_LAND_VALUE - from));
 }
 export const TOWER_LAND_VALUE = 0.9;
 
@@ -286,6 +341,11 @@ export const RESEARCH = {
   fundingStep: 250,
   // Prédios que atuam numa área pesquisam 15× mais devagar que um instituto.
   fieldShare: 1 / 15,
+  // Pesquisador com pós-graduação (depois da tecnologia) vale por este tanto.
+  posWeight: 2,
+  // Uma área rende até este tanto a mais quando todos os pesquisadores são
+  // formados nela (proporcional aos que são).
+  fieldBonus: 0.5,
   // P&D privado: pontos por mês por vaga ocupada de escritório (comércio
   // nível 3) perto de um parque tecnológico.
   privatePerJob: 0.05,
@@ -342,6 +402,70 @@ export const COMPANY_GRACE_DAYS = 7;
 export const COMPANY_CLOSE_DAYS = 20;
 // Chance por hora de uma empresa nova abrir num andar vago, havendo demanda.
 export const COMPANY_OPEN_CHANCE = 0.1;
+
+// Escolaridade dos cidadãos (citizen.edu) e etapas de ensino das escolas.
+//   EDU: 0 nenhuma, 1 fundamental, 2 médio ou técnico, 3 superior, 4 pós-graduação
+//   stages: idade de entrada, escolaridade exigida, anos de curso e a que
+//     escolaridade leva. `full`: estudante em tempo integral não trabalha.
+export const EDU = { NONE: 0, FUNDAMENTAL: 1, MEDIO: 2, SUPERIOR: 3, POS: 4 };
+export const EDU_NAMES = ['Sem escolaridade', 'Fundamental', 'Médio', 'Superior', 'Pós-graduação'];
+export const EDUCATION = {
+  stages: {
+    creche: { name: 'Creche', ages: [0, 5], needs: 0, years: 0, gives: 0 },
+    fundamental: { name: 'Ensino fundamental', ages: [6, 14], needs: 0, years: 9, gives: EDU.FUNDAMENTAL, full: true },
+    medio: { name: 'Ensino médio', ages: [15, 19], needs: EDU.FUNDAMENTAL, years: 3, gives: EDU.MEDIO, full: true },
+    // Curso técnico: à noite, aceita adultos que trabalham.
+    tecnico: { name: 'Curso técnico', ages: [15, 45], needs: EDU.FUNDAMENTAL, years: 2, gives: EDU.MEDIO },
+    superior: { name: 'Graduação', ages: [18, 30], needs: EDU.MEDIO, years: 4, gives: EDU.SUPERIOR, full: true },
+    // Pós-graduação: na universidade, depois da tecnologia de pós-graduação.
+    pos: { name: 'Pós-graduação', ages: [22, 40], needs: EDU.SUPERIOR, years: 2, gives: EDU.POS, full: true },
+  },
+  // Quem passou pela creche começa o fundamental com este adiantamento (anos).
+  crecheHeadStart: 1,
+  // Escolaridade mínima para trabalhar, por zona e nível do prédio (ou tipo
+  // de prédio do jogador). Quem estudou mais pode pegar vaga menor.
+  jobs: {
+    residential: {},
+    commercial: { 1: EDU.NONE, 2: EDU.FUNDAMENTAL, 3: EDU.MEDIO },
+    industrial: { 1: EDU.NONE, 2: EDU.FUNDAMENTAL, 3: EDU.FUNDAMENTAL },
+    buildings: {
+      instituto_pesquisa: EDU.SUPERIOR, universidade: EDU.SUPERIOR, parque_tecnologico: EDU.SUPERIOR,
+      biotecnologia: EDU.SUPERIOR, petroquimica: EDU.MEDIO, escola_media: EDU.SUPERIOR,
+      escola: EDU.MEDIO, escola_tecnica: EDU.MEDIO, senai: EDU.MEDIO, creche: EDU.FUNDAMENTAL,
+      biblioteca: EDU.MEDIO,
+    },
+  },
+  // Escolaridade de quem chega de fora, por marco do mundo: chance de cada
+  // nível (sem, fundamental, médio, superior, pós).
+  immigrants: {
+    1: [0.35, 0.45, 0.15, 0.05, 0],
+    2: [0.25, 0.45, 0.2, 0.09, 0.01],
+    3: [0.15, 0.4, 0.3, 0.13, 0.02],
+    4: [0.08, 0.32, 0.37, 0.2, 0.03],
+    5: [0.05, 0.25, 0.4, 0.25, 0.05],
+    6: [0.03, 0.2, 0.4, 0.3, 0.07],
+  },
+};
+
+// Demografia (ver systems/demography.js). Cada cidadão faz aniversário num
+// mês do ano (pelo id); a chance de morrer e de ter filho é sorteada nele.
+export const DEMOGRAPHY = {
+  // Família que chega: adultos e até familyChildren filhos, cada um com
+  // childChance (se couber na casa). Dá umas 3 crianças para cada 10 pessoas.
+  familyAdults: [1, 2],
+  familyChildren: 2,
+  childChance: 0.6,
+  // Chance por ano de um adulto de 20 a 40 anos ter um filho (se a casa tem vaga).
+  birthAges: [20, 40],
+  birthChance: 0.12,
+  // Chance de morrer por ano: baseDeath até deathFromAge, depois cresce
+  // deathGrowth por ano de idade; ninguém passa de maxAge.
+  baseDeath: 0.001,
+  deathFromAge: 60,
+  deathAt60: 0.01,
+  deathGrowth: 1.1,
+  maxAge: 100,
+};
 
 // Velocidade dos cidadãos, em tiles por minuto de jogo.
 export const CITIZEN_SPEED = 0.5;

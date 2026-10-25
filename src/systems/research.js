@@ -21,7 +21,7 @@
 //   lastMonth: { área: pontos ganhos no último mês },
 // }
 
-import { BUILDINGS, RESEARCH, ZONE } from '../world/catalog.js';
+import { BUILDINGS, EDU, RESEARCH, ZONE } from '../world/catalog.js';
 import {
   AREA_IDS, BUILDING_TECH, LEVEL_TECH, MARCOS, START_TECHS, TECHS, TECH_BY_ID, WORLD_END, marcoAt,
 } from '../world/techs.js';
@@ -153,6 +153,9 @@ export function researchOutput(state, rt) {
   let researchers = 0;
   let jobs = 0;
   const parks = [];
+  // Pesquisadores formados em cada área (rendem mais nela) e o peso da pós.
+  const byField = zeros();
+  const pos = mod(rt, 'posGraduacao', 0) > 0;
 
   for (const b of state.buildings) {
     const u = BUILDINGS[b.type].utility;
@@ -163,7 +166,13 @@ export function researchOutput(state, rt) {
       institutes++;
       researchers += workers;
       jobs += BUILDINGS[b.type].jobs;
-      staffing += full;
+      let weight = 0;
+      for (const id of rt.workers.get(b.id)) {
+        const c = rt.citizenById.get(id);
+        weight += pos && c?.edu >= EDU.POS ? RESEARCH.posWeight : 1;
+        if (c?.field) byField[c.field]++;
+      }
+      staffing += weight / BUILDINGS[b.type].jobs;
     }
     if (u.area) byArea[u.area] += base * RESEARCH.fieldShare * full;
     if (u.privateResearch) parks.push(b);
@@ -173,7 +182,9 @@ export function researchOutput(state, rt) {
   const efficiency = mod(rt, 'funding');
   for (const a of AREA_IDS) {
     if (funding[a] > 0 && staffing > 0) {
-      byArea[a] += staffing * base * Math.sqrt((funding[a] * efficiency) / RESEARCH.fundingRef);
+      const specialists = researchers ? byField[a] / researchers : 0;
+      byArea[a] += staffing * base * Math.sqrt((funding[a] * efficiency) / RESEARCH.fundingRef)
+        * (1 + RESEARCH.fieldBonus * specialists);
     }
   }
 

@@ -1,5 +1,6 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, DENSITY, DENSITY_INFO, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, ZONE, ZONE_INFO } from './world/catalog.js';
+import { radiusOf, seatsOf } from './systems/education.js';
 import { applyCommand, costs, lineTiles, planCommand, rectTiles } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
@@ -44,7 +45,12 @@ const TOOLS = [
     ['bomba_agua', 'Bomba', '#4f97c4', 'utility'], ['poco', 'Poço', '#9fc3e0', 'utility'],
     ['instituto_pesquisa', 'Instituto', '#e9edf2', 'research'], ['parque_tecnologico', 'Parque tec.', '#7fa6d6', 'research'],
     ['refinaria', 'Refinaria', '#c8ccd2', 'research'], ['fabrica_cimento', 'Cimento', '#cfc9b8', 'research'],
-    ['usina_etanol', 'Etanol', '#7d8a5c', 'research'],
+    ['usina_etanol', 'Etanol', '#7d8a5c', 'research'], ['petroquimica', 'Petroquímica', '#d0d3d8', 'research'],
+    ['biotecnologia', 'Biotecnologia', '#16a085', 'research'], ['torre_celular', 'Celular', '#c0c4c9', 'research'],
+    ['creche', 'Creche', '#f2c6b4', 'education'], ['escola', 'Escola', '#e6d1a8', 'education'],
+    ['escola_media', 'Ensino médio', '#3f6fc0', 'education'], ['escola_tecnica', 'Técnica', '#e8b931', 'education'],
+    ['senai', 'Aprendizagem', '#c23b3b', 'education'], ['universidade', 'Universidade', '#6f8fae', 'education'],
+    ['biblioteca', 'Biblioteca', '#e9e4da', 'education'],
   ].map(([building, label, swatch, group], i) => ({
     id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch, group,
     separatorBefore: i === 0,
@@ -152,6 +158,7 @@ window.jogo = {
     return applyCommand(state, rt, cmd);
   },
   advance: (ticks) => advance(state, rt, ticks),
+  select: (next) => select(next), // { type: 'building' | 'citizen', id }
   renderer,
   loop: loopStats,
   saves,
@@ -180,6 +187,9 @@ function renderHud() {
   $('city-name').textContent = state.city.name + (dirty ? ' *' : '');
   $('date').textContent = formatDate(state.time.tick);
   $('population').textContent = s.population.toLocaleString('pt-BR');
+  let kids = 0;
+  for (const c of state.citizens) if (c.age < 18) kids++;
+  $('population').parentElement.title = `População: ${(s.population - kids).toLocaleString('pt-BR')} adultos e ${kids.toLocaleString('pt-BR')} crianças e jovens`;
   $('employment').textContent = `${s.employed.toLocaleString('pt-BR')} / ${s.unemployed.toLocaleString('pt-BR')}`;
   $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
   for (const [id, value] of [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial], ['demand-i', rt.demand.industrial]]) {
@@ -284,6 +294,9 @@ function utilityTitle(id) {
   if (u.institute) makes.push('transforma a verba de pesquisa em tecnologia');
   if (u.privateResearch) makes.push('escritórios em volta fazem pesquisa');
   if (u.income) makes.push(`estatal: rende até $${fmt(u.income)}/mês`);
+  if (u.school) makes.push(`${EDUCATION.stages[u.school.stage].name.toLowerCase()}: ${fmt(seatsOf(rt, id))} vagas num raio de ${radiusOf(rt, id)} tiles`);
+  if (u.library) makes.push(`estudantes num raio de ${u.library.radius} tiles avançam ${Math.round(u.library.bonus * 100)}% mais rápido`);
+  if (u.signal) makes.push(`valoriza o terreno num raio de ${u.signal.radius} tiles`);
   const notes = [u.pollution ? 'polui' : null, u.needsWater ? 'na beira de rio ou lago' : null].filter(Boolean);
   const text = `${makes.join(', ')} · $${fmt(utilityCost(rt, id))} + $${fmt(utilityUpkeep(rt, id))}/mês`;
   return text.charAt(0).toUpperCase() + text.slice(1) + (notes.length ? ' · ' + notes.join(', ') : '');
@@ -381,7 +394,7 @@ function announceResearch() {
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
-const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h' };
+const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u' };
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);

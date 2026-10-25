@@ -32,7 +32,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
-| `L` / `P` / `N` / `H` Mapas | valor do terreno, poluição, energia ou água sobre o mapa |
+| `L` / `P` / `N` / `H` / `U` Mapas | valor do terreno, poluição, energia, água ou escolas sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
@@ -108,9 +108,49 @@ faltam, está em [`docs/arvore-tecnologica.html`](docs/arvore-tecnologica.html)
   estatais e dão receita), liberam o nível 3 de residências e comércio (código
   de zoneamento) e mudam parâmetros do jogo: manutenção, juros, velocidade dos
   cidadãos, poluição, consumo, impostos, valor do terreno, demanda.
-- Nesta versão, 59 tecnologias podem ser pesquisadas. As outras dependem de
-  sistemas que ainda não existem (trânsito, escolaridade, saúde, segurança,
-  lixo...) e aparecem como "chega numa próxima versão".
+- Nesta versão, 78 tecnologias podem ser pesquisadas (etapas 0 e 1). As
+  outras dependem de sistemas que ainda não existem (trânsito, saúde,
+  segurança, lixo...) e aparecem como "chega numa próxima versão".
+- Pesquisadores (do instituto e da universidade) precisam de **curso
+  superior**. Quem é formado numa área rende até 50% mais nela, e com a
+  tecnologia de pós-graduação, mestres e doutores valem o dobro. A distribuição
+  dos cursos da universidade fica no painel Pesquisa.
+
+## Famílias, escolas e escolaridade
+
+Regras em `src/systems/demography.js` e `src/systems/education.js`, números em
+`DEMOGRAPHY` e `EDUCATION` no catálogo.
+
+- **Famílias**: quem chega vem com um ou dois adultos e, se couber na casa, até
+  dois filhos (umas 3 crianças a cada 10 pessoas). Crianças moram com a família,
+  não trabalham e ocupam vaga na casa. A escolaridade dos adultos que chegam
+  depende do marco do mundo (no primeiro, 5% têm curso superior).
+- **Aniversários**: cada cidadão faz aniversário num mês do ano. Nele, envelhece,
+  soma um ano de curso se estuda, pode ter um filho (adultos de 20 a 40 anos,
+  se a casa tem vaga) e pode morrer (a chance cresce depois dos 60). Aos 65 se
+  aposenta.
+- **Escolas** (menu Construir): cada uma tem vagas e atende casas num raio.
+  | Prédio | Etapa | Idade | Anos | Forma em |
+  | --- | --- | --- | --- | --- |
+  | Creche | creche | 0 a 5 | — | começa o fundamental 1 ano adiantado |
+  | Escola primária | fundamental | 6 a 14 | 9 | Fundamental |
+  | Escola de ensino médio | médio | 15 a 19 | 3 | Médio |
+  | Escola técnica / Centro de aprendizagem | técnico (noturno) | 15 a 45 | 2 | Médio |
+  | Universidade | graduação e pós | 18 a 30 / 22 a 40 | 4 / 2 | Superior / Pós |
+
+  Fundamental, médio, graduação e pós são em tempo integral: quem estuda não
+  trabalha, e um jovem desempregado larga a procura para estudar. A
+  **biblioteca** faz os estudantes em volta avançarem 10% mais rápido.
+- **Empregos exigem estudo**: escritórios (comércio nível 3) pedem ensino
+  médio; mercados e indústria acima do nível 1, fundamental; institutos,
+  universidade e biotecnologia, curso superior. Quem estudou mais procura
+  primeiro a vaga que aproveita o estudo. O inspetor mostra o estudo exigido
+  em cada prédio e a escolaridade de cada cidadão.
+- **Mapa de escolas** (`U`): casas com escola primária com vaga no raio (azul),
+  com escola lotada (amarelo) e sem escola (vermelho).
+- **Arranha-céus e torres**: na densidade alta, o aço estrutural deixa o
+  comércio crescer até 25 andares, e a estrutura tubular leva residências e
+  comércio a 40.
 
 ## Energia e água
 
@@ -392,7 +432,7 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 9,                 // versão do formato (migrações em src/save/format.js)
+  "version": 10,                // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
@@ -417,6 +457,9 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 9 (antes da escolaridade) abrem com os moradores adultos
+recebendo uma escolaridade sorteada pelo marco do mundo; ninguém está estudando.
 
 Saves de antes da pesquisa (formato 8) abrem no primeiro marco, com as
 tecnologias iniciais mais as de tudo o que a cidade já tinha (e os requisitos

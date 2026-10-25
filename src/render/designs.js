@@ -542,6 +542,140 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  petroquimica(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5f5d58', lift: 0 }];
+    // Malha de torres e esferas de armazenamento (cilindros baixos), e uma chama.
+    for (const [cx, cy, h] of [[0.3, 0.3, 3.2], [0.6, 0.3, 2.6], [0.3, 0.62, 2.2], [0.62, 0.62, 2.9]]) {
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.1, lift: 0, h: h * r.range(0.9, 1.1), color: '#d0d3d8', top: '#8d949b' });
+    }
+    for (const [cx, cy] of [[1.25, 0.4], [1.65, 0.4], [1.25, 0.85], [1.65, 0.85]]) {
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.18, lift: 0, h: 0.35, color: '#f4f5f6', top: '#c9c4ba' });
+    }
+    parts.push(block([0.15, 1.2, 1.85, 1.85], 0, 0.6, r.pick(IND_WALLS), {
+      windows: { cols: 5, style: 'grid' }, doors: { count: 3, color: '#3e4145' },
+      bands: [{ at: 0.5, thick: 0.05, color: '#ef8a2d' }],
+    }));
+    parts.push({ kind: 'cylinder', cx: 0.95, cy: 0.25, r: 0.05, lift: 0, h: 3.6, color: '#b5b0a6', top: '#ef8a2d' });
+    return parts;
+  },
+
+  biotecnologia(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8fae7d', lift: 0 }];
+    const w = r.pick([wall('#e9edf2', '#c8ced6'), wall('#e6e2da', '#c9c4ba')]);
+    parts.push(block([0.12, 0.12, 1.3, 1.0], 0, 1.3, w, {
+      windows: { cols: 4, style: 'bands' }, bands: [{ at: 1.15, thick: 0.06, color: '#16a085' }],
+      doors: { count: 1, color: '#16a085' },
+    }));
+    parts.push(block([0.15, 1.2, 1.0, 1.85], 0, 0.8, r.pick(GLASS), { windows: { cols: 3, style: 'bands' } }));
+    // Biorreatores: cilindros de aço.
+    for (const [cx, cy] of [[1.5, 1.3], [1.5, 1.7], [1.62, 0.4]]) {
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.16, lift: 0, h: 0.7, color: '#d9dde2', top: '#9fa6ad' });
+    }
+    return parts;
+  },
+
+  torre_celular() {
+    const steel = wall('#c0c4c9', '#a3a7ad');
+    const parts = [{ kind: 'slab', box: [0.2, 0.2, 0.8, 0.8], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.45, 0.45, 0.55, 0.55], 0, 3.4, steel, { top: '#d6d9dd' }));
+    // Antenas no alto.
+    for (const [x, y] of [[0.38, 0.45], [0.55, 0.38], [0.45, 0.55]]) {
+      parts.push(block([x, y, x + 0.07, y + 0.07], 2.9, 0.4, wall('#e9edf2', '#c8ced6'), { top: '#ffffff' }));
+    }
+    parts.push(block([0.22, 0.65, 0.4, 0.78], 0, 0.25, wall('#e6e2da', '#c9c4ba'), { top: '#bfb8a8' }));
+    return parts;
+  },
+
+  creche(r) {
+    const w = r.pick([wall('#f2c6b4', '#d8a995'), wall('#c5e3b8', '#a8c79b'), wall('#f7e3a1', '#dcc684')]);
+    const parts = [{ kind: 'slab', box: [0.08, 0.08, 0.92, 0.92], color: '#9ab486', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.7, 0.62], 0, 0.6, w, {
+      roof: { kind: 'gable-x', color: r.pick(['#d9534f', '#3f6fc0', '#e8b931']), rise: 0.35 },
+      windows: { cols: 2, style: 'grid' }, doors: { count: 1, color: '#3f6fc0' },
+    }));
+    // Parquinho: escorregador e caixa de areia.
+    parts.push(block([0.72, 0.7, 0.86, 0.84], 0, 0.04, wall('#e3d3a1', '#cdbd8b'), { top: '#efe0b0' }));
+    parts.push(block([0.2, 0.74, 0.3, 0.88], 0, 0.25, wall('#e05a47', '#c0392b'), { top: '#f1c40f' }));
+    return parts;
+  },
+
+  escola(r) {
+    const w = r.pick([wall('#e6d1a8', '#c9b48b'), wall('#e9edf2', '#c8ced6'), wall('#d9c39a', '#bfa57a')]);
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.1, 0.1, 0.9, 0.5], 0, 0.95, w, {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 1, color: '#3d8f5a' },
+      bands: [{ at: 0.45, thick: 0.05, color: '#3d8f5a' }],
+    }));
+    // Quadra no pátio.
+    parts.push({ kind: 'slab', box: [0.14, 0.58, 0.86, 0.9], color: '#c0703f', lines: true, lift: 0.01 });
+    parts.push({ kind: 'antenna', cx: 0.16, cy: 0.16, lift: 0.95, h: 0.5 });
+    return parts;
+  },
+
+  escola_media(r) {
+    const w = r.pick([wall('#e6d1a8', '#c9b48b'), wall('#e9edf2', '#c8ced6'), wall('#c98262', '#ab6a4d')]);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.88, 0.75], 0, 1.4, w, {
+      windows: { cols: 7, style: 'grid' }, doors: { count: 2, color: '#3f6fc0' },
+      bands: [{ at: 0.7, thick: 0.05, color: '#3f6fc0' }],
+    }));
+    parts.push(block([0.12, 0.85, 0.7, 1.88], 0, 1.0, w, { windows: { cols: 3, style: 'grid' } }));
+    parts.push({ kind: 'slab', box: [0.85, 0.95, 1.88, 1.88], color: '#c0703f', lines: true, lift: 0.01 });
+    return parts;
+  },
+
+  escola_tecnica(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#8a8f86', lift: 0 }];
+    parts.push(block([0.1, 0.1, 0.9, 0.55], 0, 1.0, wall('#e6e2da', '#c9c4ba'), {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 1, color: '#e8b931' },
+      bands: [{ at: 0.9, thick: 0.06, color: '#e8b931' }],
+    }));
+    // Oficina com telhado dente de serra.
+    parts.push(block([0.1, 0.6, 0.9, 0.9], 0, 0.55, r.pick(IND_WALLS), { doors: { count: 2, color: '#3e4145' } }));
+    parts.push(...sawtooth([0.1, 0.6, 0.9, 0.9], 0.55, r.pick(IND_WALLS), true));
+    return parts;
+  },
+
+  senai(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8a8f86', lift: 0 }];
+    parts.push(block([0.12, 0.12, 1.2, 0.9], 0, 1.2, wall('#e9edf2', '#c8ced6'), {
+      windows: { cols: 4, style: 'bands' }, bands: [{ at: 1.05, thick: 0.08, color: '#c23b3b' }],
+      doors: { count: 1, color: '#c23b3b' },
+    }));
+    const w = r.pick(IND_WALLS);
+    parts.push(block([0.12, 1.05, 1.88, 1.88], 0, 0.8, w, { doors: { count: 3, color: '#3e4145' } }));
+    parts.push(...sawtooth([0.12, 1.05, 1.88, 1.88], 0.8, w, false));
+    parts.push({ kind: 'cylinder', cx: 1.55, cy: 0.45, r: 0.2, lift: 0, h: 0.8, color: '#d9dde2', top: '#9fa6ad' });
+    return parts;
+  },
+
+  universidade(r) {
+    const stone = r.pick([wall('#e6d1a8', '#c9b48b'), wall('#d9c39a', '#bfa57a'), wall('#e9e4da', '#cdc6b8')]);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7fa86e', lift: 0 }];
+    // Prédio principal com cúpula, duas alas e o gramado no meio.
+    parts.push(block([0.12, 0.12, 1.88, 0.62], 0, 1.5, stone, {
+      windows: { cols: 7, style: 'grid' }, doors: { count: 1, color: '#7a4b3a' },
+      bands: [{ at: 1.4, thick: 0.08, color: mixHex(stone.left, '#000000', 0.2) }],
+    }));
+    parts.push({ kind: 'cylinder', cx: 1.0, cy: 0.37, r: 0.22, lift: 1.5, h: 0.45, color: '#e9e4da', top: '#6f8fae' });
+    parts.push(block([0.12, 0.72, 0.55, 1.88], 0, 1.1, stone, { windows: { cols: 3, style: 'grid' } }));
+    parts.push(block([1.45, 0.72, 1.88, 1.88], 0, 1.1, stone, { windows: { cols: 3, style: 'grid' } }));
+    parts.push({ kind: 'antenna', cx: 1.0, cy: 0.37, lift: 1.95, h: 0.5 });
+    return parts;
+  },
+
+  biblioteca(r) {
+    const stone = r.pick([wall('#e9e4da', '#cdc6b8'), wall('#d9c39a', '#bfa57a')]);
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.12, 0.2, 0.88, 0.8], 0, 0.95, stone, {
+      windows: { cols: 3, style: 'bands' }, doors: { count: 1, color: '#7a4b3a' },
+      roof: { kind: 'gable-y', color: '#6f5b4b', rise: 0.3 },
+    }));
+    // Colunas na frente.
+    for (const x of [0.2, 0.4, 0.6, 0.8]) parts.push({ kind: 'cylinder', cx: x, cy: 0.86, r: 0.035, lift: 0, h: 0.85, color: '#f4f1ea', top: '#f4f1ea' });
+    return parts;
+  },
+
   parque_tecnologico(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8fae7d', lift: 0 }];
     // Prédios de vidro baixos e um mais alto, com um pátio verde no meio.

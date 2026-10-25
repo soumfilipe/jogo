@@ -3,6 +3,8 @@
 // escolhida pelo jogador). As ações passam por applyCommand, como no orçamento.
 
 import { RESEARCH } from '../world/catalog.js';
+import { COURSE_MAX, educationStats } from '../systems/education.js';
+import { isUnlocked } from '../systems/mods.js';
 import { AREAS, AREA_IDS, TECHS, TECH_BY_ID, marcoAt } from '../world/techs.js';
 import {
   autoTarget, effectiveCost, isAvailable, progress, researchOutput, target, worldKnows, worldMarco,
@@ -68,6 +70,20 @@ export class ResearchPanel {
         </section>`).join('')}
       </div>
 
+      <section data-courses hidden>
+        <h4>Cursos da universidade</h4>
+        <p class="muted small">Quem se forma escolhe a área pelos pesos abaixo. Pesquisadores
+          formados numa área rendem até ${Math.round(RESEARCH.fieldBonus * 100)}% mais nela.</p>
+        <div class="courses">${AREA_IDS.map((a) => `
+          <label class="course" style="--area:${AREA_COLORS[a]}">
+            <span>${AREAS[a]}</span>
+            <input type="range" min="0" max="${COURSE_MAX}" step="1" data-course="${a}">
+            <b data-course-share="${a}"></b>
+          </label>`).join('')}
+        </div>
+      </section>
+      <p class="small muted" data-people></p>
+
       <h4>Concluídas recentemente</h4>
       <ul class="recent" data-recent></ul>
       <p class="budget-error" data-error hidden></p>`;
@@ -75,6 +91,8 @@ export class ResearchPanel {
     this.el.addEventListener('input', (e) => {
       const area = e.target.dataset.funding;
       if (area) this.#run({ type: 'funding', area, amount: Number(e.target.value) });
+      const course = e.target.dataset.course;
+      if (course) this.#run({ type: 'course', area: course, weight: Number(e.target.value) });
     });
     this.el.addEventListener('change', (e) => {
       const area = e.target.dataset.priority;
@@ -127,6 +145,23 @@ export class ResearchPanel {
       q('[data-bar]', box).style.width = goal ? `${Math.round(Math.min(1, progress(state, goal)) * 100)}%` : '0';
       q('[data-eta]', box).textContent = goal ? eta(state, goal, out.byArea) : idle(rt, a);
     }
+
+    // Cursos da universidade (depois de ter universidade liberada).
+    const courses = q('[data-courses]');
+    courses.hidden = !isUnlocked(rt, 'universidade');
+    if (!courses.hidden) {
+      const weights = state.education.courses;
+      const total = AREA_IDS.reduce((s, a) => s + weights[a], 0);
+      for (const a of AREA_IDS) {
+        const slider = q(`[data-course="${a}"]`);
+        if (document.activeElement !== slider) slider.value = weights[a];
+        q(`[data-course-share="${a}"]`).textContent = total ? `${Math.round((weights[a] / total) * 100)}%` : '—';
+      }
+    }
+    const edu = educationStats(state);
+    const pctOf = (n) => (edu.adults ? Math.round((n / edu.adults) * 100) : 0);
+    q('[data-people]').textContent = `Adultos com curso superior: ${pctOf(edu.levels[3] + edu.levels[4])}%`
+      + ` · com pós: ${pctOf(edu.levels[4])}% · estudando agora: ${Object.values(edu.studying).reduce((s, n) => s + n, 0)}`;
 
     const recent = research.done.filter((id) => !TECH_BY_ID.get(id).start).slice(-5).reverse();
     q('[data-recent]').innerHTML = recent.length
