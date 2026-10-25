@@ -5,6 +5,7 @@
 import { NEWS, SECTORS } from '../world/catalog.js';
 import { formatDate } from '../core/time.js';
 import { mediaEra, outlets } from '../systems/news.js';
+import { icon } from './icons.js';
 
 const esc = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
@@ -21,8 +22,8 @@ const FILTERS = [
   ['opiniao', 'Opinião'], ['fofoca', 'Fofoca'], ['boato', 'Boatos e checagem'],
 ];
 
-/** Ícone do veículo (📰 jornal, 📻 rádio, 📺 TV, 🌐 portal, 📱 redes). */
-export const mediumIcon = (medium) => NEWS.media[medium]?.icon ?? '📰';
+/** Ícone do veículo (jornal, rádio, TV, portal ou redes sociais), em SVG. */
+export const mediumIcon = (medium) => icon(NEWS.media[medium]?.icon ?? 'news');
 
 export class NewsPanel {
   constructor(el) {
@@ -78,7 +79,7 @@ export class NewsPanel {
     this.key = key;
     const q = (sel) => this.el.querySelector(sel);
     const era = mediaEra(rt);
-    q('[data-era]').textContent = `${mediumIcon(era)} ${NEWS.media[era].era}`;
+    q('[data-era]').innerHTML = `${mediumIcon(era)} ${NEWS.media[era].era}`;
     for (const b of this.el.querySelectorAll('[data-filter]')) b.classList.toggle('active', b.dataset.filter === this.filter);
 
     const list = news.items.filter((i) => this.filter === 'todas' || CATS[i.cat]?.[1] === this.filter).slice(-60).reverse();

@@ -15,14 +15,14 @@ body {
   height: 100vh;
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto 1fr;
   background: var(--bg);
   color: var(--text);
   font: 14px system-ui, sans-serif;
   overflow: hidden;
 }
 
-.topbar, .toolbar, .savebar {
+.topbar, .toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -30,7 +30,15 @@ body {
   padding: 6px 12px;
   background: var(--panel);
 }
-.toolbar { gap: 6px; border-top: 1px solid #23262d; }
+.topbar { position: relative; z-index: 30; }
+.toolbar { gap: 6px; border-top: 1px solid #23262d; position: relative; z-index: 20; }
+#status {
+  position: absolute; right: 12px; bottom: 12px; z-index: 4; max-width: min(360px, 40%);
+  background: rgb(20 24 30 / .85); border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 8px; font-size: 12px; pointer-events: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#status:empty { display: none; }
 
 .spacer { flex: 1; }
 .hint { color: #ffcf6e; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
@@ -56,17 +64,69 @@ button:disabled:hover { background: #3a3f4a; }
 .toolbar kbd { color: var(--muted); font-size: 11px; margin-left: 4px; }
 .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
 
-.speeds, .toolbar .density { display: flex; gap: 2px; }
-.toolbar .density button { padding: 5px 8px; }
+.speeds { display: flex; gap: 2px; }
+.density { display: flex; gap: 4px; }
+.density button { flex: 1; padding: 6px 8px; }
 .speeds button { padding: 4px 8px; min-width: 34px; }
 
-.rci { display: inline-flex; gap: 3px; align-items: center; height: 24px; }
-.rci .bar { position: relative; width: 8px; height: 24px; background: #20232a; border-radius: 2px; }
+button.rci { display: inline-flex; gap: 3px; align-items: center; }
+.rci .col { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.rci .col b { font-size: 9px; line-height: 1; color: var(--muted); font-weight: 600; }
+.rci .bar { position: relative; width: 8px; height: 18px; background: #20232a; border-radius: 2px; }
 .rci .bar i { position: absolute; left: 0; right: 0; bottom: 50%; border-radius: 2px; }
 #demand-r i { background: #5fbf5a; }
 #demand-c i { background: #4f8ff7; }
 #demand-i i { background: #e8b931; }
 #demand-f i { background: #a3843f; }
+
+/* --- Menus da barra de ferramentas --------------------------------------- */
+.menu { position: relative; }
+.menu-button, button.direct { display: inline-flex; align-items: center; gap: 6px; }
+.menu-button .caret { margin-left: 5px; font-size: 10px; color: var(--muted); }
+.menu.active > .menu-button, .menu.open > .menu-button { border-color: var(--accent); background: #2f3b55; }
+.menu-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  width: 520px; max-height: calc(100dvh - 120px); overflow: auto;
+  background: rgb(42 46 54 / .98); border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 12px 12px; box-shadow: 0 8px 24px rgb(0 0 0 / .4);
+}
+.menu-panel[hidden] { display: none; }
+.menu-panel.narrow { width: 300px; }
+.menu-panel h4, .sheet h4 { margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.menu-panel h4 small, .sheet h4 small { text-transform: none; letter-spacing: 0; font-weight: normal; }
+.tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tool-grid.maps { grid-template-columns: 1fr 1fr; }
+.tool-grid .wide { grid-column: 1 / -1; }
+button.tool {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 6px; row-gap: 2px;
+  min-width: 0; padding: 6px 8px; text-align: left;
+}
+button.tool .name { display: flex; justify-content: space-between; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+button.tool kbd { margin: 0; }
+button.tool small { grid-column: 2; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Demanda da zona no botão: a linha do meio é o equilíbrio. */
+.demand { grid-column: 1 / -1; position: relative; height: 5px; margin-top: 3px; background: #20232a; border-radius: 2px; }
+.demand::after { content: ''; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--border); }
+.demand i { position: absolute; top: 0; bottom: 0; left: 50%; border-radius: 2px; background: var(--zone); }
+.file-menu { display: flex; flex-direction: column; gap: 4px; padding-top: 10px; }
+.file-menu button { display: flex; align-items: center; gap: 10px; text-align: left; }
+.file-menu .ico { width: 18px; text-align: center; }
+.file-menu small { margin-top: 4px; font-size: 12px; }
+
+/* --- Legenda das cores do mapa ------------------------------------------- */
+.legend {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 5;
+  min-width: 240px; max-width: calc(100% - 24px);
+  background: rgb(20 24 30 / .9); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 30px 8px 12px; font-size: 12px;
+}
+.legend .close { position: absolute; top: 4px; right: 4px; padding: 0 6px; }
+.legend .ramp { height: 10px; border-radius: 3px; margin: 6px 0 3px; }
+.legend .ends { display: flex; justify-content: space-between; gap: 16px; color: #b9bec7; }
+.legend ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; }
+.legend li { white-space: nowrap; }
+.legend li i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.legend small { display: block; margin-top: 4px; color: var(--muted); }
 
 main { position: relative; overflow: hidden; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
@@ -275,7 +335,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 @media (max-width: 760px), (pointer: coarse) and (max-height: 500px) {
   body { grid-template-rows: auto 1fr auto; }
-  .toolbar, .savebar, #minimap, #utility-hint, .topbar kbd { display: none; }
+  .toolbar, .topbar .menu, #minimap, #utility-hint, .topbar kbd, .sheet kbd { display: none; }
 
   /* Topo compacto: duas linhas curtas. */
   .topbar {
@@ -289,8 +349,9 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   .speeds { margin-left: auto; }
   .speeds button { min-width: 40px; padding: 6px 8px; font-size: 12px; }
   button.money { padding: 2px 4px; font-size: 12px; }
-  .rci { height: 18px; }
-  .rci .bar { height: 18px; width: 6px; }
+  .rci .bar { height: 14px; width: 6px; }
+  .legend { bottom: 8px; padding: 6px 28px 6px 10px; }
+  .legend ul { grid-template-columns: 1fr; }
 
   /* Barra inferior, como as abas do iOS. */
   .mobile-nav {
@@ -327,15 +388,16 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   .sheet.open .sheet-panel { transform: translateY(0); }
   .grabber { width: 38px; height: 5px; border-radius: 3px; background: #5a606c; margin: 4px auto 8px; }
   .sheet h3 { margin: 0 0 4px; font-size: 17px; }
-  .sheet h4 { margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  .sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .sheet-grid button {
-    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-    min-height: 58px; padding: 8px 10px; text-align: left; font-size: 14px;
-  }
-  .sheet-grid button .swatch { width: 14px; height: 14px; }
-  .sheet-grid button small { color: var(--muted); font-size: 11px; }
-  [data-maps] button { min-height: 46px; justify-content: center; }
+  .sheet .tool-grid { gap: 8px; }
+  .sheet button.tool { min-height: 58px; padding: 8px 10px; font-size: 14px; }
+  /* No celular o ícone fica em cima do nome, para o nome caber inteiro. */
+  .sheet button.tool { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+  .sheet button.tool .glyph { justify-self: start; }
+  .sheet button.tool small { grid-column: 1; }
+  .sheet button.tool .glyph { width: 30px; height: 30px; }
+  .sheet .tool-grid.maps button.tool { grid-template-columns: auto minmax(0, 1fr); }
+  #status { display: none; }
+  .sheet .tool-grid.maps button { min-height: 46px; }
   .sheet-list { display: flex; flex-direction: column; gap: 6px; }
   .sheet-list button { display: flex; align-items: center; gap: 12px; padding: 12px 14px; font-size: 15px; text-align: left; }
   .sheet-list .ico { font-size: 18px; width: 22px; text-align: center; }
@@ -421,3 +483,26 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .culture .fame { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .culture .up { color: #51cf66; }
 .culture .down { color: #ff8a80; }
+
+/* --- Ícones (src/ui/icons.js) -------------------------------------------- */
+.icon {
+  width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em;
+  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.icon .f { fill: currentColor; stroke: none; }
+.icon .t { fill: currentColor; fill-opacity: .28; }
+/* Ícone de ferramenta sobre a cor do prédio (a mesma cor dele no mapa). */
+.glyph {
+  display: inline-grid; place-items: center; flex: none;
+  width: 26px; height: 26px; border-radius: 6px; background: var(--c);
+}
+.glyph .icon { width: 18px; height: 18px; vertical-align: 0; }
+/* Ícone ao lado de um número ou rótulo (topo, menus, arquivo). */
+.topbar :is(span, button):has(> .ico) { display: inline-flex; align-items: center; gap: 5px; }
+.ico { display: inline-flex; justify-content: center; }
+.speeds .ico .icon { width: 13px; height: 13px; }
+#toast b .icon, .legend b .icon { margin-right: 3px; }
+button.tool small .icon { width: 11px; height: 11px; vertical-align: -1px; }
+/* Mapas: ícone na cor do mapa, com a faixa de cores na base. */
+.map-glyph { position: relative; overflow: hidden; }
+.map-glyph::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--ramp); }

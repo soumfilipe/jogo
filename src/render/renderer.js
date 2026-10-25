@@ -77,27 +77,40 @@ for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RUR
 }
 // Mapas (sobreposições): cor do chão conforme um valor de 0 a 1 do runtime.
 // O valor é arredondado em faixas para manter o agrupamento por cor.
+// `legend` é o que a legenda embaixo do mapa mostra: as pontas da faixa de
+// cores (low/high) ou categorias [valor, texto], e uma observação.
 export const MAP_MODES = {
-  valor: { name: 'Valor do terreno', label: 'Valor', layer: 'landValue', from: '#c0392b', mid: '#f1c40f', to: '#27ae60' },
+  valor: { name: 'Valor do terreno', label: 'Valor', layer: 'landValue', from: '#c0392b', mid: '#f1c40f', to: '#27ae60',
+    legend: { low: 'Baixo', high: 'Alto' } },
   // Poluição também nos rios e lagos (esgoto não tratado).
-  poluicao: { name: 'Poluição', layer: 'pollution', water: true, from: '#7db460', mid: '#c9a227', to: '#5b2a86' },
+  poluicao: { name: 'Poluição', layer: 'pollution', water: true, from: '#7db460', mid: '#c9a227', to: '#5b2a86',
+    legend: { low: 'Limpo', high: 'Muito poluído', note: 'Inclui rios e lagos (esgoto sem tratamento).' } },
   // Energia e água: prédios abastecidos (verde) ou não (vermelho) e as ruas
   // das redes com ou sem produção. O resto do mapa fica com a cor normal.
-  energia: { name: 'Energia', layer: 'powerMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
-  agua: { name: 'Água', layer: 'waterMap', from: '#d64541', mid: '#f1c40f', to: '#3498db' },
+  energia: { name: 'Energia', layer: 'powerMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { items: [[1, 'Prédio com energia'], [0, 'Prédio sem energia'], [0.85, 'Rua de rede com usina'], [0.25, 'Rua de rede sem usina']] } },
+  agua: { name: 'Água', layer: 'waterMap', from: '#d64541', mid: '#f1c40f', to: '#3498db',
+    legend: { items: [[1, 'Prédio com água'], [0, 'Prédio sem água'], [0.85, 'Rua de rede com bomba'], [0.25, 'Rua de rede sem bomba']] } },
   // Escolas (ensino fundamental): casas com escola com vaga no raio (azul),
   // com escola mas sem vaga (amarelo) e sem escola (vermelho).
-  escolas: { name: 'Escolas', layer: 'schoolMap', from: '#d64541', mid: '#f1c40f', to: '#4f8ff7' },
+  escolas: { name: 'Escolas', layer: 'schoolMap', from: '#d64541', mid: '#f1c40f', to: '#4f8ff7',
+    legend: { items: [[1, 'Escola com vaga perto'], [0.5, 'Escola perto, mas lotada'], [0, 'Sem escola perto']], note: 'Casas e escolas de ensino fundamental.' } },
   // Bem-estar das casas (ver systems/wellbeing.js): verde é bom.
-  saude: { name: 'Saúde', layer: 'healthMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
-  crime: { name: 'Segurança', label: 'Crime', layer: 'crimeMap', from: '#8e1b1b', mid: '#f1c40f', to: '#2ecc71' },
-  satisfacao: { name: 'Satisfação', layer: 'satisfactionMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  saude: { name: 'Saúde', layer: 'healthMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { low: 'Doente', high: 'Saudável', note: 'Saúde média dos moradores de cada casa.' } },
+  crime: { name: 'Segurança', label: 'Crime', layer: 'crimeMap', from: '#8e1b1b', mid: '#f1c40f', to: '#2ecc71',
+    legend: { low: 'Muito crime', high: 'Seguro' } },
+  satisfacao: { name: 'Satisfação', layer: 'satisfactionMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { low: 'Insatisfeitos', high: 'Satisfeitos' } },
   // Alimentos: casas com mercado no raio (verde) ou sem (vermelho).
-  alimentos: { name: 'Alimentos', layer: 'foodMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  alimentos: { name: 'Alimentos', layer: 'foodMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { low: 'Sem mercado', high: 'Bem abastecido', note: 'Mercados e restaurantes no raio das casas.' } },
   // Lixo: prédios com coleta (verde) ou com lixo acumulando (vermelho).
-  lixo: { name: 'Lixo', layer: 'wasteMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  lixo: { name: 'Lixo', layer: 'wasteMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { items: [[1, 'Lixo recolhido'], [0, 'Lixo acumulando']], note: 'Precisa de lixão ou aterro no raio.' } },
   // Trânsito: só as ruas mudam de cor (verde livre, vermelho parado).
-  transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { low: 'Parado', high: 'Livre', note: 'Só as ruas mudam de cor.' } },
 };
 const MAP_STEPS = 10;
 
@@ -1039,3 +1052,6 @@ function gradient(from, mid, to, steps) {
 }
 
 for (const mode of Object.values(MAP_MODES)) mode.colors = gradient(mode.from, mode.mid, mode.to, MAP_STEPS);
+
+/** Cor com que o mapa `mode` pinta o valor `v` (0 a 1). */
+export const mapColor = (mode, v) => mode.colors[Math.round(v * MAP_STEPS)];

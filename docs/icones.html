@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ícones do jogo</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    body { display: block; overflow: auto; height: auto; padding: 16px 20px 40px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-top: 16px; }
+    figure { margin: 0; padding: 12px 6px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; text-align: center; }
+    figure .icon { width: 32px; height: 32px; }
+    figure .row { display: flex; justify-content: center; gap: 8px; align-items: center; margin-top: 8px; }
+    figure .row .icon { width: 16px; height: 16px; }
+    figcaption { margin-top: 6px; font: 11px ui-monospace, monospace; color: var(--muted); word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Ícones do jogo</h1>
+  <p class="muted">Desenhados em <code>src/ui/icons.js</code>: SVG de traço numa grade de 24×24, na cor do texto. Em 32 px, 16 px e sobre a cor do prédio.</p>
+  <div class="grid" id="grid"></div>
+  <script type="module">
+    import { ICONS, icon } from '../src/ui/icons.js';
+    document.getElementById('grid').innerHTML = Object.keys(ICONS).map((name) => `
+      <figure>${icon(name)}
+        <div class="row">${icon(name)}<span class="glyph" style="--c:#4f8ff7;color:#fff">${icon(name)}</span></div>
+        <figcaption>${name}</figcaption>
+      </figure>`).join('');
+  </script>
+</body>
+</html>

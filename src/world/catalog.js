@@ -641,14 +641,14 @@ export const CULTURE = {
 // Notícias (ver systems/news.js): a imprensa da cidade transforma o que
 // acontece em notícias, que são também os avisos para o jogador.
 export const NEWS = {
-  // Do mais antigo ao mais novo: o veículo, o ícone e a tecnologia que o libera
+  // Do mais antigo ao mais novo: o veículo, o ícone (ui/icons.js) e a tecnologia que o libera
   // (o setor de empresa de cada um está em SECTORS).
   media: {
-    jornal: { name: 'Jornal', era: 'Era do jornal', icon: '📰', sector: 'jornal' },
-    radio: { name: 'Rádio', era: 'Era do rádio', icon: '📻', sector: 'radio', tech: 'radio' },
-    tv: { name: 'Televisão', era: 'Era da televisão', icon: '📺', sector: 'tv', tech: 'televisao' },
-    portal: { name: 'Internet', era: 'Era da internet', icon: '🌐', sector: 'portal', tech: 'internet' },
-    social: { name: 'Redes sociais', era: 'Era das redes sociais', icon: '📱', sector: 'digital', tech: 'smartphone' },
+    jornal: { name: 'Jornal', era: 'Era do jornal', icon: 'news', sector: 'jornal' },
+    radio: { name: 'Rádio', era: 'Era do rádio', icon: 'radio', sector: 'radio', tech: 'radio' },
+    tv: { name: 'Televisão', era: 'Era da televisão', icon: 'tv', sector: 'tv', tech: 'televisao' },
+    portal: { name: 'Internet', era: 'Era da internet', icon: 'web', sector: 'portal', tech: 'internet' },
+    social: { name: 'Redes sociais', era: 'Era das redes sociais', icon: 'phone', sector: 'digital', tech: 'smartphone' },
   },
   // Sem imprensa local, só a regional dá as notícias importantes da cidade.
   regional: { jornal: 'Folha da Região', radio: 'Rádio Nacional', tv: 'TV Regional', portal: 'Portal da Região', social: 'Portal da Região' },
