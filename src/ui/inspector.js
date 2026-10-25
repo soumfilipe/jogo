@@ -15,6 +15,8 @@ import { nowShowing, showingAppeal } from '../systems/culture.js';
 import { homeStress, overloadedParents } from '../systems/childcare.js';
 import { CHILDCARE, CULTURE } from '../world/catalog.js';
 import { unlockedTypes } from '../systems/agenda.js';
+import { activeClubs, clubStrength, unlockedSports } from '../systems/sports.js';
+import { SPORTS } from '../world/catalog.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { TICKS_PER_DAY, formatClock } from '../core/time.js';
@@ -181,6 +183,9 @@ function renderUtility(el, b, state, rt) {
   // Palco de eventos (painel Cultura): arena, estádio, praça, cinema, teatro...
   const stage = unlockedTypes(rt).some((t) => CULTURE.eventTypes[t].venues.includes(b.type));
   const next = state.culture?.events.filter((e) => e.venue === b.id && e.status === 'agendado').sort((a, c) => a.day - c.day)[0];
+  // Casa de clubes (painel Esporte): campo, estádio, ginásio.
+  const clubs = activeClubs(state).filter((c) => c.home === b.id);
+  const canFound = unlockedSports(rt).some((s) => SPORTS.kinds[s].venues.includes(b.type) && !clubs.some((c) => c.sport === s));
   const kind = u.service ? (u.service.kind === 'lazer' ? 'Lazer' : 'Serviço público') : u.school && u.institute ? 'Ensino e pesquisa' : u.school || u.library ? 'Educação'
     : u.institute || u.privateResearch ? 'Pesquisa' : u.income ? 'Estatal' : 'Serviço público';
   el.innerHTML = `
@@ -199,7 +204,7 @@ function renderUtility(el, b, state, rt) {
       ${u.freight ? `<dt>Carga</dt><dd>indústrias a até ${Math.round(u.freight.range * mod(rt, 'freightRange'))} tiles pela rua${u.freight.bonus ? ` (+${pct(u.freight.bonus)} na receita)` : ''}</dd>` : ''}
       ${u.supply ? `<dt>Abastece</dt><dd>comércio a até ${u.supply.radius} tiles</dd>` : ''}
       ${u.tourism?.works ? `<dt>Em cartaz</dt><dd>${nowShowing(state.culture, u.tourism.works, state.time.tick).slice(0, 3).map((w) => esc(w.title)).join(' · ') || 'nada'}</dd>` : ''}
-      ${u.tourism ? `<dt>Turistas</dt><dd>${visitorsAt(state, b.id)} aqui agora · ${u.tourism.appeal + (u.tourism.works ? showingAppeal(state.culture, u.tourism.works, state.time.tick) : 0)} por dia${u.tourism.game ? `, ${u.tourism.game} em dia de jogo (domingo)` : ''}${u.tourism.weekend ? `, ${u.tourism.weekend} no fim de semana` : ''}${workers ? '' : ` (${NO_STAFF})`}</dd>` : ''}
+      ${u.tourism ? `<dt>Turistas</dt><dd>${visitorsAt(state, b.id)} aqui agora · ${u.tourism.appeal + (u.tourism.works ? showingAppeal(state.culture, u.tourism.works, state.time.tick) : 0)} por dia${u.tourism.game && !clubs.length ? `, ${u.tourism.game} em dia de jogo (domingo)` : ''}${u.tourism.weekend ? `, ${u.tourism.weekend} no fim de semana` : ''}${workers ? '' : ` (${NO_STAFF})`}</dd>` : ''}
       ${u.hotel ? `<dt>Quartos</dt><dd>${u.hotel.rooms} (turista que dorme aqui gasta mais)</dd>` : ''}
       ${u.gateway ? '<dt>Turistas</dt><dd>chegam por aqui (+50% de turismo)</dd>' : ''}
       ${u.gated?.income ? `<dt>Transmissão</dt><dd>${mod(rt, u.gated.income, 0) > 0 ? 'jogos na TV dão a receita do mês' : 'sem receita até a pesquisa de esporte na TV'}</dd>` : ''}
@@ -215,9 +220,18 @@ function renderUtility(el, b, state, rt) {
       <dt>Acesso a estrada</dt><dd>${access >= 0 ? 'Sim' : NO}</dd>
       ${net ? `<dt>Rede (${label})</dt><dd>${net[res].used.toLocaleString('pt-BR')} usados de ${net[res].supply.toLocaleString('pt-BR')}</dd>` : ''}
       ${u.pollution ? `<dt>Poluição</dt><dd>alta em volta</dd>` : ''}
+      ${clubs.length ? `<dt>${clubs.length > 1 ? 'Clubes' : 'Clube'}</dt><dd>${clubs.map((c) => `${esc(c.name)} (${SPORTS.divisions[c.division].name.toLowerCase()}, força ${pct(clubStrength(state, rt, c))})`).join('; ')}</dd>` : ''}
       ${next ? `<dt>Próximo evento</dt><dd>${esc(next.name)} (em ${next.day - Math.floor(state.time.tick / TICKS_PER_DAY)} dias)</dd>` : ''}
     </dl>
-    ${stage ? '<button data-plan-event>Agendar evento aqui</button>' : ''}`;
+    ${stage ? '<button data-plan-event>Agendar evento aqui</button>' : ''}
+    ${canFound ? '<button data-found-club>Fundar clube aqui</button>' : ''}`;
+}
+
+/** "Atleta do {clube} (habilidade X%)" ou null. */
+function athleteOf(state, rt, c) {
+  if (c.athlete === undefined) return null;
+  const club = state.sports?.clubs.find((x) => x.id === c.athlete);
+  return club ? `Atleta do ${esc(club.name)} (habilidade ${pct(c.skill ?? 0)})` : null;
 }
 
 function renderCitizen(el, c, state, rt, following) {
@@ -235,9 +249,9 @@ function renderCitizen(el, c, state, rt, following) {
     <p class="muted">${c.age} anos · ${esc(activity(c))}</p>
     <dl>
       <dt>Casa</dt><dd><button class="link" data-building="${home.id}">${esc(BUILDINGS[home.type].name)} #${home.id}</button></dd>
-      <dt>Trabalho</dt><dd>${job
+      <dt>Trabalho</dt><dd>${athleteOf(state, rt, c) ?? (job
         ? `${company ? `${esc(company.name)}, ` : ''}<button class="link" data-building="${job.id}">${esc(BUILDINGS[job.type].name)} #${job.id}</button>`
-        : notWorking}</dd>
+        : notWorking)}</dd>
       <dt>Escolaridade</dt><dd>${edu}</dd>
       ${studying ? `<dt>Estuda</dt><dd>${studying}</dd>` : ''}
       ${job ? `<dt>Turno</dt><dd>${esc(SHIFTS[c.shift ?? 'diurno'].name)}</dd>

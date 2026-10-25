@@ -25,6 +25,7 @@ import { collectWaste } from './waste.js';
 import { indexVisitors, planDay, updateVisitors } from './tourism.js';
 import { closeCultureMonth } from './culture.js';
 import { runEventsOfDay } from './agenda.js';
+import { closeSportsMonth, runSportsOfDay } from './sports.js';
 import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
@@ -73,6 +74,8 @@ export function tick(state, rt) {
       // Eventos de hoje (público sorteado, encerramentos, séries) e, com eles,
       // os turistas e o público que vão andar pela cidade.
       runEventsOfDay(state, rt);
+      // Jogos do dia dos clubes da cidade (e começo e fim das temporadas).
+      runSportsOfDay(state, rt);
       planDay(state, rt);
       // Notícias do dia, com a cidade já atualizada.
       dailyNews(state, rt);
@@ -91,6 +94,7 @@ export function tick(state, rt) {
     closeHealthMonth(state, rt);
     closeResearchMonth(state, rt);
     closeCultureMonth(state, rt);
+    closeSportsMonth(state, rt);
     monthlyNews(state, rt);
   }
 }

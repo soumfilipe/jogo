@@ -33,7 +33,7 @@
 //
 // Para a tela, cada notícia publicada também entra em rt.newsFresh.
 
-import { BUILDINGS, CULTURE, ECONOMY, NEWS, SECTORS, TOURISM, ZONE } from '../world/catalog.js';
+import { BUILDINGS, CULTURE, ECONOMY, NEWS, SECTORS, SPORTS, TOURISM, ZONE } from '../world/catalog.js';
 import { MARCOS, TECHS, TECH_BY_ID, marcoAt } from '../world/techs.js';
 import { MEDIA_ARRIVAL, SOLVED, STORIES } from '../world/stories.js';
 import { FIRST_NAMES, LAST_NAMES } from '../agents/names.js';
@@ -362,6 +362,50 @@ function publishEvent(ctx, e) {
     publish(ctx, { cat: 'cultura', story: STORIES.artista_saiu, vars: { artista: e.name, genero: CULTURE.genres[e.genre]?.name ?? 'música' } });
     return;
   }
+  if (e.kind === 'jogo') {
+    const [mine, theirs] = e.score;
+    const story = mine > theirs ? STORIES.jogo_vitoria : mine < theirs ? STORIES.jogo_derrota : STORIES.jogo_empate;
+    publish(ctx, {
+      cat: 'esporte',
+      tile: e.home ? e.tile : null,
+      story,
+      vars: {
+        clube: e.club,
+        adversario: e.rival,
+        modalidade: SPORTS.kinds[e.sport].name,
+        placar: e.sport === 'volei' ? `${mine} sets a ${theirs}` : `${mine} a ${theirs}`,
+        onde: e.home ? 'em casa' : 'fora de casa',
+        torcida: e.home
+          ? `${count(e.attendance ?? 0)} torcedores foram ao jogo.`
+          : 'O time jogou longe de casa, diante da torcida adversária.',
+      },
+    });
+    return;
+  }
+  if (e.kind === 'clube_fundado') {
+    publish(ctx, { cat: 'esporte', tile: e.tile, story: STORIES.clube_fundado, vars: { clube: e.name, modalidade: SPORTS.kinds[e.sport].name.toLowerCase() } });
+    return;
+  }
+  if (e.kind === 'temporada') {
+    const story = e.champion ? STORIES.temporada_titulo : e.promoted ? STORIES.temporada_acesso
+      : e.relegated ? STORIES.temporada_rebaixamento : STORIES.temporada_fim;
+    publish(ctx, {
+      cat: 'esporte',
+      alert: e.champion || e.promoted,
+      story,
+      vars: {
+        clube: e.club,
+        modalidade: SPORTS.kinds[e.sport].name.toLowerCase(),
+        divisao: e.division.toLowerCase(),
+        posicao: e.position,
+        destaque: e.star ? `${e.star} foi o destaque da campanha.` : 'O elenco inteiro foi decisivo.',
+        proxima: e.promoted || e.relegated
+          ? `Na próxima temporada, o time disputa o campeonato ${e.next.toLowerCase()}.`
+          : 'O time defende o título na próxima temporada.',
+      },
+    });
+    return;
+  }
   if (e.kind === 'serie_confirmar') {
     publish(ctx, { cat: 'evento', alert: true, story: STORIES.serie_confirmar, vars: { evento: e.name, dias: e.days } });
     return;
@@ -431,7 +475,9 @@ function calendarNews(ctx) {
   if (ev.carnaval && c.day === TOURISM.carnaval.days[0]) publish(ctx, { cat: 'evento', alert: true, story: STORIES.carnaval });
   if (ev.mega && c.day === 1) publish(ctx, { cat: 'evento', alert: true, story: STORIES.mega });
   // Segunda-feira: o resultado do jogo de domingo, se a cidade tem campo ou estádio.
+  // (Com clube de futebol, as notícias são dos jogos de verdade; ver sports.js.)
   if (c.weekday === 0 && ctx.tick > TICKS_PER_DAY && random(ctx.rng) < 0.5
+    && !state.sports?.clubs.some((x) => x.sport === 'futebol' && !x.closed)
     && state.buildings.some((b) => b.type === 'estadio' || b.type === 'campo_futebol')) {
     footballNews(ctx);
   }

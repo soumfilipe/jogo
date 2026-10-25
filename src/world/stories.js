@@ -256,6 +256,71 @@ export const STORIES = {
       ['A torcida lotou as arquibancadas e o trânsito ficou complicado na saída.', 'O técnico disse que o time ainda pode melhorar.'],
     ],
   },
+  // Clubes da cidade (ver systems/sports.js).
+  jogo_vitoria: {
+    h: ['{clube} vence {adversario}', 'Vitória do {clube} {onde}', '{modalidade}: {clube} {placar} {adversario}'],
+    s: [
+      ['O {clube} venceu {adversario} por {placar}, {onde}.', 'Deu {clube}: {placar} sobre {adversario}, {onde}.'],
+      ['{torcida}'],
+      ['A vitória anima a torcida para a sequência do campeonato.', 'O técnico elogiou a entrega do elenco.'],
+    ],
+  },
+  jogo_derrota: {
+    h: ['{clube} perde para {adversario}', 'Derrota do {clube} {onde}', '{modalidade}: {clube} cai diante de {adversario}'],
+    s: [
+      ['O {clube} perdeu para {adversario} por {placar}, {onde}.', 'Dia ruim para o {clube}: {placar} para {adversario}, {onde}.'],
+      ['{torcida}'],
+      ['O técnico pediu calma e disse que o time vai reagir.', 'A torcida cobrou mais empenho na saída.'],
+    ],
+  },
+  jogo_empate: {
+    h: ['{clube} empata com {adversario}', 'Empate do {clube} {onde}'],
+    s: [
+      ['O {clube} empatou com {adversario}: {placar}, {onde}.'],
+      ['{torcida}'],
+      ['O resultado deixou tudo em aberto na tabela.', 'Os dois times saíram de campo reclamando da arbitragem.'],
+    ],
+  },
+  clube_fundado: {
+    h: ['Nasce o {clube}', '{cidade} ganha um clube de {modalidade}'],
+    s: [
+      ['Foi fundado o {clube}, que vai disputar o campeonato estadual de {modalidade}.'],
+      ['O elenco foi montado com atletas da própria cidade.', 'Os atletas são todos moradores de {cidade}.'],
+      ['A diretoria promete brigar pelo acesso já na primeira temporada.', 'A torcida já lota os treinos para conhecer o time.'],
+    ],
+  },
+  temporada_titulo: {
+    h: ['{clube} é campeão {divisao}!', 'Título: {clube} conquista o campeonato {divisao}', 'Festa em {cidade}: o {clube} é campeão'],
+    s: [
+      ['O {clube} terminou em primeiro lugar e é campeão {divisao} de {modalidade}.'],
+      ['{destaque}'],
+      ['{proxima}'],
+    ],
+  },
+  temporada_acesso: {
+    h: ['{clube} garante o acesso', 'O {clube} sobe de divisão'],
+    s: [
+      ['O {clube} terminou o campeonato {divisao} de {modalidade} em {posicao}º lugar e garantiu o acesso.'],
+      ['{destaque}'],
+      ['{proxima}'],
+    ],
+  },
+  temporada_rebaixamento: {
+    h: ['{clube} é rebaixado', 'Queda: o {clube} cai de divisão'],
+    s: [
+      ['O {clube} terminou o campeonato {divisao} de {modalidade} em {posicao}º lugar e foi rebaixado.'],
+      ['A diretoria promete reforçar o elenco.', 'A torcida protestou na saída do último jogo.'],
+      ['{proxima}'],
+    ],
+  },
+  temporada_fim: {
+    h: ['{clube} termina o campeonato {divisao} em {posicao}º lugar', 'Fim de temporada para o {clube}'],
+    s: [
+      ['O {clube} fechou a temporada em {posicao}º lugar no campeonato {divisao} de {modalidade}.'],
+      ['{destaque}'],
+      ['A diretoria já planeja a próxima temporada.', 'Agora é descansar e pensar em reforços.'],
+    ],
+  },
   evento_sucesso: {
     h: ['{evento} lota e vira o assunto da cidade', 'Sucesso: {publico} pessoas no {evento}', '{evento} esgota os ingressos'],
     s: [

@@ -10,6 +10,7 @@ import { createPolicies } from '../systems/policies.js';
 import { createTourism } from '../systems/tourism.js';
 import { createCulture } from '../systems/culture.js';
 import { createNews } from '../systems/news.js';
+import { createSports } from '../systems/sports.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -42,6 +43,7 @@ export function createWorld({
       fares: 0, // passagens do transporte público no mês (entram no fechamento)
       tourism: 0, // gasto dos turistas no mês (ver systems/tourism.js)
       eventsIncome: 0, // ingressos dos eventos no mês (ver systems/agenda.js)
+      sportsIncome: 0, // taxa municipal dos ingressos dos jogos (ver systems/sports.js)
     },
     map: {
       width,
@@ -68,6 +70,8 @@ export function createWorld({
     research,
     // Artistas, gêneros, filmes e peças (ver systems/culture.js).
     culture: createCulture(createRng((seed ^ 0x5eed5) >>> 0), research.world, 7 * 60),
+    // Clubes, ligas e rivais (ver systems/sports.js).
+    sports: createSports(),
     // Notícias e imprensa (ver systems/news.js).
     news: createNews(seed, research),
     // Cursos da universidade (ver systems/education.js).

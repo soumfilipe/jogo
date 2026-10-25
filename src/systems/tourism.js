@@ -13,10 +13,10 @@
 //   { id, src: tile de onde veio (e para onde volta), dest: id da atração
 //     (null quando o destino é um tile de rua, destTile, como um calçadão),
 //     until: minuto do dia em que vai embora, fan: torcedor da cidade?,
-//     event?: id do evento da agenda (ver agenda.js),
+//     event?: id do evento da agenda (ver agenda.js), match?: id do jogo (ver sports.js),
 //     state: 'indo' | 'visitando' | 'voltando', x, y, path, step }
 
-import { BUILDINGS, CULTURE, TOURISM, ZONE } from '../world/catalog.js';
+import { BUILDINGS, CULTURE, SPORTS, TOURISM, ZONE } from '../world/catalog.js';
 import { CITIZEN_SPEED } from '../world/catalog.js';
 import { MINUTES_PER_DAY, calendar } from '../core/time.js';
 import { randomInt } from '../core/rng.js';
@@ -25,6 +25,7 @@ import { attractionAppeal, eventMultiplier, todaysEvents } from './events.js';
 import { congestionFactor, roadSpeed } from './traffic.js';
 import { mod } from './mods.js';
 import { eventsToday, venueOf } from './agenda.js';
+import { clubHomes, matchesToday } from './sports.js';
 
 export function createTourism() {
   return { plan: [] }; // { at: minuto do dia, dest, src, until, fan }
@@ -70,11 +71,14 @@ export function todaysVisits(state, rt, events = todaysEvents(state, rt)) {
   const outside = tiles.length > 0;
   const cityMul = mod(rt, 'tourism') * eventMultiplier(events) * gateway;
   const visits = [];
+  // Campo, estádio ou ginásio com clube: a torcida vem dos jogos do clube (ver sports.js).
+  const clubs = clubHomes(state);
   for (const b of state.buildings) {
     if (!staffed(rt, b) || rt.access.get(b.id) < 0) continue;
-    const appeal = attractionAppeal(b.type, events, state.culture, state.time.tick);
+    const today = clubs.has(b.id) ? { ...events, game: false } : events;
+    const appeal = attractionAppeal(b.type, today, state.culture, state.time.tick);
     if (!appeal) continue;
-    const isGame = events.game && BUILDINGS[b.type].utility.tourism.game;
+    const isGame = today.game && BUILDINGS[b.type].utility.tourism.game;
     const total = Math.round(appeal * cityMul);
     const fans = isGame ? Math.round(total * TOURISM.localFans) : 0;
     visits.push({ b, tourists: outside ? total - fans : 0, fans, game: Boolean(isGame) });
@@ -119,12 +123,20 @@ export function planDay(state, rt) {
   const { visits, entries } = todaysVisits(state, rt, events);
   // Público dos eventos da agenda (já sorteado por runEventsOfDay): parte da
   // cidade, parte de fora (se há por onde chegar).
+  // Torcida dos jogos em casa dos clubes da cidade: chega antes e fica umas duas horas.
+  const share = (total) => (entries.length ? Math.round(total * (1 - TOURISM.localFans)) : 0);
   const crowds = eventsToday(state).map((ev) => {
     const venue = venueOf(state, rt, ev.venue);
     const total = ev.results[ev.results.length - 1] ?? 0;
-    const fromOutside = entries.length ? Math.round(total * (1 - TOURISM.localFans)) : 0;
-    return { ev, venue, total, fromOutside };
+    const [h0, h1] = CULTURE.eventTypes[ev.type].hours;
+    return { tag: { event: ev.id }, venue, total, fromOutside: share(total), h0, h1 };
   }).filter((c) => c.venue && c.total > 0);
+  for (const { fx, club } of matchesToday(state)) {
+    const b = rt.buildingById.get(club.home);
+    if (!b) continue;
+    const hour = SPORTS.kinds[club.sport].hour;
+    crowds.push({ tag: { match: fx.id }, venue: { building: b.id, tile: b.tile }, total: fx.attendance, fromOutside: share(fx.attendance), h0: hour, h1: hour + 2 });
+  }
   let outside = parkTourists(state, rt);
   let wanted = 0;
   for (const v of visits) {
@@ -153,15 +165,14 @@ export function planDay(state, rt) {
     add(Math.round(v.tourists * scale), () => entries[randomInt(state.rng, 0, entries.length - 1)], false);
     if (homes.length) add(Math.round(v.fans * scale), () => rt.access.get(homes[randomInt(state.rng, 0, homes.length - 1)].id), true);
   }
-  // Público dos eventos: chega de 2h a 10 min antes e vai embora no fim.
-  for (const { ev, venue, total, fromOutside } of crowds) {
-    const [h0, h1] = CULTURE.eventTypes[ev.type].hours;
+  // Público dos eventos e dos jogos: chega de 2h a 10 min antes e vai embora no fim.
+  for (const { tag, venue, total, fromOutside, h0, h1 } of crowds) {
     const until = Math.min(MINUTES_PER_DAY - 30, h1 * 60);
     const dest = venue.building;
     const destTile = dest === null ? venue.tile : undefined;
     const add = (count, src, fan) => {
       for (let i = 0; i < count; i++) {
-        const p = { at: randomInt(state.rng, h0 * 60 - 120, h0 * 60 - 10), dest, src: src(), until, fan, event: ev.id };
+        const p = { at: randomInt(state.rng, h0 * 60 - 120, h0 * 60 - 10), dest, src: src(), until, fan, ...tag };
         if (destTile !== undefined) p.destTile = destTile;
         plan.push(p);
       }
@@ -223,6 +234,7 @@ export function updateVisitors(state, rt) {
     };
     if (p.dest === null) v.destTile = p.destTile;
     if (p.event) v.event = p.event;
+    if (p.match) v.match = p.match;
     addVisitor(state, rt, v);
   }
 

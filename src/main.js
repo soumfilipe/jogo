@@ -22,6 +22,7 @@ import { renderInspector } from './ui/inspector.js';
 import { BudgetPanel } from './ui/budget.js';
 import { ResearchPanel } from './ui/research.js';
 import { CulturePanel } from './ui/culture.js';
+import { SportsPanel } from './ui/sports.js';
 import { NewsPanel, mediumIcon } from './ui/news.js';
 import { Sheets } from './ui/sheets.js';
 import { hydrateIcons, icon, inkFor } from './ui/icons.js';
@@ -248,6 +249,7 @@ function throttledHud() {
   budget.render(state, rt);
   research.render(state, rt);
   culture.render(state, rt);
+  sports.render(state, rt);
   if (newsReset) {
     newsReset = false;
     newsPanel.markSeen(state);
@@ -580,12 +582,22 @@ const culture = new CulturePanel($('culture'), {
   },
 });
 $('btn-culture').onclick = () => toggleCulture();
+// Esporte: clubes, ligas e atletas (botão Esporte no topo).
+const sports = new SportsPanel($('sports'), {
+  act: (cmd) => {
+    const result = applyCommand(state, rt, cmd);
+    if (result.ok) dirty = true;
+    return result;
+  },
+  inspect: (id) => select({ type: 'citizen', id }),
+});
+$('btn-sports').onclick = () => toggleSports();
 // Notícias: o que a imprensa publicou e os veículos da cidade (botão Notícias no topo).
 const newsPanel = new NewsPanel($('news'));
 $('btn-news').onclick = () => toggleNews();
 
-// Orçamento, pesquisa, cultura e notícias ocupam o mesmo canto: abrir um fecha os outros.
-const cornerPanels = () => [budget, research, culture, newsPanel];
+// Orçamento, pesquisa, cultura, esporte e notícias ocupam o mesmo canto: abrir um fecha os outros.
+const cornerPanels = () => [budget, research, culture, sports, newsPanel];
 function openOnly(panel, force) {
   panel.toggle(force);
   if (panel.open) for (const other of cornerPanels()) if (other !== panel) other.toggle(false);
@@ -594,6 +606,7 @@ function openOnly(panel, force) {
 const toggleBudget = (force) => openOnly(budget, force);
 const toggleResearch = (force) => openOnly(research, force);
 const toggleCulture = (force) => openOnly(culture, force);
+const toggleSports = (force) => openOnly(sports, force);
 const toggleNews = (force) => openOnly(newsPanel, force);
 
 // Avisos na tela: as notícias de alerta que a imprensa acabou de publicar
@@ -736,6 +749,9 @@ for (const button of $('mobile-nav').children) {
     } else if (button.dataset.mobile === 'culture') {
       sheets.close();
       toggleCulture();
+    } else if (button.dataset.mobile === 'sports') {
+      sheets.close();
+      toggleSports();
     } else if (button.dataset.mobile === 'news') {
       sheets.close();
       toggleNews();
@@ -979,6 +995,9 @@ $('inspector-body').addEventListener('click', (e) => {
     select({ type: 'building', id: Number(target.dataset.building) });
     const b = rt.buildingById.get(selection.id);
     centerOn(cam, (b.tile % state.map.width) + 0.5, Math.floor(b.tile / state.map.width) + 0.5);
+  } else if ('foundClub' in target.dataset) {
+    sports.foundAt(selection.id);
+    toggleSports(true);
   } else if ('planEvent' in target.dataset) {
     culture.planAt(selection.id);
     toggleCulture(true);

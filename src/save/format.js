@@ -23,9 +23,10 @@ import { createRng, hash2 } from '../core/rng.js';
 import { createCulture } from '../systems/culture.js';
 import { talentOf } from '../agents/citizens.js';
 import { createNews } from '../systems/news.js';
+import { createSports } from '../systems/sports.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -236,6 +237,13 @@ const MIGRATIONS = {
     }
     data.citizens = encodeTable(citizens, { moves: { path: data.map.width } });
     save.version = 17;
+    return save;
+  },
+  // v17 -> v18: clubes e ligas (a cidade começa sem clubes).
+  17: (save) => {
+    save.data.sports ??= createSports();
+    save.data.economy.sportsIncome ??= 0;
+    save.version = 18;
     return save;
   },
 };

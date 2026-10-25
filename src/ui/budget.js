@@ -55,11 +55,13 @@ export class BudgetPanel {
         <dt data-fares>Passagens</dt><dd data-fares data-line="fares"></dd>
         <dt data-tourism>Turismo</dt><dd data-tourism data-line="tourism"></dd>
         <dt data-events>Eventos</dt><dd data-events data-line="events"></dd>
+        <dt data-sports-in>Esporte (taxa dos ingressos)</dt><dd data-sports-in data-line="sports-in"></dd>
         <dt data-food-export>Exportação de alimentos</dt><dd data-food-export data-line="food-export"></dd>
         <dt>Manutenção das ruas</dt><dd data-line="roads"></dd>
         <dt>Serviços públicos</dt><dd data-line="utilities"></dd>
         <dt>Pesquisa</dt><dd data-line="research"></dd>
         <dt>Leis e políticas</dt><dd data-line="policies"></dd>
+        <dt data-sports-out>Repasse aos clubes</dt><dd data-sports-out data-line="sports-out"></dd>
         <dt data-food-import>Alimentos importados</dt><dd data-food-import data-line="food-import"></dd>
         <dt>Parcelas de empréstimos</dt><dd data-line="loans"></dd>
         <dt class="total">Saldo do mês</dt><dd class="total" data-line="net"></dd>
@@ -145,7 +147,7 @@ export class BudgetPanel {
     }
 
     q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal - budget.income.fares
-      - budget.income.food - budget.income.tourism - (budget.income.events ?? 0));
+      - budget.income.food - budget.income.tourism - (budget.income.events ?? 0) - (budget.income.sports ?? 0));
     for (const el of this.el.querySelectorAll('[data-tourism]')) el.hidden = budget.income.tourism === 0;
     q('[data-line="tourism"]').textContent = money(budget.income.tourism);
     for (const el of this.el.querySelectorAll('[data-events]')) el.hidden = !budget.income.events;
@@ -164,6 +166,10 @@ export class BudgetPanel {
     q('[data-line="policies"]').textContent = money(-budget.expenses.policies);
     this.#renderPolicies(state, rt, budget.income.total);
     q('[data-line="loans"]').textContent = money(-budget.expenses.loans);
+    for (const el of this.el.querySelectorAll('[data-sports-in]')) el.hidden = !budget.income.sports;
+    q('[data-line="sports-in"]').textContent = money(budget.income.sports ?? 0);
+    for (const el of this.el.querySelectorAll('[data-sports-out]')) el.hidden = !budget.expenses.sports;
+    q('[data-line="sports-out"]').textContent = money(-(budget.expenses.sports ?? 0));
     q('[data-line="net"]').textContent = money(budget.net);
 
     const loans = q('[data-loans]');

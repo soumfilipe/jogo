@@ -24,6 +24,10 @@
 //     marketing, recurrence?, name? }    (agenda um evento; ver systems/agenda.js)
 //   { type: 'confirmEvent', id, artists?, marketing?, ticket? }   (próxima edição da série)
 //   { type: 'cancelEvent', id }
+//   { type: 'club', sport, home, name? }  (funda um clube; ver systems/sports.js)
+//   { type: 'clubBudget', id, training?, subsidy?, reinvest? }
+//   { type: 'clubCt', id }                (sobe o centro de treinamento)
+//   { type: 'closeClub', id }
 
 import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
@@ -38,6 +42,7 @@ import { computeCoverage } from '../systems/services.js';
 import { computeTransit } from '../systems/transit.js';
 import { computeFreight } from '../systems/logistics.js';
 import { cancelEvent, confirmEdition, scheduleEvent } from '../systems/agenda.js';
+import { closeClub, clubBudget, foundClub, upgradeCt } from '../systems/sports.js';
 
 // Ferramentas que vêm da pesquisa (efeito { tool } em techs.js).
 export const TOOL_TECH = {
@@ -142,6 +147,11 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'event') return scheduleEvent(state, rt, cmd);
   if (cmd.type === 'confirmEvent') return confirmEdition(state, rt, cmd);
   if (cmd.type === 'cancelEvent') return cancelEvent(state, rt, cmd);
+  // Clubes (ver systems/sports.js).
+  if (cmd.type === 'club') return foundClub(state, rt, cmd);
+  if (cmd.type === 'clubBudget') return clubBudget(state, rt, cmd);
+  if (cmd.type === 'clubCt') return upgradeCt(state, rt, cmd);
+  if (cmd.type === 'closeClub') return closeClub(state, rt, cmd);
   if (cmd.type === 'policy') {
     const result = setPolicy(state, rt, cmd.id, cmd.on);
     if (result.ok) computeMods(state, rt);

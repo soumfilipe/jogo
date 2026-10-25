@@ -706,8 +706,67 @@ export const CULTURE = {
   // Artista da cidade larga o emprego e vive da arte com esta fama.
   fullTimeFame: 0.25,
   // Vocação dos cidadãos (arte, esporte) e o talento mínimo para virar artista.
+  // A *Educação física escolar* aumenta a vocação para o esporte (mod calling.esporte).
   calling: { arte: 0.08, esporte: 0.08 },
   artistTalent: 0.6,
+};
+
+// Esporte (ver systems/sports.js): clubes da cidade, com atletas cidadãos,
+// jogando ligas contra cidades rivais inventadas.
+//   kinds: modalidades. venues: onde o clube manda os jogos; weekday: dia do
+//   jogo (0 = segunda ... 6 = domingo); hour: início; squad/starters: elenco e
+//   titulares; season: [mês de início, mês de fim]; score: como o placar é
+//   sorteado; tech: pesquisa que libera; points: [vitória, empate, derrota]
+//   (no vôlei, a vitória por 3 a 2 vale 2 e a derrota por 2 a 3 vale 1).
+export const SPORTS = {
+  kinds: {
+    futebol: { name: 'Futebol', venues: ['campo_futebol', 'estadio'], weekday: 6, hour: 16, squad: 22, starters: 11, season: [3, 11], score: 'gols', goals: 1.3, tech: 'futebol_profissional', points: [3, 1, 0] },
+    futsal: { name: 'Futsal', venues: ['ginasio'], weekday: 5, hour: 19, squad: 12, starters: 5, season: [4, 10], score: 'gols', goals: 3, tech: 'ginasio', points: [3, 1, 0] },
+    volei: { name: 'Vôlei', venues: ['ginasio'], weekday: 5, hour: 19, squad: 14, starters: 6, season: [4, 10], score: 'sets', tech: 'ginasio', points: [3, 0, 0] },
+    basquete: { name: 'Basquete', venues: ['ginasio'], weekday: 5, hour: 19, squad: 13, starters: 5, season: [4, 10], score: 'pontos', tech: 'ginasio', points: [2, 0, 1] },
+    handebol: { name: 'Handebol', venues: ['ginasio'], weekday: 5, hour: 19, squad: 14, starters: 7, season: [4, 10], score: 'gols', goals: 26, tech: 'ginasio', points: [2, 1, 0] },
+  },
+  // Lugares no estádio, no campo do clube e no ginásio; bônus de força de mandar o jogo ali.
+  venues: {
+    campo_futebol: { capacity: 2_000, bonus: 0 },
+    estadio: { capacity: 20_000, bonus: 0.04 },
+    ginasio: { capacity: 1_500, bonus: 0 },
+  },
+  // Divisões: força média das rivais, prêmio do campeão (os outros ganham
+  // menos, pela posição) e patrocínio por mês.
+  divisions: [
+    { name: 'Estadual', strength: 0.35, prize: 20_000, sponsor: 2_000, broadcast: 1_000 },
+    { name: 'Regional', strength: 0.5, prize: 80_000, sponsor: 8_000, broadcast: 5_000 },
+    { name: 'Nacional', strength: 0.65, prize: 400_000, sponsor: 40_000, broadcast: 25_000 },
+  ],
+  teams: 8,
+  up: 2,
+  down: 2,
+  foundCost: 15_000,
+  // Salário por atleta: salary × (0,5 + habilidade).
+  salary: 300,
+  ticket: 10,
+  // Parte do ingresso que fica com a prefeitura (taxa municipal).
+  cityShare: 0.1,
+  // Público: parte da população (mais gente de fora, se há por onde chegar),
+  // vezes (0,3 + torcida) e (0,5 + força).
+  audience: { city: 0.25, regional: 600 },
+  // Treino: a habilidade sobe growth × (0,3 + ln(1 + verba / scale)) por mês
+  // até peakAge, fica parada até declineAge e depois cai decline por mês.
+  training: { growth: 0.006, scale: 5_000 },
+  peakAge: 27,
+  declineAge: 31,
+  decline: 0.008,
+  ages: [18, 34],
+  // Centro de treinamento: custo de cada nível e ganho de habilidade por nível.
+  ct: { cost: [30_000, 80_000, 200_000], bonus: 0.15, strength: 0.02 },
+  // Meses no vermelho até o clube perder atletas.
+  redMonths: 3,
+  // Reinvestir: caixa acima de tantos meses de despesas vira treino.
+  reserveMonths: 6,
+  // Nomes inventados das rivais: "{time} de {cidade}".
+  rivalTeams: ['Ferroviário', 'Operário', 'União', 'Atlético', 'Comercial', 'Guarani', 'Independente', 'Esporte Clube', 'Ypiranga', 'Industrial', 'Juventude', 'Palmeirense', 'Real', 'América', 'Botafogo', 'Náutico'],
+  rivalCities: ['Vila Serrana', 'São Bento da Mata', 'Porto do Sul', 'Santa Clara do Rio', 'Campo Belo', 'Serra Azul', 'Lagoa Seca', 'Rio Claro do Norte', 'Monte Verde', 'Pedra Branca', 'Barra Funda', 'Vale do Sol', 'Bom Jardim', 'Três Pontes', 'Águas Claras', 'Nova Esperança', 'Porto Real', 'Cachoeira Alta', 'São Miguel', 'Santa Rita'],
 };
 
 // Turismo (ver systems/tourism.js).
