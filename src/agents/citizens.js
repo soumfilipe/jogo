@@ -18,7 +18,8 @@
 //   mode:  transporte da viagem atual ('onibus', 'brt', 'vlt', 'metro'; null = carro)
 //   talent: talento (0 a 1);  calling: vocação ('arte' | 'esporte' | null)
 //   artist?: id do artista (state.culture) quando é artista da cidade;
-//            fullTime?: vive da arte (não procura emprego)
+//            fullTime?: vive da arte (true) ou do esporte ('esporte'): não procura emprego
+//   athlete?: id do clube (state.sports) quando é atleta;  skill?: habilidade (0 a 1)
 //   stress?: ver systems/childcare.js
 // }
 //
@@ -79,16 +80,17 @@ export function createCitizen(state, rt, home, { age, edu = 1, lastName } = {}) 
     path: null,
     step: 0,
     mode: null,
-    ...talentOf(random(state.rng), random(state.rng)),
+    ...talentOf(random(state.rng), random(state.rng), CULTURE.calling.esporte * mod(rt, 'calling.esporte')),
   });
 }
 
 /**
  * Talento e vocação a partir de dois sorteios de 0 a 1 (a migração de saves
- * antigos usa um hash do id no lugar do sorteio).
+ * antigos usa um hash do id no lugar do sorteio). `esporte`: chance de
+ * vocação para o esporte (a Educação física escolar aumenta).
  */
-export function talentOf(roll, callRoll) {
-  const { arte, esporte } = CULTURE.calling;
+export function talentOf(roll, callRoll, esporte = CULTURE.calling.esporte) {
+  const { arte } = CULTURE.calling;
   const calling = callRoll < arte ? 'arte' : callRoll < arte + esporte ? 'esporte' : null;
   return { talent: Math.round(roll * 1000) / 1000, calling };
 }

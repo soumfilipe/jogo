@@ -15,11 +15,11 @@ const CATS = {
   tecnologia: ['Tecnologia', 'ciencia'], mundo: ['Mundo', 'ciencia'], evento: ['Eventos', 'cidade'],
   cultura: ['Cultura', 'fofoca'], economia: ['Economia', 'alertas'], imprensa: ['Imprensa', 'cidade'],
   fofoca: ['Fofoca', 'fofoca'], critica: ['Opinião', 'opiniao'], boato: ['Exclusivo', 'boato'],
-  checagem: ['Checagem', 'boato'],
+  checagem: ['Checagem', 'boato'], esporte: ['Esporte', 'esporte'],
 };
 const FILTERS = [
   ['todas', 'Todas'], ['alertas', 'Alertas'], ['cidade', 'Cidade'], ['ciencia', 'Ciência'],
-  ['opiniao', 'Opinião'], ['fofoca', 'Fofoca'], ['boato', 'Boatos e checagem'],
+  ['esporte', 'Esporte'], ['opiniao', 'Opinião'], ['fofoca', 'Fofoca'], ['boato', 'Boatos e checagem'],
 ];
 
 /** Ícone do veículo (jornal, rádio, TV, portal ou redes sociais), em SVG. */

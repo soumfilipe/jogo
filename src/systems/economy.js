@@ -5,8 +5,10 @@
 //   comercial / industrial / rural: cada vaga ocupada paga incomePerJob por ponto
 //   estatais (refinaria, fábrica de cimento...): receita proporcional à lotação
 //   exportação de alimentos que sobram (ver food.js)
+//   taxa municipal dos ingressos dos jogos dos clubes (ver sports.js)
 // Despesas: manutenção das ruas e dos serviços públicos, verba de pesquisa,
-// leis e políticas ativas, alimentos importados, parcelas de empréstimos. Tecnologias mudam vários desses valores (mod()).
+// leis e políticas ativas, alimentos importados, parcelas de empréstimos,
+// repasse aos clubes. Tecnologias mudam vários desses valores (mod()).
 //
 // monthlyBudget() calcula o mês "como está agora" (para o painel e a
 // previsão); closeMonth() aplica no fim de cada mês, paga as parcelas e guarda
@@ -19,6 +21,7 @@ import { policiesCost } from './policies.js';
 import { freightFactor } from './logistics.js';
 import { foodBalance } from './food.js';
 import { effectiveWorkers, overloadedParents, productivity } from './childcare.js';
+import { sportsSubsidy } from './sports.js';
 
 const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
 
@@ -27,7 +30,8 @@ export function monthlyBudget(state, rt) {
   // Pais sem creche para o filho pequeno rendem menos (ver childcare.js).
   const overloaded = overloadedParents(state, rt);
   let employed = 0;
-  for (const c of state.citizens) if (c.job !== null) employed += productivity(overloaded, c.id);
+  // Atletas dos clubes recebem salário do clube e pagam imposto como empregados.
+  for (const c of state.citizens) if (c.job !== null || c.athlete !== undefined) employed += productivity(overloaded, c.id);
 
   // Vagas ocupadas, já pesadas pelo modificador de imposto do nível do prédio.
   const jobsFilled = { commercial: 0, industrial: 0, rural: 0 };
@@ -68,10 +72,12 @@ export function monthlyBudget(state, rt) {
     // Gasto dos turistas juntado neste mês (ver tourism.js).
     // Ingressos dos eventos realizados neste mês (ver agenda.js).
     events: Math.round(state.economy.eventsIncome ?? 0),
+    // Taxa municipal dos ingressos dos jogos (ver sports.js).
+    sports: Math.round(state.economy.sportsIncome ?? 0),
     tourism: Math.round(state.economy.tourism ?? 0),
   };
   income.total = income.residential + income.commercial + income.industrial + income.rural
-    + income.statal + income.food + income.fares + income.tourism + income.events;
+    + income.statal + income.food + income.fares + income.tourism + income.events + income.sports;
 
   const expenses = {
     roads: Math.round(roadTiles * mod(rt, 'roadUpkeep', ECONOMY.roadUpkeepPerMonth) * mod(rt, 'maintenance')),
@@ -80,9 +86,11 @@ export function monthlyBudget(state, rt) {
     policies: policiesCost(state, rt, income.total),
     food: food.importCost,
     loans: state.economy.loans.reduce((sum, loan) => sum + loanInstallment(loan), 0),
+    // Repasse mensal aos clubes da cidade (ver sports.js).
+    sports: sportsSubsidy(state),
   };
   expenses.total = expenses.roads + expenses.utilities + expenses.research + expenses.policies + expenses.food
-    + expenses.loans;
+    + expenses.loans + expenses.sports;
 
   return { income, expenses, net: income.total - expenses.total };
 }
@@ -95,6 +103,7 @@ export function closeMonth(state, rt) {
   economy.fares = 0; // as passagens do mês já entraram na receita
   economy.tourism = 0; // e o gasto dos turistas também
   economy.eventsIncome = 0; // e os ingressos dos eventos
+  economy.sportsIncome = 0; // e a taxa dos jogos
 
   for (const loan of economy.loans) {
     const interest = Math.round(loan.balance * monthlyRate(loan));

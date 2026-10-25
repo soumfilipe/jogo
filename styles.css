@@ -176,7 +176,7 @@ button { touch-action: manipulation; }
 #inspector h4 { margin: 12px 0 0; font-size: 13px; }
 #inspector .companies li { display: block; }
 #inspector .companies small { display: block; }
-#inspector .link { background: none; border: none; padding: 0; color: #9cc1ff; cursor: pointer; text-align: left; }
+#inspector .link, .sports .link { background: none; border: none; padding: 0; color: #9cc1ff; cursor: pointer; text-align: left; }
 #inspector .close { position: absolute; top: 6px; right: 6px; padding: 0 7px; }
 
 dialog {
@@ -356,7 +356,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   /* Barra inferior, como as abas do iOS. */
   .mobile-nav {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(9, 1fr);
     background: var(--panel);
     border-top: 1px solid #23262d;
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
@@ -532,3 +532,8 @@ button.tool small .icon { width: 11px; height: 11px; vertical-align: -1px; }
 /* Mapas: ícone na cor do mapa, com a faixa de cores na base. */
 .map-glyph { position: relative; overflow: hidden; }
 .map-glyph::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--ramp); }
+.sports .league tr.mine td { font-weight: 600; color: var(--accent); }
+.sports .league tr.good td:first-child { color: #51cf66; }
+.sports .league tr.bad td:first-child { color: #ff8a80; }
+.sports .league tr.good td:last-child, .sports .league tr.bad td:last-child { color: inherit; }
+.sports .games li { align-items: flex-end; }

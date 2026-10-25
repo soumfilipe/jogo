@@ -26,6 +26,7 @@ export const ICONS = {
   money: '<circle cx="12" cy="12" r="9"/><path d="M14.8 8.8c-.6-.9-1.6-1.3-2.8-1.3-1.6 0-2.8.8-2.8 2.1 0 3 5.8 1.6 5.8 4.7 0 1.3-1.3 2.2-3 2.2-1.3 0-2.4-.5-3-1.4M12 5.8v1.7M12 16.5v1.7"/>',
   research: '<path class="t" d="M7.4 15h9.2l2.4 3.5a1.7 1.7 0 0 1-1.5 2.5h-11A1.7 1.7 0 0 1 5 18.5z"/><path d="M9.5 3h5M10.5 3v6L5 18.5A1.7 1.7 0 0 0 6.5 21h11a1.7 1.7 0 0 0 1.5-2.5L13.5 9V3"/>',
   culture: '<path d="M9 18V5.5l11-2.5v13"/><path d="M9 9.5l11-2.5"/><circle class="t" cx="6.5" cy="18" r="2.5"/><circle class="t" cx="17.5" cy="16" r="2.5"/>',
+  sport: '<circle cx="12" cy="12" r="9"/><path class="t" d="M12 7.6l3.2 2.3-1.2 3.8h-4l-1.2-3.8z"/><path d="M12 3v4.6M15.2 9.9l4.4-1.5M14 13.7l2.7 3.8M10 13.7l-2.7 3.8M8.8 9.9 4.4 8.4"/>',
   power: '<path class="t" d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
   water: `<path class="t" d="${drop(12, 3, 1.55)}"/>`,
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.5"/><path d="M8 10.5v-3a4 4 0 0 1 8 0v3M12 14.5v2"/>',

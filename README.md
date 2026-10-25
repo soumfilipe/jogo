@@ -55,6 +55,7 @@ Salvar, carregar e o resto ficam no menu 💾 Arquivo, no topo.
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `Z` Cultura (ou 🎭 no topo) | artistas em alta, gêneros em moda e o que está em cartaz; agenda, novo evento, séries e histórico |
+| Esporte (no topo) | clubes da cidade, tabela, jogos, elenco e histórico das temporadas |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
 | Notícias (no topo) | o que a imprensa publicou, com filtros, e os jornais, rádios, TVs e canais da cidade |
 | Calçadão | rua só de pedestres (depois de *Ruas de lazer*): valoriza o comércio em volta; vira rua de novo se você desenhar uma rua por cima |
@@ -283,6 +284,41 @@ inspetor de uma arena, estádio, praça, cinema ou teatro):
   arte pode virar artista da cidade (mais com a *Economia criativa*); com
   fama, larga o emprego para viver da arte. Se passa um ano sem palco aqui,
   muda de cidade com a família.
+
+## Clubes e ligas
+
+Regras em `src/systems/sports.js`; números em `SPORTS` no catálogo.
+
+- **Clubes**: o jogador funda um clube (painel **Esporte** ou "Fundar clube
+  aqui" no inspetor) por $15 mil, que viram o caixa inicial do clube.
+  - **Futebol** (com *Futebol profissional*) joga no campo do clube ou no estádio, aos domingos às 16h.
+  - **Futsal, vôlei, basquete e handebol** (com o *Ginásio poliesportivo*) jogam no ginásio, aos sábados às 19h.
+- **Atletas são moradores**: o elenco sai dos cidadãos de 18 a 34 anos, primeiro
+  os que têm vocação para o esporte e depois os mais talentosos.
+  - O atleta larga o emprego e recebe salário do clube; ainda paga imposto como empregado.
+  - A habilidade sobe com o treino e com o centro de treinamento até uns 27 anos e cai depois dos 31.
+  - Com mais de 34 anos, o atleta se aposenta e volta ao mercado. O clube repõe o elenco todo mês.
+- **Ligas contra cidades rivais inventadas**: três divisões (estadual,
+  regional e nacional), com 8 times, turno e returno. Os dois primeiros sobem e os
+  dois últimos caem. A força das rivais cresce com a divisão.
+- **Partidas**: o placar é sorteado pela força dos times, com vantagem para
+  quem joga em casa e peso da torcida. Futebol, futsal e handebol têm gols; o vôlei tem sets;
+  o basquete tem pontos e não empata.
+- **Torcida**: em jogo em casa, ela anda até o local (pontos verdes). O
+  público depende do tamanho da cidade, da torcida e da força do time.
+  - Vitórias e títulos aumentam a torcida.
+  - 10% dos ingressos ficam com a prefeitura (receita **Esporte**); o resto vai para o clube.
+- **Caixa do clube**:
+  - entram ingressos, patrocínio (maior nas divisões de cima), cota de TV
+    (com *Esporte ao vivo na TV*), prêmios de fim de temporada e o **repasse
+    da prefeitura** (despesa *Repasse aos clubes* do orçamento);
+  - saem salários e a verba de treino;
+  - sem dinheiro, o treino é cortado, e com 3 meses no vermelho os melhores atletas vão embora.
+  - Com "reinvestir prêmios" ligado, o caixa acima de 6 meses de despesas vira treino.
+- **Tecnologias**: a *Educação física escolar* aumenta a vocação esportiva dos
+  novos cidadãos, e os *Megaeventos* aumentam o patrocínio em 30%.
+- Os resultados, títulos, acessos e rebaixamentos viram notícia (filtro
+  **Esporte** no painel de notícias).
 
 ## Notícias e imprensa
 
@@ -716,6 +752,8 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 17 (antes dos clubes) abrem sem clubes e sem ligas.
 
 Saves do formato 16 (antes da agenda) abrem sem eventos agendados; o talento
 e a vocação dos cidadãos saem de um hash do id (o sorteio da simulação não muda).
