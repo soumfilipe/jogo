@@ -7,6 +7,7 @@ import { generateForest, generateTerrain } from './terrain.js';
 import { createResearch } from '../systems/research.js';
 import { createEducation } from '../systems/education.js';
 import { createPolicies } from '../systems/policies.js';
+import { createTourism } from '../systems/tourism.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -36,6 +37,7 @@ export function createWorld({
       history: [], // um registro por mês fechado (ver systems/economy.js)
       lastMonth: null,
       fares: 0, // passagens do transporte público no mês (entram no fechamento)
+      tourism: 0, // gasto dos turistas no mês (ver systems/tourism.js)
     },
     map: {
       width,
@@ -46,11 +48,15 @@ export function createWorld({
       // Densidade de cada tile zoneado (DENSITY no catálogo).
       density: new Uint8Array(width * height).fill(DENSITY.MEDIUM),
       road: new Uint8Array(width * height),
+      // Parques de conservação (1 = tile protegido; ver commands.js).
+      park: new Uint8Array(width * height),
     },
     buildings: [], // { id, type, tile, builtAt, floors? } (floors: só se cresceu andares)
     citizens: [], //  ver src/agents/citizens.js
     companies: [], // { id, name, sector, building, floor, floors, foundedAt, understaffedDays? }
     pathQueue: [], // ids de cidadãos esperando o cálculo de rota
+    visitors: [], //  turistas andando ou visitando (ver systems/tourism.js)
+    tourism: createTourism(),
     // Energia e água importadas da região (só em saves anteriores aos serviços
     // públicos; acaba quando o jogador constrói a primeira usina/bomba).
     utilities: { imported: { power: false, water: false } },

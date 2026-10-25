@@ -22,7 +22,7 @@ import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { hash2 } from '../core/rng.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -189,6 +189,17 @@ const MIGRATIONS = {
     save.version = 13;
     return save;
   },
+  // v13 -> v14: turistas, plano de chegadas do dia, gasto dos turistas no mês
+  // e a camada dos parques de conservação no mapa.
+  13: (save) => {
+    const data = save.data;
+    data.visitors ??= encodeTable([], { moves: { path: data.map.width } });
+    data.tourism ??= { plan: [] };
+    data.economy.tourism ??= 0;
+    data.map.park ??= { $typed: 'Uint8Array', length: data.map.width * data.map.height, rle: [data.map.width * data.map.height, 0] };
+    save.version = 14;
+    return save;
+  },
 };
 
 // Prédios, cidadãos e empresas: de listas de objetos para tabelas em colunas (e volta).
@@ -196,6 +207,7 @@ function packLists(data) {
   if (Array.isArray(data.buildings)) data.buildings = encodeTable(data.buildings);
   if (Array.isArray(data.companies)) data.companies = encodeTable(data.companies);
   if (Array.isArray(data.citizens)) data.citizens = encodeTable(data.citizens, { moves: { path: data.map.width } });
+  if (Array.isArray(data.visitors)) data.visitors = encodeTable(data.visitors, { moves: { path: data.map.width } });
 }
 
 function unpackLists(data) {
@@ -204,6 +216,7 @@ function unpackLists(data) {
     buildings: decodeTable(data.buildings),
     ...(data.companies ? { companies: decodeTable(data.companies) } : {}),
     citizens: decodeTable(data.citizens, { moves: { path: data.map.width } }),
+    ...(data.visitors ? { visitors: decodeTable(data.visitors, { moves: { path: data.map.width } }) } : {}),
   };
 }
 
@@ -217,10 +230,11 @@ export function createSave(state, meta) {
     throw new SaveError('INVALID_ID', `Id de save inválido: ${meta && meta.id}`);
   }
   // Prédios, cidadãos e empresas vão direto para as colunas (sem a cópia de encodeState).
-  const data = encodeState({ ...state, buildings: [], citizens: [], companies: [] });
+  const data = encodeState({ ...state, buildings: [], citizens: [], companies: [], visitors: [] });
   data.buildings = state.buildings;
   data.citizens = state.citizens;
   data.companies = state.companies;
+  data.visitors = state.visitors;
   packLists(data);
   const now = new Date().toISOString();
   return {

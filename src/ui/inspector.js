@@ -10,6 +10,7 @@ import { transitRadius } from '../systems/transit.js';
 import { EXPORT, freightFactor } from '../systems/logistics.js';
 import { farmOutput } from '../systems/food.js';
 import { isCollected, wasteCapacity } from '../systems/waste.js';
+import { visitorsAt } from '../systems/tourism.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
@@ -157,7 +158,7 @@ function renderUtility(el, b, state, rt) {
     <p class="muted">${kind} · ${info.size}×${info.size}</p>
     <dl>
       ${res ? `<dt>Produz</dt><dd>${fmt(utilityOutput(rt, b.type, res))} de ${label}</dd>` : ''}
-      ${u.income ? `<dt>Receita</dt><dd>$${fmt(u.income * (workers / jobs) * mod(rt, `output.${b.type}`))}/mês</dd>` : ''}
+      ${u.income && (!u.gated?.income || mod(rt, u.gated.income, 0) > 0) ? `<dt>Receita</dt><dd>$${fmt(u.income * (workers / jobs) * mod(rt, `output.${b.type}`))}/mês</dd>` : ''}
       <dt>Manutenção</dt><dd>$${fmt(utilityUpkeep(rt, b.type))}/mês</dd>
       <dt>${u.institute ? 'Pesquisadores' : 'Funcionários'}</dt><dd>${workers} / ${jobs}</dd>
       ${jobs ? `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>` : ''}
@@ -167,6 +168,10 @@ function renderUtility(el, b, state, rt) {
       ${u.transit ? `<dt>Atende</dt><dd>quem mora e trabalha a até ${transitRadius(rt, b.type)} tiles de uma estação ${MODE_TEXT[u.transit.mode]}</dd>` : ''}
       ${u.freight ? `<dt>Carga</dt><dd>indústrias a até ${Math.round(u.freight.range * mod(rt, 'freightRange'))} tiles pela rua${u.freight.bonus ? ` (+${pct(u.freight.bonus)} na receita)` : ''}</dd>` : ''}
       ${u.supply ? `<dt>Abastece</dt><dd>comércio a até ${u.supply.radius} tiles</dd>` : ''}
+      ${u.tourism ? `<dt>Turistas</dt><dd>${visitorsAt(state, b.id)} aqui agora · ${u.tourism.appeal} por dia${u.tourism.game ? `, ${u.tourism.game} em dia de jogo (domingo)` : ''}${u.tourism.weekend ? `, ${u.tourism.weekend} no fim de semana` : ''}${workers ? '' : ` (${NO_STAFF})`}</dd>` : ''}
+      ${u.hotel ? `<dt>Quartos</dt><dd>${u.hotel.rooms} (turista que dorme aqui gasta mais)</dd>` : ''}
+      ${u.gateway ? '<dt>Turistas</dt><dd>chegam por aqui (+50% de turismo)</dd>' : ''}
+      ${u.gated?.income ? `<dt>Transmissão</dt><dd>${mod(rt, u.gated.income, 0) > 0 ? 'jogos na TV dão a receita do mês' : 'sem receita até a pesquisa de esporte na TV'}</dd>` : ''}
       ${u.waste ? `<dt>Recolhe</dt><dd>lixo dos prédios a até ${u.waste.radius} tiles${workers ? '' : ` (${NO_STAFF})`}</dd>
       <dt>Ocupado</dt><dd>${pct((b.fill ?? 0) / wasteCapacity(b.type))}${(b.fill ?? 0) >= wasteCapacity(b.type) ? ' <b style="color:#ff8a80">cheio: construa outro</b>' : ''}</dd>` : ''}
       ${u.recycle ? `<dt>Recicla</dt><dd>lixo ×${u.recycle.share} dos prédios a até ${u.recycle.radius} tiles</dd>` : ''}

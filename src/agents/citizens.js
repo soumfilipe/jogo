@@ -122,6 +122,10 @@ export function updateCitizens(state, rt) {
   const minute = state.time.tick % MINUTES_PER_DAY;
   startDepartures(state, rt, minute);
   processPathQueue(state, rt);
+  // Ocupação das ruas no começo do movimento: a velocidade de cada um depende
+  // só dela (e não da ordem em que os viajantes andam). Vale também para os
+  // turistas, que andam logo depois (ver systems/tourism.js).
+  if (rt.movers.size || rt.visitorMovers?.size) countOccupancy(state, rt);
   moveCitizens(state, rt);
 }
 
@@ -191,9 +195,6 @@ function moveCitizens(state, rt) {
   if (rt.movers.size === 0) return;
   const { width, road } = state.map;
   const speed = mod(rt, 'citizenSpeed', CITIZEN_SPEED);
-  // Ocupação das ruas no começo do tick: a velocidade de cada um depende só
-  // dela (e não da ordem em que os viajantes andam).
-  countOccupancy(state, rt);
   for (const id of rt.movers) {
     const c = rt.citizenById.get(id);
     const tile = Math.floor(c.y) * width + Math.floor(c.x);

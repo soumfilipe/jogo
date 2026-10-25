@@ -165,6 +165,29 @@ Regras em `src/systems/food.js`; números em `FOOD` no catálogo.
   aumenta o raio). Casa sem mercado no raio perde saúde e satisfação; o mapa
   *Alimentos* (`Q`) mostra quem está bem servido.
 
+## Turismo e eventos
+
+Regras em `src/systems/tourism.js` e `events.js`; números em `TOURISM` no
+catálogo.
+
+- **Turistas** chegam de carro pelas estradas que saem do mapa (ou pelo
+  aeroporto, que ainda aumenta o turismo em 50%), vão a uma atração, ficam
+  algumas horas e vão embora, entrando no trânsito como qualquer carro (verde
+  água na tela). Sem estrada saindo do mapa nem aeroporto, não vem turista.
+- **Atrações** (grupo *Turismo e cultura*): museu, campo de futebol, estádio
+  (3x3), parque temático (3x3), arena de eSports e centro cultural. Cada uma
+  também dá lazer ao bairro. O hotel não atrai, mas quem dorme nele gasta bem
+  mais. O gasto dos turistas vira a receita *Turismo* do mês.
+- **Calendário** (a data no topo mostra o dia da semana): jogo aos domingos
+  (a torcida, metade da própria cidade, chega junto para o jogo das 16h e sai
+  às 19h, em vermelho na tela), parques temáticos e arenas lotam no fim de
+  semana, carnaval de 10 a 14 de fevereiro (mais turistas e mais satisfação) e,
+  com estádio e metrô, um megaevento em julho a cada 4 anos.
+- **Ferramentas da pesquisa**: *Conservação* marca a mata como parque (não pode
+  ser desmatada, atrai turistas e valoriza o terreno; demolir tira o parque) e
+  *Revitalizar* transforma uma indústria abandonada em centro cultural. Com o
+  esporte na TV, campos e estádios dão receita todo mês.
+
 ## Lixo e esgoto
 
 Regras em `src/systems/waste.js` e `sanitation.js`; números em `WASTE` e
@@ -551,6 +574,9 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 13 (antes do turismo) abrem sem turistas e sem parques de
+conservação.
 
 Saves do formato 12 (antes da zona rural) abrem com o imposto rural no padrão.
 

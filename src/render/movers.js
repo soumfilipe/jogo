@@ -20,6 +20,13 @@ const BUS_LENGTH = 0.5;
 // Cor dos veículos de cada modo de transporte público.
 export const MODE_COLORS = { onibus: '#e8b931', brt: '#c0392b', vlt: '#16a085' };
 
+// Turistas e torcedores (em dia de jogo).
+export const VISITOR_COLORS = { tourist: '#1abc9c', fan: '#e05a47' };
+
+export function visitorColor(v) {
+  return v.fan ? VISITOR_COLORS.fan : VISITOR_COLORS.tourist;
+}
+
 export function carColor(c) {
   if (c.mode) return MODE_COLORS[c.mode];
   return CAR_COLORS[Math.floor(hash2(c.id, 5) * CAR_COLORS.length)];

@@ -16,7 +16,7 @@ import { frontTile } from '../world/runtime.js';
 import { screenToWorld, visibleRange, worldToScreen } from './camera.js';
 import { MAX_FLOORS, addSilhouette, drawBuilding, windowSize } from './buildings.js';
 import { TILE_H, TILE_W } from './iso.js';
-import { addCar, carColor, moverPose } from './movers.js';
+import { addCar, carColor, moverPose, visitorColor } from './movers.js';
 import { LIGHT_COLORS, darkness, isLit, windowSchedules } from './lights.js';
 import { TRUNK, treesFor, waterDepth } from './nature.js';
 import { Smog } from './smog.js';
@@ -58,6 +58,8 @@ const WAVE_GROUPS = 4;
 // Chão da mata, de rala a fechada.
 const FOREST_GROUNDS = ['#6aa452', '#609b4b', '#578f45', '#4e843f'];
 const SAND = '#d9c98f';
+// Chão dos parques de conservação (mata protegida).
+const PARK_GROUND = '#3f8a52';
 // Rua, avenida e via expressa (ver ROAD_TYPES): quanto mais larga, mais escura.
 const ROAD_COLORS = [null, '#5c5f68', '#4c4f57', '#3d4047'];
 const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
@@ -466,6 +468,7 @@ export class Renderer {
       else if (terrain[tile] === TERRAIN.WATER) {
         color = WATER[Math.min(WATER.length - 1, Math.floor(Math.max(0, depth[tile]) * WATER.length + hash2(x, y) * 0.6))];
       } else if (terrain[tile] === TERRAIN.SAND) color = SAND;
+      else if (terrain[tile] === TERRAIN.FOREST && state.map.park?.[tile]) color = PARK_GROUND;
       else if (terrain[tile] === TERRAIN.FOREST) {
         color = FOREST_GROUNDS[Math.min(3, Math.floor(Math.max(0, forest[tile] - 1) * 4 / FOREST.maxDensity))];
       }
@@ -680,6 +683,16 @@ export class Renderer {
       const pose = moverPose(state, c);
       if (!pose) continue;
       cars.push({ pose, color: carColor(c) });
+      carBoxes.push([cx, cy, pose.depth]);
+    }
+    // Turistas (e torcida em dia de jogo) também andam de carro.
+    for (const id of rt.visitorMovers ?? []) {
+      const v = rt.visitorById.get(id);
+      const [cx, cy] = worldToScreen(cam, v.x, v.y);
+      if (cx < -margin || cy < -margin || cx > cam.viewW + margin || cy > cam.viewH + margin) continue;
+      const pose = moverPose(state, v);
+      if (!pose) continue;
+      cars.push({ pose, color: visitorColor(v) });
       carBoxes.push([cx, cy, pose.depth]);
     }
 

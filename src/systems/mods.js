@@ -20,7 +20,8 @@
 //   roadCapacity, congestion, speed.<via>, radius.<modo>, freightRange,
 //   pollution.traffic, noise, food.output, food.waste, food.price, food.sand,
 //   food.consumption, pollution.farm, demand.rural, waste, pollution.river,
-//   output.sewage, biogas, reuso (os dois últimos ligam a produção `gated`)
+//   output.sewage, biogas, reuso (os dois últimos ligam a produção `gated`),
+//   tourism, broadcast, event.carnaval, event.mega
 
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { BUILDING_TECH, TECH_BY_ID } from '../world/techs.js';

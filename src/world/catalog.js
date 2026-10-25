@@ -277,6 +277,54 @@ export const BUILDINGS = {
     utility: { power: 0, water: 0, cost: 25_000, upkeep: 400, pollution: 3, area: 'abastecimento', mods: [{ mod: 'food.price', mul: 0.8 }] },
   },
 
+  // --- Turismo e eventos (ver systems/tourism.js e events.js) ----------------
+  //   utility.tourism: turistas por dia que a atração chama: `appeal` sempre,
+  //     `game` em dia de jogo (domingo), `weekend` no sábado e no domingo
+  //   utility.hotel: quartos (turistas que dormem na cidade gastam mais)
+  //   utility.gateway: turistas chegam por aqui (além das estradas da borda)
+  museu: {
+    name: 'Museu', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 12,
+    utility: { power: 0, water: 0, cost: 14_000, upkeep: 250, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 12, strength: 0.7 }, tourism: { appeal: 25 } },
+  },
+  campo_futebol: {
+    name: 'Campo de futebol do clube', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 8,
+    utility: {
+      power: 0, water: 0, cost: 6_000, upkeep: 120, pollution: 0, income: 400, area: 'cultura',
+      service: { kind: 'lazer', radius: 10, strength: 0.6 }, tourism: { appeal: 0, game: 80 }, gated: { income: 'broadcast' },
+    },
+  },
+  estadio: {
+    name: 'Estádio', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 30,
+    utility: {
+      power: 0, water: 0, cost: 60_000, upkeep: 900, pollution: 2, income: 2_500, area: 'cultura',
+      service: { kind: 'lazer', radius: 18, strength: 0.8 }, tourism: { appeal: 5, game: 300 }, gated: { income: 'broadcast' },
+    },
+  },
+  parque_tematico: {
+    name: 'Parque temático', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 60,
+    utility: { power: 0, water: 0, cost: 45_000, upkeep: 700, pollution: 1, income: 1_200, area: 'cultura', service: { kind: 'lazer', radius: 20, strength: 0.8 }, tourism: { appeal: 30, weekend: 150 } },
+  },
+  hotel: {
+    name: 'Hotel', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 20,
+    utility: { power: 0, water: 0, cost: 12_000, upkeep: 200, pollution: 0, area: 'cultura', hotel: { rooms: 60 } },
+  },
+  arena_esports: {
+    name: 'Arena de eSports', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 15,
+    utility: { power: 0, water: 0, cost: 20_000, upkeep: 350, pollution: 0, income: 500, area: 'computacao', service: { kind: 'lazer', radius: 14, strength: 0.7 }, tourism: { appeal: 20, weekend: 40 } },
+  },
+  aeroporto: {
+    name: 'Aeroporto', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 50,
+    utility: {
+      power: 0, water: 0, cost: 80_000, upkeep: 1_200, pollution: 10, area: 'engenharia',
+      gateway: { tourism: 1.5 }, freight: { range: 60, bonus: 0.05 },
+    },
+  },
+  // Só pela ferramenta de revitalização (ver commands.js).
+  centro_cultural: {
+    name: 'Centro cultural', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 8,
+    utility: { power: 0, water: 0, cost: 4_000, upkeep: 120, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 10, strength: 0.7 }, tourism: { appeal: 12 } },
+  },
+
   // --- Lixo e esgoto (ver systems/waste.js e sanitation.js) -------------------
   //   utility.waste: { radius, capacity } — recolhe o lixo dos prédios no raio
   //     até encher (b.fill guarda quanto já recebeu)
@@ -478,6 +526,8 @@ export const COSTS = {
   demolishRoad: 2,
   demolishBuilding: 20,
   clearForest: 5,
+  // Marcar um tile de mata como parque de conservação.
+  park: 3,
 };
 
 export const ECONOMY = {
@@ -508,6 +558,28 @@ export const TAX_ZONES = ['residential', 'commercial', 'industrial', 'rural'];
 
 // Alimentos (ver systems/food.js), em unidades por mês.
 // Lixo (ver systems/waste.js), em unidades por dia.
+// Turismo (ver systems/tourism.js).
+export const TOURISM = {
+  // Gasto de um turista que vem passar o dia, e a mais de quem dorme num hotel.
+  daySpend: 3,
+  hotelSpend: 8,
+  // Turistas por dia de cada tile de parque de conservação.
+  parkAppeal: 0.15,
+  // Horário de chegada (minutos do dia) e quanto tempo cada um fica (minutos).
+  arrive: [8 * 60, 13 * 60],
+  stay: [3 * 60, 5 * 60],
+  // Jogo de domingo: torcida chega para o jogo das 16h e fica 3 horas.
+  gameArrive: [14 * 60, 15 * 60 + 45],
+  gameEnd: 19 * 60,
+  // Parte da torcida que é da própria cidade (sai de casa).
+  localFans: 0.5,
+  // Limite de turistas andando ao mesmo tempo (desempenho).
+  maxVisitors: 600,
+  // Carnaval (fevereiro, dias 10 a 14) e megaevento (julho, a cada 4 anos).
+  carnaval: { month: 2, days: [10, 14], tourists: 120, multiplier: 1.5, satisfaction: 0.05 },
+  mega: { month: 7, every: 4, multiplier: 3 },
+};
+
 export const WASTE = {
   perResident: 0.05,
   perJob: { commercial: 0.03, industrial: 0.06, rural: 0.01 },

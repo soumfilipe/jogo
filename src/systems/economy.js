@@ -35,7 +35,9 @@ export function monthlyBudget(state, rt) {
     const workers = rt.workers.get(b.id).size;
     if (info.utility) {
       utilities += utilityUpkeep(rt, b.type);
-      if (info.utility.income) {
+      // Receita que vem da pesquisa (ex.: transmissão dos jogos) só depois dela.
+      const gate = info.utility.gated?.income;
+      if (info.utility.income && (!gate || mod(rt, gate, 0) > 0)) {
         const full = workers / jobsOf(rt, b.type);
         statal += info.utility.income * full * mod(rt, `output.${b.type}`);
       }
@@ -60,9 +62,11 @@ export function monthlyBudget(state, rt) {
     food: food.exportIncome,
     // Passagens do transporte público juntadas neste mês (ver transit.js).
     fares: Math.round(state.economy.fares ?? 0),
+    // Gasto dos turistas juntado neste mês (ver tourism.js).
+    tourism: Math.round(state.economy.tourism ?? 0),
   };
   income.total = income.residential + income.commercial + income.industrial + income.rural
-    + income.statal + income.food + income.fares;
+    + income.statal + income.food + income.fares + income.tourism;
 
   const expenses = {
     roads: Math.round(roadTiles * mod(rt, 'roadUpkeep', ECONOMY.roadUpkeepPerMonth) * mod(rt, 'maintenance')),
@@ -84,6 +88,7 @@ export function closeMonth(state, rt) {
   const economy = state.economy;
   economy.money += budget.net;
   economy.fares = 0; // as passagens do mês já entraram na receita
+  economy.tourism = 0; // e o gasto dos turistas também
 
   for (const loan of economy.loans) {
     const interest = Math.round(loan.balance * monthlyRate(loan));

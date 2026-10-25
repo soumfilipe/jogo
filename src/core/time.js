@@ -22,8 +22,12 @@ export function calendar(tick) {
     day: (totalDays % DAYS_PER_MONTH) + 1,
     month: (Math.floor(totalDays / DAYS_PER_MONTH) % MONTHS_PER_YEAR) + 1,
     year: Math.floor(totalDays / (DAYS_PER_MONTH * MONTHS_PER_YEAR)) + 1,
+    // Dia da semana: 0 = segunda ... 5 = sábado, 6 = domingo (o dia 1 do jogo é segunda).
+    weekday: totalDays % 7,
   };
 }
+
+export const WEEKDAY_NAMES = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
 
 export function formatClock(minuteOfDay) {
   const h = String(Math.floor(minuteOfDay / 60)).padStart(2, '0');
@@ -33,5 +37,5 @@ export function formatClock(minuteOfDay) {
 
 export function formatDate(tick) {
   const c = calendar(tick);
-  return `${formatClock(c.minuteOfDay)} · ${c.day} ${MONTH_NAMES[c.month - 1]}, ano ${c.year}`;
+  return `${formatClock(c.minuteOfDay)} · ${WEEKDAY_NAMES[c.weekday]}, ${c.day} ${MONTH_NAMES[c.month - 1]}, ano ${c.year}`;
 }

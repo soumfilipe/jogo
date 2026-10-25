@@ -27,9 +27,9 @@ test('RNG com a mesma semente gera a mesma sequência', () => {
 });
 
 test('calendário a partir do tick', () => {
-  assert.deepEqual(calendar(0), { minuteOfDay: 0, hour: 0, minute: 0, day: 1, month: 1, year: 1 });
+  assert.deepEqual(calendar(0), { minuteOfDay: 0, hour: 0, minute: 0, day: 1, month: 1, year: 1, weekday: 0 });
   const c = calendar(TICKS_PER_DAY * 30 * 12 + TICKS_PER_DAY * 31 + 8 * 60 + 5);
-  assert.deepEqual(c, { minuteOfDay: 485, hour: 8, minute: 5, day: 2, month: 2, year: 2 });
+  assert.deepEqual(c, { minuteOfDay: 485, hour: 8, minute: 5, day: 2, month: 2, year: 2, weekday: 6 });
 });
 
 test('mundo 256x256 tem terreno variado e determinístico', () => {

@@ -22,12 +22,14 @@ import { computeTransit } from './transit.js';
 import { computeFreight } from './logistics.js';
 import { updateTrafficMap } from './traffic.js';
 import { collectWaste } from './waste.js';
+import { indexVisitors, planDay, updateVisitors } from './tourism.js';
 
 export function tick(state, rt) {
   state.time.tick++;
   const t = state.time.tick;
 
   updateCitizens(state, rt);
+  updateVisitors(state, rt);
   growForests(state, rt);
 
   if (t % 60 === 0) {
@@ -59,6 +61,8 @@ export function tick(state, rt) {
       computeUtilities(state, rt);
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
+      // Turistas de hoje (meia-noite): plano de chegadas e gasto do dia.
+      planDay(state, rt);
     }
     // Andares vagos são alugados antes de surgirem prédios novos.
     openCompanies(state, rt);
@@ -84,6 +88,7 @@ export function advance(state, rt, ticks) {
 /** Monta os índices derivados de um estado (novo ou recém-carregado). */
 export function prepare(state) {
   const rt = buildRuntime(state);
+  indexVisitors(state, rt);
   grantLegacyResearch(state);
   computeMods(state, rt);
   convertLegacyJobs(state, rt);

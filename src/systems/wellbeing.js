@@ -19,7 +19,7 @@
 // Tudo é derivado do estado (rt.wellbeing), menos a epidemia, que tem data
 // para acabar (state.health.epidemicUntil).
 
-import { BUILDINGS, ECONOMY, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
+import { BUILDINGS, ECONOMY, TOURISM, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
 import { removeCitizen } from '../world/runtime.js';
 import { canWork } from '../agents/citizens.js';
 import { chance } from '../core/rng.js';
@@ -27,6 +27,7 @@ import { TICKS_PER_MONTH } from '../core/time.js';
 import { mod } from './mods.js';
 import { computeWaste, fillWasteMap, isCollected } from './waste.js';
 import { computeSanitation } from './sanitation.js';
+import { todaysEvents } from './events.js';
 
 const clamp = (v) => Math.min(1, Math.max(0, v));
 
@@ -43,7 +44,9 @@ export function computeWellbeing(state, rt) {
   const crimeMul = mod(rt, 'crime');
   const community = mod(rt, 'communityPolicing', 0) > 0;
   const leisureMul = mod(rt, 'leisure');
-  const satisfactionAdd = mod(rt, 'satisfaction', 0) + mod(rt, 'satisfactionPolicy', 0);
+  // Carnaval: a cidade inteira mais feliz nos dias de festa.
+  const party = todaysEvents(state, rt).carnaval ? TOURISM.carnaval.satisfaction : 0;
+  const satisfactionAdd = mod(rt, 'satisfaction', 0) + mod(rt, 'satisfactionPolicy', 0) + party;
   const tax = (state.economy.taxes.residential - ECONOMY.taxDefault) * S.taxPerPoint;
   const waste = computeWaste(state, rt);
   const sanitation = computeSanitation(state, rt);
