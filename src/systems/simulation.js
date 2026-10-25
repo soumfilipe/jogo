@@ -13,6 +13,8 @@ import { closeResearchMonth, grantLegacyResearch } from './research.js';
 import { applyUtilityEffects, computeUtilities } from './utilities.js';
 import { convertLegacyJobs, openCompanies, reviewCompanies } from './companies.js';
 import { growForests } from './forest.js';
+import { closeDemographyMonth } from './demography.js';
+import { enrollStudents, refreshSchoolMap } from './education.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -34,6 +36,7 @@ export function tick(state, rt) {
     if (t % TICKS_PER_DAY === 0) {
       applyUtilityEffects(state, rt);
       reviewCompanies(state, rt);
+      enrollStudents(state, rt);
       computeUtilities(state, rt);
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
@@ -48,6 +51,7 @@ export function tick(state, rt) {
 
   if (t % TICKS_PER_MONTH === 0) {
     closeMonth(state, rt);
+    closeDemographyMonth(state, rt);
     closeResearchMonth(state, rt);
   }
 }
@@ -66,5 +70,6 @@ export function prepare(state) {
   computeDemand(state, rt);
   computeUtilities(state, rt);
   computeLandValue(state, rt); // para os mapas e o painel; a simulação recalcula antes de usar
+  refreshSchoolMap(state, rt); // só o mapa: matricular mudaria o estado ao carregar
   return rt;
 }

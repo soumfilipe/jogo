@@ -45,6 +45,19 @@ export function computeLandValue(state, rt) {
   const bonusAll = mod(rt, 'landValue.all', 0);
   const bonusCommercial = mod(rt, 'landValue.commercial', 0);
   const zone = state.map.zone;
+  // Sinal de celular: torres valorizam o terreno no raio delas.
+  const signal = new Float32Array(n);
+  for (const b of state.buildings) {
+    const s = BUILDINGS[b.type].utility?.signal;
+    if (!s || rt.workers.get(b.id).size === 0) continue;
+    const bx = b.tile % width;
+    const by = (b.tile - bx) / width;
+    for (let y = Math.max(0, by - s.radius); y <= Math.min(height - 1, by + s.radius); y++) {
+      for (let x = Math.max(0, bx - s.radius); x <= Math.min(width - 1, bx + s.radius); x++) {
+        if (Math.abs(x - bx) + Math.abs(y - by) <= s.radius) signal[y * width + x] = Math.max(signal[y * width + x], s.landValue);
+      }
+    }
+  }
 
   const natureSum = boxSum(nature, width, height, NATURE_RADIUS);
   const commerceSum = boxSum(commerce, width, height, COMMERCE_RADIUS);
@@ -61,6 +74,7 @@ export function computeLandValue(state, rt) {
       + 0.3 * Math.min(1, activitySum[i] / ACTIVITY_FULL)
       - 0.55 * p
       + bonusAll
+      + signal[i]
       + (zone[i] === ZONE.COMMERCIAL ? bonusCommercial : 0);
     landValue[i] = Math.min(1, Math.max(0, value));
   }

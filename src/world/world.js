@@ -5,6 +5,7 @@ import { createRng } from '../core/rng.js';
 import { DENSITY, ECONOMY, TERRAIN } from './catalog.js';
 import { generateForest, generateTerrain } from './terrain.js';
 import { createResearch } from '../systems/research.js';
+import { createEducation } from '../systems/education.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -50,6 +51,8 @@ export function createWorld({
     utilities: { imported: { power: false, water: false } },
     // Pesquisa e tecnologias (ver systems/research.js).
     research: createResearch(startMarco),
+    // Cursos da universidade (ver systems/education.js).
+    education: createEducation(),
     nextId: 1,
   };
 }

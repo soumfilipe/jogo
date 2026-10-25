@@ -16,6 +16,7 @@ export function buildRuntime(state) {
     companyById: new Map(),
     companiesIn: new Map(), // id do prédio -> empresas dele, do andar mais baixo ao mais alto
     companyWorkers: new Map(), // id da empresa -> Set de ids de cidadãos
+    students: new Map(), //  id da escola -> Set de ids de alunos (ver systems/education.js)
     departures: new Map(), // minuto do dia -> Set de ids de cidadãos
     movers: new Set(), //    cidadãos andando agora
     roadComponent: new Int32Array(width * height), // rede de estradas de cada tile (0 = sem)
@@ -84,12 +85,14 @@ export function removeBuilding(state, rt, id) {
     setJob(rt, citizen, null);
   }
   for (const co of [...(rt.companiesIn.get(id) || [])]) removeCompany(state, rt, co.id);
+  for (const cid of [...(rt.students.get(id) || [])]) leaveSchool(rt, rt.citizenById.get(cid));
 
   state.buildings.splice(state.buildings.indexOf(building), 1);
   rt.buildingById.delete(id);
   for (const t of footprint(state, building)) rt.buildingAt[t] = 0;
   rt.residents.delete(id);
   rt.workers.delete(id);
+  rt.students.delete(id);
   rt.access.delete(id);
   touchMap(rt, building.tile, BUILDINGS[building.type].size);
 }
@@ -100,6 +103,7 @@ function indexBuilding(state, rt, b) {
   rt.residents.set(b.id, new Set());
   rt.workers.set(b.id, new Set());
   rt.companiesIn.set(b.id, []);
+  if (BUILDINGS[b.type].utility?.school) rt.students.set(b.id, new Set());
 }
 
 /** Derruba a mata de um tile (vira grama). */
@@ -219,6 +223,7 @@ export function removeCitizen(state, rt, id) {
   const citizen = rt.citizenById.get(id);
   if (!citizen) return;
   setJob(rt, citizen, null);
+  leaveSchool(rt, citizen);
   rt.residents.get(citizen.home)?.delete(id);
   rt.movers.delete(id);
   rt.citizenById.delete(id);
@@ -235,6 +240,27 @@ function indexCitizen(rt, c) {
     addDeparture(rt, c.departHome, c.id);
   }
   if (c.state === 'viajando') rt.movers.add(c.id);
+  if (c.school != null) rt.students.get(c.school)?.add(c.id);
+}
+
+/**
+ * Matricula o cidadão na escola `schoolId`, na etapa `stage` (ver
+ * EDUCATION.stages), ou tira da escola com schoolId = null.
+ */
+export function enroll(rt, citizen, schoolId, stage) {
+  leaveSchool(rt, citizen);
+  if (schoolId === null) return;
+  citizen.school = schoolId;
+  citizen.stage = stage;
+  rt.students.get(schoolId).add(citizen.id);
+}
+
+/** Tira o cidadão da escola (formou, desistiu, a escola foi demolida). */
+export function leaveSchool(rt, citizen) {
+  if (citizen.school == null) return;
+  rt.students.get(citizen.school)?.delete(citizen.id);
+  citizen.school = null;
+  citizen.stage = null;
 }
 
 /**

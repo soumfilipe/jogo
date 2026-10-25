@@ -2,8 +2,9 @@
 // cidadão individual (casa, emprego, rotina e o que está fazendo agora).
 
 import {
-  BUILDINGS, DENSITY_INFO, MAX_LEVEL, SECTORS, SHIFTS, ZONE, buildingFloors, capacityOf,
+  BUILDINGS, DENSITY_INFO, EDU_NAMES, EDUCATION, MAX_LEVEL, SECTORS, SHIFTS, ZONE, buildingFloors, capacityOf,
 } from '../world/catalog.js';
+import { minEduFor, radiusOf, seatsOf } from '../systems/education.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
@@ -62,6 +63,8 @@ function renderBuilding(el, b, state, rt) {
     <p class="muted"><span class="stars" title="Nível ${info.level}">${stars}</span> · nível ${info.level}${info.size > 1 ? ` · ${info.size}×${info.size}` : ''}</p>
     <dl>
       <dt>${info.residents ? 'Moradores' : 'Funcionários'}</dt><dd>${people.length} / ${capacity}</dd>
+      ${info.residents ? `<dt>Crianças</dt><dd>${people.filter((c) => c.age < 18).length}</dd>`
+        : `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>`}
       <dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>
       ${info.zone !== ZONE.INDUSTRIAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
@@ -105,7 +108,8 @@ function renderUtility(el, b, state, rt) {
   const workers = rt.workers.get(b.id).size;
   const jobs = jobsOf(rt, b.type);
   const fmt = (v) => Math.round(v).toLocaleString('pt-BR');
-  const kind = u.institute || u.privateResearch ? 'Pesquisa' : u.income ? 'Estatal' : 'Serviço público';
+  const kind = u.school && u.institute ? 'Ensino e pesquisa' : u.school || u.library ? 'Educação'
+    : u.institute || u.privateResearch ? 'Pesquisa' : u.income ? 'Estatal' : 'Serviço público';
   el.innerHTML = `
     <h3>${esc(info.name)} #${b.id}</h3>
     <p class="muted">${kind} · ${info.size}×${info.size}</p>
@@ -114,6 +118,11 @@ function renderUtility(el, b, state, rt) {
       ${u.income ? `<dt>Receita</dt><dd>$${fmt(u.income * (workers / jobs) * mod(rt, `output.${b.type}`))}/mês</dd>` : ''}
       <dt>Manutenção</dt><dd>$${fmt(utilityUpkeep(rt, b.type))}/mês</dd>
       <dt>${u.institute ? 'Pesquisadores' : 'Funcionários'}</dt><dd>${workers} / ${jobs}</dd>
+      ${jobs ? `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>` : ''}
+      ${u.school ? `<dt>Alunos</dt><dd>${rt.students.get(b.id).size} / ${seatsOf(rt, b.type)} (${esc(EDUCATION.stages[u.school.stage].name.toLowerCase())})</dd>
+      <dt>Atende</dt><dd>casas a até ${radiusOf(rt, b.type)} tiles</dd>` : ''}
+      ${u.library ? `<dt>Estudantes</dt><dd>a até ${u.library.radius} tiles estudam ${Math.round(u.library.bonus * 100)}% mais rápido</dd>` : ''}
+      ${u.signal ? `<dt>Sinal</dt><dd>valoriza o terreno a até ${u.signal.radius} tiles</dd>` : ''}
       ${u.institute ? '<dt>Pesquisa</dt><dd>nas áreas com verba (painel Pesquisa)</dd>' : ''}
       ${u.area ? `<dt>Pesquisa</dt><dd>um pouco de ${esc(AREAS[u.area])}</dd>` : ''}
       ${u.privateResearch ? '<dt>Pesquisa</dt><dd>P&amp;D dos escritórios em volta</dd>' : ''}
@@ -127,6 +136,12 @@ function renderCitizen(el, c, rt, following) {
   const home = rt.buildingById.get(c.home);
   const job = c.job !== null ? rt.buildingById.get(c.job) : null;
   const company = c.company != null ? rt.companyById.get(c.company) : null;
+  const school = c.school != null ? rt.buildingById.get(c.school) : null;
+  const edu = `${EDU_NAMES[c.edu ?? 0]}${c.field ? ` (${esc(AREAS[c.field])})` : ''}`;
+  const studying = school
+    ? `${esc(EDUCATION.stages[c.stage].name)}, ${c.stage === 'creche' ? '' : `${Math.floor(c.study || 0) + 1}º ano, `}<button class="link" data-building="${school.id}">${esc(BUILDINGS[school.type].name)} #${school.id}</button>`
+    : null;
+  const notWorking = c.age < 18 ? (school ? 'Estudante' : 'Criança') : c.age > 64 ? 'Aposentado(a)' : school ? 'Estudante' : 'Desempregado(a)';
   el.innerHTML = `
     <h3>${esc(c.name)}</h3>
     <p class="muted">${c.age} anos · ${esc(activity(c))}</p>
@@ -134,7 +149,9 @@ function renderCitizen(el, c, rt, following) {
       <dt>Casa</dt><dd><button class="link" data-building="${home.id}">${esc(BUILDINGS[home.type].name)} #${home.id}</button></dd>
       <dt>Trabalho</dt><dd>${job
         ? `${company ? `${esc(company.name)}, ` : ''}<button class="link" data-building="${job.id}">${esc(BUILDINGS[job.type].name)} #${job.id}</button>`
-        : c.age > 64 ? 'Aposentado(a)' : 'Desempregado(a)'}</dd>
+        : notWorking}</dd>
+      <dt>Escolaridade</dt><dd>${edu}</dd>
+      ${studying ? `<dt>Estuda</dt><dd>${studying}</dd>` : ''}
       ${job ? `<dt>Turno</dt><dd>${esc(SHIFTS[c.shift ?? 'diurno'].name)}</dd>
       <dt>Rotina</dt><dd>sai ${formatClock(c.departWork)}, volta ${formatClock(c.departHome)}</dd>` : ''}
     </dl>

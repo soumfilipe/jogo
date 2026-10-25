@@ -12,7 +12,7 @@ import { fitCompanies, foundCompanies, vacantFloors } from './companies.js';
 import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
-import { createCitizen } from '../agents/citizens.js';
+import { moveInFamily } from './demography.js';
 import { isBuildable } from '../world/world.js';
 import { levelUnlocked, mod } from './mods.js';
 import { LEVEL_TECH, TECH_BY_ID } from '../world/techs.js';
@@ -150,8 +150,10 @@ function nextStep(state, rt, b) {
   }
   if (!info.tall) return null;
   const floor = buildingFloors(b) + 1;
-  if (floor > maxFloorsFor(info, density)) {
-    return floor <= maxFloorsFor(info, DENSITY.HIGH) ? { limited: DENSITY_INFO[density] } : null;
+  // Andares a mais na densidade alta vêm da pesquisa (aço estrutural, estrutura tubular).
+  const extra = mod(rt, `maxFloors.${DEMAND_KEY[info.zone]}`, 0);
+  if (floor > maxFloorsFor(info, density, extra)) {
+    return floor <= maxFloorsFor(info, DENSITY.HIGH, extra) ? { limited: DENSITY_INFO[density] } : null;
   }
   return {
     floor,
@@ -233,13 +235,16 @@ function isFreeBlock(state, rt, tile, size, z) {
   return true;
 }
 
+/**
+ * Famílias se mudam para casas com vaga. A demanda (attraction) conta só os
+ * adultos, que são os que procuram emprego; os filhos vêm junto se couberem.
+ */
 export function moveIn(state, rt) {
   let arrivals = Math.min(rt.demand.attraction, MAX_MOVE_IN_PER_HOUR);
   if (arrivals <= 0) return;
   for (const b of state.buildings) {
     if (arrivals <= 0) break;
     if (vacancies(rt, b) <= 0 || rt.access.get(b.id) < 0 || !isServed(rt, b)) continue;
-    createCitizen(state, rt, b);
-    arrivals--;
+    arrivals -= moveInFamily(state, rt, b);
   }
 }
