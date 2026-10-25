@@ -20,6 +20,7 @@
 
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { BUILDING_TECH, TECH_BY_ID } from '../world/techs.js';
+import { POLICIES } from './policies.js';
 
 export const ZONE_KEY = {
   [ZONE.RESIDENTIAL]: 'residential',
@@ -45,6 +46,10 @@ export function computeMods(state, rt) {
 
   const done = new Set(state.research?.done ?? []);
   for (const id of done) for (const e of TECH_BY_ID.get(id)?.effects ?? []) apply(e);
+  // Leis ativas (as que perderam a tecnologia não valem).
+  for (const id of state.policies?.active ?? []) {
+    if (done.has(POLICIES[id]?.tech)) for (const e of POLICIES[id].effects) apply(e);
+  }
   for (const b of state.buildings) {
     const effects = BUILDINGS[b.type].utility?.mods;
     if (effects && rt.workers.get(b.id)?.size > 0) for (const e of effects) apply(e);
@@ -97,7 +102,7 @@ export function utilityOutput(rt, type, res) {
 
 /** Preço para construir um prédio do jogador. */
 export function utilityCost(rt, type) {
-  return Math.round(BUILDINGS[type].utility.cost * mod(rt, `cost.${type}`) * mod(rt, 'buildCost'));
+  return Math.round(BUILDINGS[type].utility.cost * mod(rt, `cost.${type}`) * mod(rt, 'cost.utilities') * mod(rt, 'buildCost'));
 }
 
 /** Manutenção mensal de um prédio do jogador. */
@@ -107,5 +112,5 @@ export function utilityUpkeep(rt, type) {
 
 /** Peso de poluição de um prédio do jogador. */
 export function utilityPollution(rt, type) {
-  return BUILDINGS[type].utility.pollution * mod(rt, `pollution.${type}`);
+  return BUILDINGS[type].utility.pollution * mod(rt, `pollution.${type}`) * mod(rt, 'pollution.utilities');
 }

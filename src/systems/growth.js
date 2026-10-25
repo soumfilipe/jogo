@@ -46,6 +46,8 @@ export function growBuildings(state, rt) {
   // Prédios grandes são de nível 3: dependem da tecnologia que libera o nível.
   const largeUnlocked = (z) => levelUnlocked(rt, z, BUILDINGS[LARGE_BUILDINGS[z][0]].level);
   const need = (info) => consumption(info, undefined, rt);
+  // Licenciamento ambiental: indústria nova longe das casas.
+  const buffer = mod(rt, 'industryBuffer', 0);
   // Começa num ponto aleatório para não favorecer o canto do mapa.
   const start = randomInt(state.rng, 0, total - 1);
 
@@ -59,6 +61,7 @@ export function growBuildings(state, rt) {
     if (access < 0) continue;
     // Só cresce onde a rede tem energia e água sobrando para o prédio novo.
     if (!fits(state, rt, access, need(BUILDINGS[LEVELS[z][1][0]]))) continue;
+    if (buffer && z === ZONE.INDUSTRIAL && nearZone(state, tile, ZONE.RESIDENTIAL, buffer)) continue;
     if (!chance(state.rng, GROW_CHANCE)) continue;
 
     let type = pick(state.rng, LEVELS[z][1]);
@@ -220,6 +223,19 @@ function isFreeLot(state, rt, tile, z = state.map.zone[tile]) {
     !rt.buildingAt[tile] &&
     isBuildable(state, tile)
   );
+}
+
+/** Há tile da zona `z` a até `radius` tiles (em quadrado) de `tile`? */
+function nearZone(state, tile, z, radius) {
+  const { width, height, zone } = state.map;
+  const x = tile % width;
+  const y = (tile - x) / width;
+  for (let yy = Math.max(0, y - radius); yy <= Math.min(height - 1, y + radius); yy++) {
+    for (let xx = Math.max(0, x - radius); xx <= Math.min(width - 1, x + radius); xx++) {
+      if (zone[yy * width + xx] === z) return true;
+    }
+  }
+  return false;
 }
 
 function isFreeBlock(state, rt, tile, size, z) {

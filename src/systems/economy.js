@@ -5,7 +5,7 @@
 //   comercial / industrial: cada vaga ocupada paga incomePerJob por ponto
 //   estatais (refinaria, fábrica de cimento...): receita proporcional à lotação
 // Despesas: manutenção das ruas e dos serviços públicos, verba de pesquisa,
-// parcelas de empréstimos. Tecnologias mudam vários desses valores (mod()).
+// leis e políticas ativas, parcelas de empréstimos. Tecnologias mudam vários desses valores (mod()).
 //
 // monthlyBudget() calcula o mês "como está agora" (para o painel e a
 // previsão); closeMonth() aplica no fim de cada mês, paga as parcelas e guarda
@@ -14,6 +14,7 @@
 import { BUILDINGS, ECONOMY, TAX_ZONES, ZONE } from '../world/catalog.js';
 import { jobsOf, mod, utilityOutput, utilityUpkeep } from './mods.js';
 import { researchOutput } from './research.js';
+import { policiesCost } from './policies.js';
 
 const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial' };
 
@@ -37,7 +38,7 @@ export function monthlyBudget(state, rt) {
       }
     }
     const key = ZONE_KEY[info.zone];
-    if (key && b.abandoned === undefined) jobsFilled[key] += workers * mod(rt, `income.${key}.${info.level}`);
+    if (key && b.abandoned === undefined) jobsFilled[key] += workers * mod(rt, `income.${key}.${info.level}`) * mod(rt, `income.${key}`);
   }
 
   let roadTiles = 0;
@@ -56,9 +57,10 @@ export function monthlyBudget(state, rt) {
     roads: Math.round(roadTiles * mod(rt, 'roadUpkeep', ECONOMY.roadUpkeepPerMonth) * mod(rt, 'maintenance')),
     utilities,
     research: researchOutput(state, rt).fundingCost,
+    policies: policiesCost(state, rt, income.total),
     loans: state.economy.loans.reduce((sum, loan) => sum + loanInstallment(loan), 0),
   };
-  expenses.total = expenses.roads + expenses.utilities + expenses.research + expenses.loans;
+  expenses.total = expenses.roads + expenses.utilities + expenses.research + expenses.policies + expenses.loans;
 
   return { income, expenses, net: income.total - expenses.total };
 }

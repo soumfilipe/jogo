@@ -1,6 +1,9 @@
 import { createWorld } from './world/world.js';
 import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, ZONE, ZONE_INFO } from './world/catalog.js';
 import { radiusOf, seatsOf } from './systems/education.js';
+import { serviceRadius } from './systems/services.js';
+
+const SERVICE_NAMES = { saude: 'saúde', policia: 'menos crime', bombeiros: 'apaga incêndios', lazer: 'lazer' };
 import { applyCommand, costs, lineTiles, planCommand, rectTiles } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
@@ -51,6 +54,11 @@ const TOOLS = [
     ['escola_media', 'Ensino médio', '#3f6fc0', 'education'], ['escola_tecnica', 'Técnica', '#e8b931', 'education'],
     ['senai', 'Aprendizagem', '#c23b3b', 'education'], ['universidade', 'Universidade', '#6f8fae', 'education'],
     ['biblioteca', 'Biblioteca', '#e9e4da', 'education'],
+    ['hospital', 'Hospital', '#f4f5f6', 'services'], ['clinica', 'Clínica', '#51cf66', 'services'],
+    ['posto_saude', 'Vacinação', '#4f8ff7', 'services'], ['caps', 'CAPS', '#8e44ad', 'services'],
+    ['delegacia', 'Delegacia', '#2c3e50', 'services'], ['guarda_municipal', 'Guarda', '#16a085', 'services'],
+    ['central_cameras', 'Câmeras', '#5b7fa8', 'services'], ['quartel_bombeiros', 'Bombeiros', '#c0392b', 'services'],
+    ['parque', 'Praça', '#7fb069', 'leisure'], ['cinema', 'Cinema', '#8e44ad', 'leisure'], ['ginasio', 'Ginásio', '#3f6fc0', 'leisure'],
   ].map(([building, label, swatch, group], i) => ({
     id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch, group,
     separatorBefore: i === 0,
@@ -187,6 +195,16 @@ function renderHud() {
   $('city-name').textContent = state.city.name + (dirty ? ' *' : '');
   $('date').textContent = formatDate(state.time.tick);
   $('population').textContent = s.population.toLocaleString('pt-BR');
+  const city = rt.cityWellbeing;
+  if (city) {
+    const sat = Math.round(city.satisfaction * 100);
+    const happy = $('happiness');
+    happy.firstChild.textContent = `${sat >= 60 ? '😀' : sat >= 40 ? '🙂' : '😟'} `;
+    happy.lastElementChild.textContent = `${sat}%`;
+    happy.title = `Satisfação média ${sat}% · saúde ${Math.round(city.health * 100)}% · crime ${Math.round(city.crime * 100)}%`
+      + (state.health?.epidemicUntil > state.time.tick ? ' · EPIDEMIA' : '');
+    happy.classList.toggle('short', sat < 40 || state.health?.epidemicUntil > state.time.tick);
+  }
   let kids = 0;
   for (const c of state.citizens) if (c.age < 18) kids++;
   $('population').parentElement.title = `População: ${(s.population - kids).toLocaleString('pt-BR')} adultos e ${kids.toLocaleString('pt-BR')} crianças e jovens`;
@@ -297,6 +315,7 @@ function utilityTitle(id) {
   if (u.school) makes.push(`${EDUCATION.stages[u.school.stage].name.toLowerCase()}: ${fmt(seatsOf(rt, id))} vagas num raio de ${radiusOf(rt, id)} tiles`);
   if (u.library) makes.push(`estudantes num raio de ${u.library.radius} tiles avançam ${Math.round(u.library.bonus * 100)}% mais rápido`);
   if (u.signal) makes.push(`valoriza o terreno num raio de ${u.signal.radius} tiles`);
+  if (u.service) makes.push(`${SERVICE_NAMES[u.service.kind]} num raio de ${serviceRadius(rt, id)} tiles`);
   const notes = [u.pollution ? 'polui' : null, u.needsWater ? 'na beira de rio ou lago' : null].filter(Boolean);
   const text = `${makes.join(', ')} · $${fmt(utilityCost(rt, id))} + $${fmt(utilityUpkeep(rt, id))}/mês`;
   return text.charAt(0).toUpperCase() + text.slice(1) + (notes.length ? ' · ' + notes.join(', ') : '');
@@ -380,6 +399,7 @@ function toggleResearch(force) {
 // Aviso de tecnologia concluída (a simulação deixa os ids em rt.researchEvents).
 let toastTimer = null;
 function announceResearch() {
+  announceEvents();
   const events = rt.researchEvents;
   if (!events?.length) return;
   rt.researchEvents = [];
@@ -391,10 +411,30 @@ function announceResearch() {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
 }
+// Incêndios e epidemias (a simulação deixa em rt.events).
+function announceEvents() {
+  const events = rt.events;
+  if (!events?.length) return;
+  rt.events = [];
+  const burned = events.filter((e) => e.kind === 'incendio').reduce((n, e) => n + e.count, 0);
+  const lines = [];
+  if (burned) {
+    lines.push(`<b>🔥 Incêndio</b><span>${burned} ${burned === 1 ? 'prédio virou' : 'prédios viraram'} ruína. Quartéis de bombeiros apagam o fogo no raio deles.</span>`);
+  }
+  if (events.some((e) => e.kind === 'epidemia')) {
+    lines.push('<b>🦠 Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>');
+  }
+  const toast = $('toast');
+  toast.innerHTML = lines.join('');
+  toast.hidden = false;
+  status([burned ? 'Incêndio' : null, events.some((e) => e.kind === 'epidemia') ? 'Epidemia' : null].filter(Boolean).join(', '));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+}
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
-const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u' };
+const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j' };
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);

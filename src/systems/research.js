@@ -174,7 +174,7 @@ export function researchOutput(state, rt) {
       }
       staffing += weight / BUILDINGS[b.type].jobs;
     }
-    if (u.area) byArea[u.area] += base * RESEARCH.fieldShare * full;
+    if (u.area) byArea[u.area] += base * RESEARCH.fieldShare * full * mod(rt, `fieldShare.${u.area}`);
     if (u.privateResearch) parks.push(b);
   }
 

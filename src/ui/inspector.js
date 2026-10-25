@@ -5,6 +5,7 @@ import {
   BUILDINGS, DENSITY_INFO, EDU_NAMES, EDUCATION, MAX_LEVEL, SECTORS, SHIFTS, ZONE, buildingFloors, capacityOf,
 } from '../world/catalog.js';
 import { minEduFor, radiusOf, seatsOf } from '../systems/education.js';
+import { serviceRadius } from '../systems/services.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
@@ -42,7 +43,9 @@ function renderBuilding(el, b, state, rt) {
   const upgrade = upgradeBlockers(state, rt, b);
   let next = '';
   const service = rt.service?.get(b.id);
-  if (b.abandoned !== undefined) {
+  if (b.burned) {
+    next = 'Destruído por um incêndio: vai desabar se não for demolido. Quartéis de bombeiros apagam o fogo no raio deles.';
+  } else if (b.abandoned !== undefined) {
     next = 'Abandonado: ninguém mora ou trabalha aqui. Vai desabar se não for demolido.';
   } else if (upgrade?.limited) {
     next = `A densidade ${upgrade.limited.name.toLowerCase()} da zona não deixa crescer mais: rezoneie com densidade maior.`;
@@ -65,6 +68,7 @@ function renderBuilding(el, b, state, rt) {
       <dt>${info.residents ? 'Moradores' : 'Funcionários'}</dt><dd>${people.length} / ${capacity}</dd>
       ${info.residents ? `<dt>Crianças</dt><dd>${people.filter((c) => c.age < 18).length}</dd>`
         : `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>`}
+      ${wellbeingRows(rt, b)}
       <dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>
       ${info.zone !== ZONE.INDUSTRIAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
@@ -83,6 +87,20 @@ function renderBuilding(el, b, state, rt) {
 }
 
 const NO = '<b style="color:#ff8a80">Não</b>';
+const NO_STAFF = '<b style="color:#ff8a80">sem funcionários, não atende</b>';
+const SERVICE_TEXT = { saude: 'saúde', policia: 'policiamento', bombeiros: 'bombeiros', lazer: 'lazer' };
+
+// Saúde, crime e satisfação do prédio (ver systems/wellbeing.js).
+function wellbeingRows(rt, b) {
+  const w = rt.wellbeing?.get(b.id);
+  if (!w) return '';
+  const rows = [];
+  if (BUILDINGS[b.type].residents) {
+    rows.push(`<dt>Satisfação</dt><dd>${pct(w.satisfaction)}</dd>`, `<dt>Saúde</dt><dd>${pct(w.health)}</dd>`);
+  }
+  rows.push(`<dt>Crime</dt><dd>${pct(w.crime)}</dd>`);
+  return rows.join('');
+}
 
 // Empresas do prédio, andar por andar, e os andares vagos.
 function companies(b, rt) {
@@ -108,7 +126,7 @@ function renderUtility(el, b, state, rt) {
   const workers = rt.workers.get(b.id).size;
   const jobs = jobsOf(rt, b.type);
   const fmt = (v) => Math.round(v).toLocaleString('pt-BR');
-  const kind = u.school && u.institute ? 'Ensino e pesquisa' : u.school || u.library ? 'Educação'
+  const kind = u.service ? (u.service.kind === 'lazer' ? 'Lazer' : 'Serviço público') : u.school && u.institute ? 'Ensino e pesquisa' : u.school || u.library ? 'Educação'
     : u.institute || u.privateResearch ? 'Pesquisa' : u.income ? 'Estatal' : 'Serviço público';
   el.innerHTML = `
     <h3>${esc(info.name)} #${b.id}</h3>
@@ -123,6 +141,7 @@ function renderUtility(el, b, state, rt) {
       <dt>Atende</dt><dd>casas a até ${radiusOf(rt, b.type)} tiles</dd>` : ''}
       ${u.library ? `<dt>Estudantes</dt><dd>a até ${u.library.radius} tiles estudam ${Math.round(u.library.bonus * 100)}% mais rápido</dd>` : ''}
       ${u.signal ? `<dt>Sinal</dt><dd>valoriza o terreno a até ${u.signal.radius} tiles</dd>` : ''}
+      ${u.service ? `<dt>Atende</dt><dd>${SERVICE_TEXT[u.service.kind]} a até ${serviceRadius(rt, b.type)} tiles${workers ? '' : ` (${NO_STAFF})`}</dd>` : ''}
       ${u.institute ? '<dt>Pesquisa</dt><dd>nas áreas com verba (painel Pesquisa)</dd>' : ''}
       ${u.area ? `<dt>Pesquisa</dt><dd>um pouco de ${esc(AREAS[u.area])}</dd>` : ''}
       ${u.privateResearch ? '<dt>Pesquisa</dt><dd>P&amp;D dos escritórios em volta</dd>' : ''}

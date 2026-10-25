@@ -7,6 +7,9 @@ import { leasedJobs, usesCompanies } from '../world/runtime.js';
 import { taxDemandShift } from './economy.js';
 import { mod } from './mods.js';
 
+// Quanto a satisfação média move a demanda residencial (de −15 a +15).
+const SATISFACTION_DEMAND = 30;
+
 export function computeDemand(state, rt) {
   let housing = 0;
   let commercialJobs = 0;
@@ -35,7 +38,10 @@ export function computeDemand(state, rt) {
 
   // Quanta gente quer vir morar aqui: vagas sobrando atraem, desemprego afasta,
   // imposto residencial alto afasta. A constante faz uma cidade vazia crescer.
-  const attraction = openJobs - unemployed + 12 + taxDemandShift(state, 'residential');
+  // A satisfação média (guardada uma vez por dia, ver wellbeing.js) também atrai ou afasta.
+  const satisfaction = state.wellbeing?.satisfaction ?? 0.5;
+  const attraction = openJobs - unemployed + 12 + taxDemandShift(state, 'residential')
+    + Math.round((satisfaction - 0.5) * SATISFACTION_DEMAND);
 
   rt.demand = {
     attraction,

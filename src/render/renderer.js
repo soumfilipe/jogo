@@ -83,6 +83,10 @@ export const MAP_MODES = {
   // Escolas (ensino fundamental): casas com escola com vaga no raio (azul),
   // com escola mas sem vaga (amarelo) e sem escola (vermelho).
   escolas: { name: 'Escolas', layer: 'schoolMap', from: '#d64541', mid: '#f1c40f', to: '#4f8ff7' },
+  // Bem-estar das casas (ver systems/wellbeing.js): verde é bom.
+  saude: { name: 'Saúde', layer: 'healthMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  crime: { name: 'Segurança', label: 'Crime', layer: 'crimeMap', from: '#8e1b1b', mid: '#f1c40f', to: '#2ecc71' },
+  satisfacao: { name: 'Satisfação', layer: 'satisfactionMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
 };
 const MAP_STEPS = 10;
 

@@ -197,6 +197,56 @@ export const BUILDINGS = {
     name: 'Biblioteca', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 4,
     utility: { power: 0, water: 0, cost: 5_000, upkeep: 120, pollution: 0, area: 'cultura', library: { radius: 12, bonus: 0.1 } },
   },
+
+  // --- Serviços e lazer (cobertura: ver systems/services.js) -----------------
+  //   utility.service: { kind, radius, strength } — tipo de cobertura
+  //     (saude, policia, bombeiros, lazer), raio em tiles e quanto cobre no
+  //     centro (1 = o máximo); a cobertura cai até a borda do raio. O prédio
+  //     só cobre com funcionários.
+  hospital: {
+    name: 'Hospital', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
+    utility: { power: 0, water: 0, cost: 30_000, upkeep: 1_200, pollution: 0, area: 'saude', service: { kind: 'saude', radius: 24, strength: 1 } },
+  },
+  posto_saude: {
+    name: 'Posto de vacinação', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 5,
+    utility: { power: 0, water: 0, cost: 4_000, upkeep: 150, pollution: 0, area: 'saude', service: { kind: 'saude', radius: 10, strength: 0.4 } },
+  },
+  clinica: {
+    name: 'Clínica de bairro', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 8,
+    utility: { power: 0, water: 0, cost: 6_000, upkeep: 250, pollution: 0, area: 'saude', service: { kind: 'saude', radius: 12, strength: 0.7 } },
+  },
+  caps: {
+    name: 'Centro de atenção psicossocial', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 8,
+    utility: { power: 0, water: 0, cost: 6_000, upkeep: 250, pollution: 0, area: 'saude', service: { kind: 'lazer', radius: 14, strength: 0.6 } },
+  },
+  delegacia: {
+    name: 'Delegacia de polícia', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 15,
+    utility: { power: 0, water: 0, cost: 10_000, upkeep: 450, pollution: 0, area: 'seguranca', service: { kind: 'policia', radius: 16, strength: 1 } },
+  },
+  guarda_municipal: {
+    name: 'Guarda municipal', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 8,
+    utility: { power: 0, water: 0, cost: 5_000, upkeep: 200, pollution: 0, area: 'seguranca', service: { kind: 'policia', radius: 12, strength: 0.6 } },
+  },
+  central_cameras: {
+    name: 'Central de videomonitoramento', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
+    utility: { power: 0, water: 0, cost: 12_000, upkeep: 400, pollution: 0, area: 'seguranca', service: { kind: 'policia', radius: 20, strength: 0.5 } },
+  },
+  quartel_bombeiros: {
+    name: 'Quartel de bombeiros', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 12,
+    utility: { power: 0, water: 0, cost: 9_000, upkeep: 400, pollution: 0, area: 'seguranca', service: { kind: 'bombeiros', radius: 16, strength: 1 } },
+  },
+  parque: {
+    name: 'Praça', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 1,
+    utility: { power: 0, water: 0, cost: 1_500, upkeep: 40, pollution: 0, area: 'ambiental', service: { kind: 'lazer', radius: 6, strength: 0.6 }, park: true },
+  },
+  cinema: {
+    name: 'Cinema', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 6_000, upkeep: 100, pollution: 0, income: 300, area: 'cultura', service: { kind: 'lazer', radius: 14, strength: 0.7 } },
+  },
+  ginasio: {
+    name: 'Ginásio poliesportivo', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 12_000, upkeep: 300, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 16, strength: 0.8 } },
+  },
 };
 
 /**
@@ -419,6 +469,8 @@ export const EDUCATION = {
     superior: { name: 'Graduação', ages: [18, 30], needs: EDU.MEDIO, years: 4, gives: EDU.SUPERIOR, full: true },
     // Pós-graduação: na universidade, depois da tecnologia de pós-graduação.
     pos: { name: 'Pós-graduação', ages: [22, 40], needs: EDU.SUPERIOR, years: 2, gives: EDU.POS, full: true },
+    // Educação de jovens e adultos: à noite, na escola primária (com a lei).
+    eja: { name: 'Educação de jovens e adultos', ages: [18, 60], needs: EDU.NONE, years: 2, gives: EDU.FUNDAMENTAL },
   },
   // Quem passou pela creche começa o fundamental com este adiantamento (anos).
   crecheHeadStart: 1,
@@ -465,6 +517,48 @@ export const DEMOGRAPHY = {
   deathAt60: 0.01,
   deathGrowth: 1.1,
   maxAge: 100,
+  // Crianças pequenas (até 4 anos) morrem com esta chance por ano, menos com
+  // saúde e vacinação.
+  childDeath: 0.02,
+  childAges: 4,
+};
+
+// Bem-estar (ver systems/wellbeing.js): saúde, crime e satisfação de cada casa,
+// de 0 a 1, recalculados uma vez por dia.
+export const WELLBEING = {
+  // Saúde: base, mais até `coverage` com hospital/clínica no raio, menos a
+  // poluição. A saúde multiplica a chance de morrer (de healthDeath[0] com
+  // saúde 1 até healthDeath[1] com saúde 0).
+  health: { base: 0.6, coverage: 0.35, pollution: 0.3 },
+  healthDeath: [0.6, 1.8],
+  // Crime: base mais desemprego, insatisfação e densidade, menos a polícia.
+  crime: { base: 0.15, unemployment: 0.5, unhappiness: 0.35, density: 0.15, police: 0.7 },
+  // Satisfação: base e o peso de cada fator.
+  satisfaction: {
+    base: 0.6, health: 0.15, safety: 0.2, leisure: 0.15, school: 0.05,
+    pollution: 0.2, unemployment: 0.3, taxPerPoint: 0.015,
+  },
+  // Casas com satisfação abaixo de `leaveBelow` perdem uma família por dia
+  // com esta chance (emigração).
+  leaveBelow: 0.25,
+  leaveChance: 0.25,
+  // Epidemia: chance por mês quando a saúde média da cidade está abaixo de
+  // epidemicBelow (cidades acima de epidemicMinPop); dura epidemicMonths e
+  // multiplica as mortes por epidemicDeath.
+  epidemicBelow: 0.55,
+  epidemicMinPop: 500,
+  epidemicChance: 0.08,
+  epidemicMonths: 2,
+  epidemicDeath: 3,
+};
+
+// Incêndios (ver systems/fire.js): chance por dia de cada prédio pegar fogo
+// (por nível); com bombeiros no raio, a chance de apagar é a cobertura;
+// sem apagar, o prédio vira ruína e o fogo passa aos vizinhos com spreadChance
+// (baixa: com 8 vizinhos, o fogo não pode crescer sem parar).
+export const FIRE = {
+  dailyChance: 0.00004,
+  spreadChance: 0.08,
 };
 
 // Velocidade dos cidadãos, em tiles por minuto de jogo.

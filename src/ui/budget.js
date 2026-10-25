@@ -4,6 +4,7 @@
 
 import { ECONOMY, TAX_ZONES } from '../world/catalog.js';
 import { loanOffers, loanPayment, loanRate, monthlyBudget } from '../systems/economy.js';
+import { POLICIES, policyCost, policyUnlocked } from '../systems/policies.js';
 import { calendar } from '../core/time.js';
 
 const ZONE_NAMES = { residential: 'Residencial', commercial: 'Comercial', industrial: 'Industrial' };
@@ -53,6 +54,7 @@ export class BudgetPanel {
         <dt>Manutenção das ruas</dt><dd data-line="roads"></dd>
         <dt>Serviços públicos</dt><dd data-line="utilities"></dd>
         <dt>Pesquisa</dt><dd data-line="research"></dd>
+        <dt>Leis e políticas</dt><dd data-line="policies"></dd>
         <dt>Parcelas de empréstimos</dt><dd data-line="loans"></dd>
         <dt class="total">Saldo do mês</dt><dd class="total" data-line="net"></dd>
       </dl>
@@ -63,11 +65,19 @@ export class BudgetPanel {
       <h4>Empréstimos</h4>
       <ul class="loans" data-loans></ul>
       <div class="loan-offers" data-offers></div>
+
+      <h4>Leis e políticas</h4>
+      <ul class="policies" data-policies></ul>
+      <p class="muted small" data-policies-locked></p>
       <p class="budget-error" data-error hidden></p>`;
 
     this.el.addEventListener('input', (e) => {
       const zone = e.target.dataset.tax;
       if (zone) this.#run({ type: 'tax', zone, percent: Number(e.target.value) });
+    });
+    this.el.addEventListener('change', (e) => {
+      const id = e.target.dataset.policy;
+      if (id) this.#run({ type: 'policy', id, on: e.target.checked });
     });
     this.el.addEventListener('click', (e) => {
       const target = e.target.closest('button');
@@ -84,6 +94,26 @@ export class BudgetPanel {
     error.hidden = result.ok;
     if (!result.ok) error.textContent = result.reason;
     this.render(this.state, this.rt);
+  }
+
+  // Lista de leis liberadas, com custo do mês; refeita só quando algo muda.
+  #renderPolicies(state, rt, income) {
+    const ids = Object.keys(POLICIES).filter((id) => policyUnlocked(rt, id));
+    const active = new Set(state.policies.active);
+    const costs = ids.map((id) => policyCost(state, rt, id, income));
+    const key = ids.map((id, i) => `${id}:${active.has(id)}:${costs[i]}`).join();
+    if (key === this.policiesKey) return;
+    this.policiesKey = key;
+    this.el.querySelector('[data-policies]').innerHTML = ids.length
+      ? ids.map((id, i) => `
+        <li><label>
+          <input type="checkbox" data-policy="${id}"${active.has(id) ? ' checked' : ''}>
+          <span><b>${POLICIES[id].name}</b><small>${POLICIES[id].desc}</small></span>
+          <em>${costs[i] ? `${money(costs[i])}/mês` : 'sem custo'}</em>
+        </label></li>`).join('')
+      : '<li class="muted">Nenhuma lei liberada ainda: elas vêm da pesquisa.</li>';
+    const locked = Object.keys(POLICIES).length - ids.length;
+    this.el.querySelector('[data-policies-locked]').textContent = locked ? `Mais ${locked} leis chegam com a pesquisa.` : '';
   }
 
   render(state, rt) {
@@ -110,6 +140,8 @@ export class BudgetPanel {
     q('[data-line="roads"]').textContent = money(-budget.expenses.roads);
     q('[data-line="utilities"]').textContent = money(-budget.expenses.utilities);
     q('[data-line="research"]').textContent = money(-budget.expenses.research);
+    q('[data-line="policies"]').textContent = money(-budget.expenses.policies);
+    this.#renderPolicies(state, rt, budget.income.total);
     q('[data-line="loans"]').textContent = money(-budget.expenses.loans);
     q('[data-line="net"]').textContent = money(budget.net);
 
