@@ -36,6 +36,11 @@ Salvar, carregar e o resto ficam no menu 💾 Arquivo, no topo.
   para a direita: a cidade quer mais; para a esquerda: sobra) e a escolha da
   densidade. As barrinhas R, C, I e F no topo são a mesma demanda; clicar nelas
   abre o menu Zonas.
+- **Ícones próprios**: cada prédio, zona, rua, menu e mapa tem um ícone desenhado
+  para o jogo (`src/ui/icons.js`, SVG de traço numa grade de 24×24, na cor do
+  texto), no lugar dos emojis. Nos menus o ícone fica sobre a cor do prédio, a
+  mesma dele no mapa. Todos juntos em `docs/icones.html`
+  (http://localhost:8080/docs/icones.html).
 - **Legenda dos mapas**: com um mapa ligado, uma legenda embaixo mostra o que
   cada cor quer dizer (faixa de ruim a bom, ou as categorias, como "prédio sem
   energia" ou "escola perto, mas lotada"). O × da legenda desliga o mapa.

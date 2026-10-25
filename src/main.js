@@ -23,6 +23,7 @@ import { BudgetPanel } from './ui/budget.js';
 import { ResearchPanel } from './ui/research.js';
 import { CulturePanel } from './ui/culture.js';
 import { Sheets } from './ui/sheets.js';
+import { hydrateIcons, icon, inkFor } from './ui/icons.js';
 import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
 import { detectBackend } from './save/backends.js';
@@ -35,7 +36,7 @@ const canvas = $('map');
 
 // Ferramentas: `shape` define como o arraste seleciona tiles.
 const TOOLS = [
-  { id: 'inspect', name: 'Inspecionar', icon: '✋', key: 'v' },
+  { id: 'inspect', name: 'Inspecionar', key: 'v' },
   { id: 'road', name: 'Estrada', key: 'e', shape: 'line', road: 1, color: 'rgba(255,255,255,0.35)', swatch: '#5a5d65', group: 'road' },
   // Avenida e via expressa: sobre uma rua, melhoram ela (paga só a diferença).
   { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57', group: 'road' },
@@ -97,13 +98,13 @@ const GROUPS = {
   research: 'Pesquisa e estatais',
 };
 const MENUS = [
-  { id: 'ruas', name: 'Ruas', icon: '🛣️', groups: ['road'] },
-  { id: 'zonas', name: 'Zonas', icon: '🏘️', groups: ['zone'] },
-  { id: 'infra', name: 'Infraestrutura', icon: '⚡', groups: ['utility', 'waste'] },
-  { id: 'servicos', name: 'Serviços', icon: '🏥', groups: ['education', 'services', 'food'] },
-  { id: 'lazer', name: 'Lazer e cultura', icon: '🎡', groups: ['leisure', 'tourism'] },
-  { id: 'transporte', name: 'Transporte', icon: '🚌', groups: ['transit', 'freight'] },
-  { id: 'economia', name: 'Estatais', icon: '🏭', groups: ['research'] },
+  { id: 'ruas', name: 'Ruas', icon: 'roads', groups: ['road'] },
+  { id: 'zonas', name: 'Zonas', icon: 'zones', groups: ['zone'] },
+  { id: 'infra', name: 'Infraestrutura', icon: 'infra', groups: ['utility', 'waste'] },
+  { id: 'servicos', name: 'Serviços', icon: 'services', groups: ['education', 'services', 'food'] },
+  { id: 'lazer', name: 'Lazer e cultura', icon: 'leisure', groups: ['leisure', 'tourism'] },
+  { id: 'transporte', name: 'Transporte', icon: 'transport', groups: ['transit', 'freight'] },
+  { id: 'economia', name: 'Estatais', icon: 'estatais', groups: ['research'] },
 ];
 // Mapas, também por área.
 const MAP_MENU = [
@@ -111,6 +112,11 @@ const MAP_MENU = [
   ['Serviços', ['escolas', 'saude', 'crime', 'alimentos']],
   ['Cidade', ['valor', 'poluicao', 'satisfacao']],
 ];
+// Ícone de cada ferramenta (src/ui/icons.js): o do prédio, da zona ou o id.
+const ZONE_ICON = { [ZONE.RESIDENTIAL]: 'residencial', [ZONE.COMMERCIAL]: 'comercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
+const toolIcon = (t) => (t.building === 'parque' ? 'praca' : t.building ?? ZONE_ICON[t.zone] ?? t.id);
+/** Ícone sobre a cor da ferramenta (a mesma do prédio ou da zona no mapa). */
+const glyph = (t) => `<span class="glyph" style="--c:${t.swatch};color:${inkFor(t.swatch)}">${icon(toolIcon(t))}</span>`;
 const DEMAND_KEY = {
   [ZONE.RESIDENTIAL]: 'residential', [ZONE.COMMERCIAL]: 'commercial',
   [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural',
@@ -144,6 +150,7 @@ let mapMode = null; //   chave de MAP_MODES (valor do terreno, poluição) ou nu
 let following = false;
 const keysDown = new Set();
 
+hydrateIcons();
 const renderer = new Renderer(canvas);
 const sheets = new Sheets(); // painéis do celular (ver mais abaixo)
 const minimap = new Minimap($('minimap'));
@@ -251,7 +258,12 @@ function renderHud() {
   if (city) {
     const sat = Math.round(city.satisfaction * 100);
     const happy = $('happiness');
-    happy.firstChild.textContent = `${sat >= 60 ? '😀' : sat >= 40 ? '🙂' : '😟'} `;
+    const face = happy.firstElementChild;
+    const mood = sat >= 60 ? 'face-happy' : sat >= 40 ? 'face-neutral' : 'face-sad';
+    if (face.dataset.icon !== mood) {
+      face.dataset.icon = mood;
+      face.innerHTML = icon(mood);
+    }
     happy.lastElementChild.textContent = `${sat}%`;
     happy.title = `Satisfação média ${sat}% · saúde ${Math.round(city.health * 100)}% · crime ${Math.round(city.crime * 100)}%`
       + (state.health?.epidemicUntil > state.time.tick ? ' · EPIDEMIA' : '');
@@ -334,7 +346,7 @@ function toolButton(t) {
   button.className = 'tool';
   button.dataset.tool = t.id;
   const key = t.key ? `<kbd>${t.key.toUpperCase()}</kbd>` : '';
-  button.innerHTML = `<span class="swatch" style="background:${t.swatch || t.color}"></span>
+  button.innerHTML = `${glyph(t)}
     <span class="name">${t.label || t.name}${key}</span><small>${toolCost(t)}</small>
     ${t.zone ? `<span class="demand" data-demand="${t.zone}" style="--zone:${t.swatch}"><i></i></span>` : ''}`;
   button.onclick = () => {
@@ -412,7 +424,8 @@ document.addEventListener('pointerdown', (e) => {
 const directButton = (t) => {
   const button = document.createElement('button');
   button.dataset.tool = t.id;
-  button.innerHTML = `${t.swatch ? `<span class="swatch" style="background:${t.swatch}"></span>` : ''}${t.icon ?? t.name}<kbd>${t.key.toUpperCase()}</kbd>`;
+  button.className = 'direct';
+  button.innerHTML = `${icon(toolIcon(t))}${t.id === 'inspect' ? '' : `<span>${t.name}</span>`}<kbd>${t.key.toUpperCase()}</kbd>`;
   button.title = `${t.name} (tecla ${t.key.toUpperCase()})`;
   button.onclick = () => {
     selectTool(t);
@@ -422,7 +435,7 @@ const directButton = (t) => {
 };
 const bulldozeTool = TOOLS.find((t) => t.id === 'bulldoze');
 $('tools').append(directButton(TOOLS[0]));
-for (const menu of MENUS) addMenu(menu.id, `${menu.icon} <span data-menu-label>${menu.name}</span>`, menuSections(menu));
+for (const menu of MENUS) addMenu(menu.id, `${icon(menu.icon)}<span data-menu-label>${menu.name}</span>`, menuSections(menu));
 $('tools').append(directButton(bulldozeTool));
 
 // Escolha da densidade: Baixa / Média / Alta. Na barra fica depois das zonas;
@@ -493,7 +506,7 @@ function refreshTools() {
       const small = button.querySelector('small');
       if (!small) continue; // Inspecionar e Demolir: sempre liberados
       button.disabled = Boolean(locked);
-      small.textContent = locked ? `🔒 ${lockText(t)}` : toolCost(t);
+      small.innerHTML = locked ? `${icon('lock')} ${escapeHtml(lockText(t))}` : toolCost(t);
       button.title = locked ? `${t.name}: precisa de ${lockText(t)}`
         : t.building ? `${t.name}: ${utilityTitle(t.building)}` : t.name;
     }
@@ -530,7 +543,7 @@ const budget = new BudgetPanel($('budget'), {
 });
 $('btn-budget').onclick = () => toggleBudget();
 
-// Pesquisa: painel aberto pelo botão 🔬 no topo ou pela tecla T. Ocupa o
+// Pesquisa: painel aberto pelo botão de pesquisa no topo ou pela tecla T. Ocupa o
 // mesmo canto do orçamento, então abrir um fecha o outro.
 const research = new ResearchPanel($('research'), {
   act: (cmd) => {
@@ -540,7 +553,7 @@ const research = new ResearchPanel($('research'), {
   },
 });
 $('btn-research').onclick = () => toggleResearch();
-// Cultura: artistas, gêneros e o que está em cartaz (botão 🎭 ou tecla Z).
+// Cultura: artistas, gêneros e o que está em cartaz (botão no topo ou tecla Z).
 const culture = new CulturePanel($('culture'));
 $('btn-culture').onclick = () => toggleCulture();
 
@@ -579,7 +592,7 @@ function announceResearch() {
   rt.researchEvents = [];
   const names = events.map((id) => TECH_BY_ID.get(id));
   const toast = $('toast');
-  toast.innerHTML = names.map((t) => `<b>🔬 ${escapeHtml(t.name)}</b><span>${escapeHtml(t.mechanic)}</span>`).join('');
+  toast.innerHTML = names.map((t) => `<b>${icon('research')} ${escapeHtml(t.name)}</b><span>${escapeHtml(t.mechanic)}</span>`).join('');
   toast.hidden = false;
   status(`Nova tecnologia: ${names.map((t) => t.name).join(', ')}`);
   clearTimeout(toastTimer);
@@ -593,13 +606,13 @@ function announceEvents() {
   const burned = events.filter((e) => e.kind === 'incendio').reduce((n, e) => n + e.count, 0);
   const lines = [];
   if (burned) {
-    lines.push(`<b>🔥 Incêndio</b><span>${burned} ${burned === 1 ? 'prédio virou' : 'prédios viraram'} ruína. Quartéis de bombeiros apagam o fogo no raio deles.</span>`);
+    lines.push(`<b>${icon('fire')} Incêndio</b><span>${burned} ${burned === 1 ? 'prédio virou' : 'prédios viraram'} ruína. Quartéis de bombeiros apagam o fogo no raio deles.</span>`);
   }
   if (events.some((e) => e.kind === 'epidemia')) {
-    lines.push('<b>🦠 Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>');
+    lines.push(`<b>${icon('epidemic')} Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>`);
   }
   for (const e of events.filter((x) => x.kind === 'festa')) {
-    lines.push(`<b>🎉 ${escapeHtml(e.name)}</b><span>${escapeHtml(e.text)}</span>`);
+    lines.push(`<b>${icon('party')} ${escapeHtml(e.name)}</b><span>${escapeHtml(e.text)}</span>`);
   }
   const toast = $('toast');
   toast.innerHTML = lines.join('');
@@ -629,8 +642,10 @@ function mapButtons(onPick) {
       const button = document.createElement('button');
       button.className = 'tool';
       button.dataset.map = id ?? '';
-      const ramp = id ? `background:linear-gradient(90deg, ${mode.from}, ${mode.mid}, ${mode.to})` : 'background:#3a3f4a';
-      button.innerHTML = `<span class="swatch ramp" style="${ramp}"></span>
+      if (!id) button.classList.add('wide');
+      // Ícone na cor "boa" do mapa, com a faixa de cores embaixo.
+      const ramp = id ? `linear-gradient(90deg, ${mode.from}, ${mode.mid}, ${mode.to})` : 'var(--border)';
+      button.innerHTML = `<span class="glyph map-glyph" style="--c:#20232a;--ramp:${ramp};color:${id ? mode.to : 'var(--muted)'}">${icon(id ?? 'map-off')}</span>
         <span class="name">${mode.name}${MAP_KEYS[id] ? `<kbd>${MAP_KEYS[id].toUpperCase()}</kbd>` : ''}</span>`;
       button.title = id ? `Mapa: ${mode.name}` : 'Desliga a sobreposição';
       button.onclick = () => {
@@ -646,14 +661,12 @@ function mapButtons(onPick) {
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);
-addMenu('mapas', '🗺️ <span data-menu-label>Mapas</span>', mapButtons(closeMenus), 'narrow');
+addMenu('mapas', `${icon('map')}<span data-menu-label>Mapas</span>`, mapButtons(closeMenus), 'narrow');
 
-// O status (salvo, erros) fica no canto direito da barra.
-const spacer = document.createElement('span');
-spacer.className = 'spacer';
-$('tools').append(spacer, $('status'));
+// O status (salvo, erros) fica num balão no canto de baixo do mapa.
+$('viewport').append($('status'));
 // Arquivo: os botões de salvar/carregar ficam num menu no topo, antes das velocidades.
-const fileMenu = addMenu('arquivo', '💾 Arquivo', [...$('file-actions').children], 'narrow file-menu', $('speeds').parentElement);
+const fileMenu = addMenu('arquivo', `${icon('save')}<span>Arquivo</span>`, [...$('file-actions').children], 'narrow file-menu', $('speeds').parentElement);
 $('speeds').before(fileMenu);
 $('file-actions').remove();
 fileMenu.querySelector('.menu-panel').addEventListener('click', (e) => {
@@ -686,7 +699,7 @@ function renderLegend() {
     : `<div class="ramp" style="background:linear-gradient(90deg, ${mode.colors.join(', ')})"></div>
        <div class="ends"><span>${legend.low}</span><span>${legend.high}</span></div>`;
   el.innerHTML = `<button class="close" data-legend-close title="Desligar o mapa">×</button>
-    <b>${mode.name}</b>${body}${legend.note ? `<small>${legend.note}</small>` : ''}`;
+    <b>${icon(mapMode)} ${mode.name}</b>${body}${legend.note ? `<small>${legend.note}</small>` : ''}`;
 }
 $('legend').addEventListener('click', (e) => {
   if (e.target.closest('[data-legend-close]')) setMap(null);
@@ -733,6 +746,12 @@ for (const button of $('mobile-nav').children) {
 }
 sheets.onChange = () => updateMobileNav();
 
+function setIcon(el, name) {
+  if (el.dataset.icon === name) return;
+  el.dataset.icon = name;
+  el.innerHTML = icon(name);
+}
+
 // Destaca o botão ativo e mostra a ferramenta/mapa escolhidos nos rótulos.
 function updateMobileNav() {
   const nav = $('mobile-nav');
@@ -741,6 +760,9 @@ function updateMobileNav() {
   nav.querySelector('[data-mobile="inspect"]').classList.toggle('active', !building);
   nav.querySelector('[data-sheet="sheet-build"]').classList.toggle('active', building);
   nav.querySelector('[data-build-label]').textContent = building ? (tool.label || tool.name) : 'Construir';
+  // O ícone dos botões vira o da ferramenta e o do mapa escolhidos.
+  setIcon(nav.querySelector('[data-sheet="sheet-build"] .ico'), building ? toolIcon(tool) : 'build');
+  setIcon(nav.querySelector('[data-sheet="sheet-maps"] .ico'), mapMode ?? 'map');
   nav.querySelector('[data-maps-label]').textContent = mapMode ? MAP_MODES[mapMode].label || MAP_MODES[mapMode].name : 'Mapas';
   nav.querySelector('[data-sheet="sheet-maps"]').classList.toggle('active', Boolean(mapMode));
   for (const b of nav.querySelectorAll('[data-sheet]')) b.classList.toggle('open', sheets.openId === b.dataset.sheet);
