@@ -1015,7 +1015,18 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
-  arena_esports(r) {
+  teatro(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#b5b0a6', lift: 0 }];
+    // Fachada clássica com marquise vermelha e cartaz.
+    const w = r.pick([wall('#f0e6d2', '#d4c8b0'), wall('#e3b5ae', '#c9968f')]);
+    parts.push(block([0.12, 0.12, 0.88, 0.78], 0, 1.1, w, {
+      roof: { kind: 'gable-y', color: '#7a4b3a', rise: 0.3 }, doors: { count: 3, color: '#7a1f2b' }, windows: { cols: 3, style: 'grid' },
+    }));
+    parts.push(block([0.15, 0.78, 0.85, 0.9], 0.45, 0.08, wall('#c0392b', '#a03024'), { top: '#e05a47' }));
+    return parts;
+  },
+
+  arena_eventos(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5b5f66', lift: 0 }];
     parts.push({ kind: 'cylinder', cx: 1, cy: 1, r: 0.8, lift: 0, h: 0.9, color: r.pick(['#2c3e50', '#22303e']), top: '#8e44ad' });
     parts.push({ kind: 'cylinder', cx: 1, cy: 1, r: 0.6, lift: 0.9, h: 0.1, color: '#5fb7d8', top: '#5fb7d8' });

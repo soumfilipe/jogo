@@ -68,9 +68,12 @@ export function computeLandValue(state, rt) {
   const road = state.map.road;
   for (let i = 0; i < n; i++) {
     if (!road[i]) continue;
+    const type = ROAD_TYPES[road[i]];
     // Engarrafado não polui sem limite: conta até o dobro da capacidade da via.
-    industry[i] += Math.min(occupancy[i], 2 * ROAD_TYPES[road[i]].capacity) * carPollution;
-    noise[i] = ROAD_TYPES[road[i]].noise;
+    industry[i] += Math.min(occupancy[i], 2 * type.capacity) * carPollution;
+    noise[i] = type.noise;
+    // Calçadão: o movimento de pedestres valoriza como comércio.
+    if (type.commerce) commerce[i] += type.commerce;
   }
   // Tecnologias que valorizam o terreno (em toda a cidade ou numa zona).
   const bonusAll = mod(rt, 'landValue.all', 0);

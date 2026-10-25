@@ -69,7 +69,7 @@ export function todaysVisits(state, rt, events = todaysEvents(state, rt)) {
   const visits = [];
   for (const b of state.buildings) {
     if (!staffed(rt, b) || rt.access.get(b.id) < 0) continue;
-    const appeal = attractionAppeal(b.type, events);
+    const appeal = attractionAppeal(b.type, events, state.culture, state.time.tick);
     if (!appeal) continue;
     const isGame = events.game && BUILDINGS[b.type].utility.tourism.game;
     const total = Math.round(appeal * cityMul);
