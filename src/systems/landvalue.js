@@ -3,21 +3,27 @@
 // para que carregar um save não mude o resultado da simulação.
 //
 // Valor do terreno sobe com natureza por perto (água, floresta), comércio
-// e movimento (prédios em volta), e cai com a poluição das indústrias.
+// e movimento (prédios em volta), e cai com a poluição das indústrias e dos
+// carros e com o barulho de avenidas e vias expressas.
 
-import { BUILDINGS, TERRAIN, ZONE } from '../world/catalog.js';
+import { BUILDINGS, ROAD_TYPES, TERRAIN, TRAFFIC, ZONE } from '../world/catalog.js';
 import { mod, utilityPollution } from './mods.js';
+import { countOccupancy } from './traffic.js';
 
 const NATURE_RADIUS = 4;
 const COMMERCE_RADIUS = 8;
 const ACTIVITY_RADIUS = 8;
 const POLLUTION_RADIUS = 6;
+const NOISE_RADIUS = 3;
 
 // Quanto de cada coisa por perto já conta como "máximo".
 const NATURE_FULL = 20;
 const COMMERCE_FULL = 15;
 const ACTIVITY_FULL = 80;
 const POLLUTION_FULL = 12;
+// Perda máxima de valor pelo barulho das vias, e quanto cada ponto de ruído tira.
+const NOISE_MAX = 0.2;
+const NOISE_WEIGHT = 0.4;
 
 export function computeLandValue(state, rt) {
   const { width, height, terrain } = state.map;
@@ -41,6 +47,17 @@ export function computeLandValue(state, rt) {
     if (info.zone === ZONE.INDUSTRIAL) industry[b.tile] += weight * industryPollution;
     if (info.utility) industry[b.tile] += utilityPollution(rt, b.type);
   }
+  // Carros na rua agora (contados das posições em viagem, que estão no estado).
+  const occupancy = countOccupancy(state, rt);
+  const carPollution = TRAFFIC.carPollution * mod(rt, 'pollution.traffic');
+  const noise = new Float32Array(n);
+  const road = state.map.road;
+  for (let i = 0; i < n; i++) {
+    if (!road[i]) continue;
+    // Engarrafado não polui sem limite: conta até o dobro da capacidade da via.
+    industry[i] += Math.min(occupancy[i], 2 * ROAD_TYPES[road[i]].capacity) * carPollution;
+    noise[i] = ROAD_TYPES[road[i]].noise;
+  }
   // Tecnologias que valorizam o terreno (em toda a cidade ou numa zona).
   const bonusAll = mod(rt, 'landValue.all', 0);
   const bonusCommercial = mod(rt, 'landValue.commercial', 0);
@@ -63,6 +80,8 @@ export function computeLandValue(state, rt) {
   const commerceSum = boxSum(commerce, width, height, COMMERCE_RADIUS);
   const activitySum = boxSum(activity, width, height, ACTIVITY_RADIUS);
   const pollutionSum = boxSum(industry, width, height, POLLUTION_RADIUS);
+  const noiseSum = boxSum(noise, width, height, NOISE_RADIUS);
+  const noiseMod = mod(rt, 'noise');
 
   const { landValue, pollution } = rt;
   for (let i = 0; i < n; i++) {
@@ -73,6 +92,7 @@ export function computeLandValue(state, rt) {
       + 0.25 * Math.min(1, commerceSum[i] / COMMERCE_FULL)
       + 0.3 * Math.min(1, activitySum[i] / ACTIVITY_FULL)
       - 0.55 * p
+      - Math.min(NOISE_MAX, noiseSum[i] * NOISE_WEIGHT) * noiseMod
       + bonusAll
       + signal[i]
       + (zone[i] === ZONE.COMMERCIAL ? bonusCommercial : 0);

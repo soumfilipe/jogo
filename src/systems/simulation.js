@@ -18,6 +18,9 @@ import { enrollStudents, refreshSchoolMap } from './education.js';
 import { computeCoverage } from './services.js';
 import { applyEmigration, closeHealthMonth, computeWellbeing } from './wellbeing.js';
 import { applyFires } from './fire.js';
+import { computeTransit } from './transit.js';
+import { computeFreight } from './logistics.js';
+import { updateTrafficMap } from './traffic.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -28,6 +31,8 @@ export function tick(state, rt) {
 
   if (t % 60 === 0) {
     computeMods(state, rt);
+    computeTransit(state, rt);
+    updateTrafficMap(state, rt);
     computeDemand(state, rt);
     // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
     // assim o resultado não depende de quando o save foi carregado.
@@ -43,6 +48,7 @@ export function tick(state, rt) {
       // Bem-estar do dia: cobertura dos serviços, saúde, crime e satisfação;
       // depois quem está insatisfeito se muda e os incêndios do dia.
       computeCoverage(state, rt);
+      computeFreight(state, rt);
       computeWellbeing(state, rt);
       state.wellbeing = { ...rt.cityWellbeing };
       applyEmigration(state, rt);
@@ -83,6 +89,8 @@ export function prepare(state) {
   computeLandValue(state, rt); // para os mapas e o painel; a simulação recalcula antes de usar
   refreshSchoolMap(state, rt); // só o mapa: matricular mudaria o estado ao carregar
   // Para os mapas e o painel; a simulação recalcula no começo de cada dia.
+  computeTransit(state, rt);
+  computeFreight(state, rt);
   computeCoverage(state, rt);
   computeWellbeing(state, rt);
   return rt;

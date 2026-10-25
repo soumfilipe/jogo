@@ -16,7 +16,9 @@
 //   privateResearch, demand.<zona>, income.all, income.<zona>.<nível>,
 //   jobs.<zona>.<nível>, consumption.<zona>, landValue.all,
 //   landValue.<zona>, upgradeChance.<zona>, pollution.industry,
-//   pollution.<tipo>, output.power, output.<tipo>, cost.<tipo>, upkeep.<tipo>
+//   pollution.<tipo>, output.power, output.<tipo>, cost.<tipo>, upkeep.<tipo>,
+//   roadCapacity, congestion, speed.<via>, radius.<modo>, freightRange,
+//   pollution.traffic, noise
 
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { BUILDING_TECH, TECH_BY_ID } from '../world/techs.js';

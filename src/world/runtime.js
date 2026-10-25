@@ -296,7 +296,7 @@ function addDeparture(rt, minute, id) {
 export function sendHome(state, rt, citizen) {
   const home = rt.buildingById.get(citizen.home);
   const [x, y] = tileCenter(state, home.tile);
-  Object.assign(citizen, { state: 'casa', dest: null, path: null, step: 0, x, y });
+  Object.assign(citizen, { state: 'casa', dest: null, path: null, step: 0, x, y, mode: null });
   rt.movers.delete(citizen.id);
 }
 

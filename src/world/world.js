@@ -32,6 +32,7 @@ export function createWorld({
       nextLoanId: 1,
       history: [], // um registro por mês fechado (ver systems/economy.js)
       lastMonth: null,
+      fares: 0, // passagens do transporte público no mês (entram no fechamento)
     },
     map: {
       width,

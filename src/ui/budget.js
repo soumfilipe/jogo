@@ -51,6 +51,7 @@ export class BudgetPanel {
       <dl class="budget-lines">
         <dt>Impostos</dt><dd data-line="income"></dd>
         <dt data-statal>Estatais</dt><dd data-statal data-line="statal"></dd>
+        <dt data-fares>Passagens</dt><dd data-fares data-line="fares"></dd>
         <dt>Manutenção das ruas</dt><dd data-line="roads"></dd>
         <dt>Serviços públicos</dt><dd data-line="utilities"></dd>
         <dt>Pesquisa</dt><dd data-line="research"></dd>
@@ -134,7 +135,9 @@ export class BudgetPanel {
       q(`[data-tax-income="${zone}"]`).textContent = `${money(budget.income[zone])}/mês`;
     }
 
-    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal);
+    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal - budget.income.fares);
+    for (const el of this.el.querySelectorAll('[data-fares]')) el.hidden = budget.income.fares === 0;
+    q('[data-line="fares"]').textContent = money(budget.income.fares);
     for (const el of this.el.querySelectorAll('[data-statal]')) el.hidden = budget.income.statal === 0;
     q('[data-line="statal"]').textContent = money(budget.income.statal);
     q('[data-line="roads"]').textContent = money(-budget.expenses.roads);

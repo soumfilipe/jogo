@@ -1,6 +1,17 @@
 // A* sobre os tiles de estrada (4 vizinhos). Os buffers são reaproveitados
 // entre buscas para não gerar lixo; cada busca usa um "carimbo" para saber
 // quais posições já foram tocadas nela.
+//
+// O custo de passar por um tile é o inverso da velocidade do tipo de rua
+// (ROAD_TYPES): avenidas e vias expressas atraem os caminhos. Usa só a
+// velocidade do catálogo (sem modificadores nem trânsito), para que uma rota
+// guardada no cache continue certa até as ruas mudarem.
+
+import { ROAD_TYPES } from '../world/catalog.js';
+
+const STEP_COST = [Infinity];
+for (const [value, type] of Object.entries(ROAD_TYPES)) STEP_COST[Number(value)] = 1 / type.speed;
+const MIN_COST = Math.min(...STEP_COST);
 
 let buffers = null;
 
@@ -34,7 +45,7 @@ export function findRoadPath(map, from, to) {
   const ty = (to - tx) / width;
   const h = (t) => {
     const x = t % width;
-    return Math.abs(x - tx) + Math.abs((t - x) / width - ty);
+    return (Math.abs(x - tx) + Math.abs((t - x) / width - ty)) * MIN_COST;
   };
 
   seen[from] = stamp;
@@ -58,7 +69,7 @@ export function findRoadPath(map, from, to) {
 
     function relax(n) {
       if (!road[n] || closed[n] === stamp) return;
-      const cost = g[current] + 1;
+      const cost = g[current] + (STEP_COST[road[n]] ?? 1);
       if (seen[n] !== stamp || cost < g[n]) {
         seen[n] = stamp;
         g[n] = cost;

@@ -144,6 +144,11 @@ export const POLICIES = {
     desc: 'Casas com painel no telhado: consumo residencial 15% menor.',
     cost: {}, effects: [{ mod: 'consumption.residential', mul: 0.85 }],
   },
+  ciclovia_lazer: {
+    name: 'Ruas de lazer', tech: 'ciclovia_lazer',
+    desc: 'Domingo sem carros: mais saúde e satisfação, um pouco menos de capacidade nas ruas.',
+    cost: {}, effects: [{ mod: 'satisfactionPolicy', add: 0.03 }, { mod: 'health', add: 0.03 }, { mod: 'roadCapacity', mul: 0.97 }],
+  },
 };
 
 export function createPolicies() {

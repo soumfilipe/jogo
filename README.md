@@ -32,7 +32,8 @@ npm test   # testes da simulação, do formato de save e do servidor
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
-| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` Mapas | valor do terreno, poluição, energia, água, escolas, saúde, crime ou satisfação sobre o mapa |
+| Avenida / Via expressa | como a estrada, mas mais rápidas e com mais capacidade (depois da pesquisa *Via expressa*); sobre uma rua, melhoram ela pagando só a diferença |
+| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` Mapas | valor do terreno, poluição, energia, água, escolas, saúde, crime, satisfação ou trânsito sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
@@ -142,6 +143,31 @@ números em `WELLBEING` e `FIRE` no catálogo.
   como o código contra incêndio, a merenda escolar, a saúde da família e o
   orçamento participativo. Cada uma tem custo mensal (fixo, por morador, por
   aluno...) e efeitos enquanto está ativa.
+
+## Trânsito, transporte público e carga
+
+Regras em `src/systems/traffic.js`, `transit.js` e `logistics.js`; números em
+`ROAD_TYPES` e `TRAFFIC` no catálogo.
+
+- **Tipos de via**: rua, avenida (40% mais rápida, o dobro da capacidade) e via
+  expressa (2× mais rápida, ~3× a capacidade, mas barulhenta: tira valor do
+  terreno em volta). As rotas preferem as vias mais rápidas.
+- **Engarrafamento**: a cada tick, os carros em cada tile de rua são contados;
+  acima da capacidade do tipo de via, todos ali andam mais devagar. Semáforos,
+  engenharia de tráfego e smartphone aliviam. O mapa *Trânsito* (`M`) mostra as
+  ruas livres (verde) e paradas (vermelho), e os carros parados poluem.
+- **Transporte público** (grupo Transporte do menu Construir): ponto de ônibus,
+  estações de BRT, VLT e metrô. Quem mora **e** trabalha no raio de estações do
+  mesmo modo vai nele (o mais rápido disponível) e paga passagem, que entra na
+  receita do mês (linha *Passagens* no orçamento). O ônibus ainda pega trânsito,
+  mas ocupa pouco a rua; BRT e VLT têm faixa própria; o metrô anda por baixo e
+  não aparece.
+- **Carga** (grupo Carga): a indústria precisa de um terminal ao alcance pela
+  rua (pátio ferroviário, porto, centro de distribuição); sem ele, arrecada 20%
+  menos. O caminhão de carga multiplica o alcance; o porto (na água) soma 10%;
+  o centro de distribuição abastece o comércio em volta (+5%).
+- Tudo é derivado das posições e dos prédios: salvar no meio do rush e carregar
+  dá o mesmo resultado.
 
 ## Famílias, escolas e escolaridade
 
@@ -363,7 +389,8 @@ entre uma e outra, a imagem pronta é reaproveitada.
 
 ## Cidadãos nas ruas
 
-Cada cidadão em viagem aparece como um carrinho com cor própria, alinhado à rua
+Cada cidadão em viagem aparece como um carrinho com cor própria (quem vai de
+ônibus, BRT ou VLT, num veículo maior na cor da linha), alinhado à rua
 e andando pela **mão direita** (`src/render/movers.js`; é só desenho, a posição
 simulada continua no meio da rua). Os carros ficam numa camada desenhada de trás
 para frente em que os prédios recortam o que está atrás deles, então não
@@ -484,6 +511,8 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 11 (antes da etapa 3) abrem sem passagens acumuladas no mês.
 
 Saves do formato 10 (antes da etapa 2) abrem sem leis ativas, sem epidemia e
 com a saúde, o crime e a satisfação calculados no primeiro dia.

@@ -4,7 +4,8 @@
 //   applyCommand(state, rt, cmd) -> { ok, cost, count, reason }
 //
 // Comandos:
-//   { type: 'road',     tiles }
+//   { type: 'road',     tiles, road }     (road: tipo de rua de ROAD_TYPES, padrão 1;
+//                                         sobre uma rua de tipo menor, melhora ela)
 //   { type: 'zone',     tiles, zone, density? }
 //                       (zone = ZONE.NONE remove a zona; density padrão: média.
 //                        Mudar só a densidade vale também em lote construído)
@@ -18,7 +19,7 @@
 //   { type: 'course', area, weight }     (peso da área nos cursos da universidade, 0 a 5)
 //   { type: 'policy', id, on }           (liga ou desliga uma lei)
 
-import { BUILDINGS, COSTS, DENSITY, TERRAIN, ZONE } from './catalog.js';
+import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
 import { isBuildable } from './world.js';
 import { BUILDING_TECH, TECH_BY_ID, marcoAt } from './techs.js';
@@ -28,10 +29,17 @@ import { setFunding, setPriority } from '../systems/research.js';
 import { refreshSchoolMap, setCourse } from '../systems/education.js';
 import { setPolicy } from '../systems/policies.js';
 import { computeCoverage } from '../systems/services.js';
+import { computeTransit } from '../systems/transit.js';
+import { computeFreight } from '../systems/logistics.js';
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
   const { road, zone, terrain, density } = state.map;
+  const roadType = cmd.road ?? 1;
+  if (cmd.type === 'road' && !roadUnlocked(rt, roadType)) {
+    const tech = TECH_BY_ID.get(ROAD_TYPES[roadType].tech);
+    return { tiles: [], cost: 0, reason: `${ROAD_TYPES[roadType].name} precisa da tecnologia ${tech.name}.` };
+  }
   const tiles = [];
   const buildings = new Set(); // prédios grandes ocupam vários tiles: conta uma vez
   const c = costs(rt);
@@ -42,8 +50,11 @@ export function planCommand(state, rt, cmd) {
     const forest = terrain[tile] === TERRAIN.FOREST;
 
     if (cmd.type === 'road') {
-      if (road[tile] || rt.buildingAt[tile] || !isBuildable(state, tile)) continue;
-      cost += c.road + (forest ? c.clearForest : 0);
+      if (road[tile] >= roadType || rt.buildingAt[tile] || !isBuildable(state, tile)) continue;
+      // Rua nova paga o tipo inteiro; melhorar uma rua paga só a diferença.
+      cost += road[tile]
+        ? roadCost(rt, roadType) - roadCost(rt, road[tile])
+        : roadCost(rt, roadType) + (forest ? c.clearForest : 0);
     } else if (cmd.type === 'zone') {
       if (road[tile] || !isBuildable(state, tile)) continue;
       const sameZone = zone[tile] === cmd.zone;
@@ -66,6 +77,17 @@ export function planCommand(state, rt, cmd) {
     tiles.push(tile);
   }
   return { tiles, cost: Math.round(cost) };
+}
+
+/** Preço de um tile de rua do tipo `type` (com os modificadores de construção). */
+export function roadCost(rt, type) {
+  return ROAD_TYPES[type].cost * mod(rt, 'buildCost');
+}
+
+/** O tipo de rua já foi liberado pela pesquisa? */
+export function roadUnlocked(rt, type) {
+  const tech = ROAD_TYPES[type]?.tech;
+  return Boolean(ROAD_TYPES[type]) && (!tech || Boolean(rt.techDone?.has(tech)));
 }
 
 /** Preços por tile do momento (tecnologias mudam). */
@@ -114,6 +136,8 @@ export function applyCommand(state, rt, cmd) {
     computeMods(state, rt);
     if (utility.school) refreshSchoolMap(state, rt);
     if (utility.service) computeCoverage(state, rt);
+    if (utility.transit) computeTransit(state, rt);
+    if (utility.freight) computeFreight(state, rt);
     return { ok: true, cost, count: 1 };
   }
 
@@ -122,7 +146,7 @@ export function applyCommand(state, rt, cmd) {
 
   for (const tile of tiles) {
     if (cmd.type === 'road') {
-      road[tile] = 1;
+      road[tile] = cmd.road ?? 1;
       zone[tile] = ZONE.NONE;
       if (terrain[tile] === TERRAIN.FOREST) clearForest(state, tile);
       roadsChanged = true;
@@ -145,7 +169,11 @@ export function applyCommand(state, rt, cmd) {
 
   state.economy.money -= cost;
   if (roadsChanged) recomputeRoads(state, rt);
-  if (cmd.type === 'bulldoze') computeMods(state, rt);
+  if (cmd.type === 'bulldoze') {
+    computeMods(state, rt);
+    computeTransit(state, rt);
+  }
+  if (roadsChanged || cmd.type === 'bulldoze') computeFreight(state, rt);
   touchMap(rt);
   return { ok: true, cost, count: tiles.length };
 }
