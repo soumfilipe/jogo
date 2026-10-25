@@ -26,7 +26,7 @@ const toMidnight = (state, rt) => advance(state, rt, TICKS_PER_DAY - (state.time
 
 test('textos: toda pauta vira manchete e 3 ou 4 frases, sem chave sobrando', () => {
   // Chaves que são frases inteiras (descrição da tecnologia, nota histórica...).
-  const SENTENCES = new Set(['o_que', 'texto', 'texto2', 'texto3', 'desc', 'nota', 'aqui', 'feridos', 'bombeiros', 'marco', 'lance', 'atracoes', 'torcida', 'destaque', 'proxima']);
+  const SENTENCES = new Set(['o_que', 'texto', 'texto2', 'texto3', 'desc', 'nota', 'aqui', 'feridos', 'bombeiros', 'marco', 'lance', 'atracoes', 'torcida', 'destaque', 'proxima', 'familia']);
   const vars = new Proxy({}, { get: (_, k) => (typeof k !== 'string' ? undefined : SENTENCES.has(k) ? `Frase ${k}.` : `<${k}>`) });
   const rng = createRng(5);
   const stories = [];

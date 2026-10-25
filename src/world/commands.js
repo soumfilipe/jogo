@@ -25,9 +25,12 @@
 //   { type: 'confirmEvent', id, artists?, marketing?, ticket? }   (próxima edição da série)
 //   { type: 'cancelEvent', id }
 //   { type: 'club', sport, home, name? }  (funda um clube; ver systems/sports.js)
-//   { type: 'clubBudget', id, training?, subsidy?, reinvest? }
+//   { type: 'clubBudget', id, training?, subsidy?, reinvest?, youthBudget? }
 //   { type: 'clubCt', id }                (sobe o centro de treinamento)
 //   { type: 'closeClub', id }
+//   { type: 'clubAcademy', id }           (abre a próxima categoria da escolinha)
+//   { type: 'promoteYouth', id, player }  (jovem de 16 ou 17 anos sobe ao time adulto)
+//   { type: 'acceptOffer', id } / { type: 'rejectOffer', id }   (propostas pelos craques)
 
 import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
@@ -42,7 +45,9 @@ import { computeCoverage } from '../systems/services.js';
 import { computeTransit } from '../systems/transit.js';
 import { computeFreight } from '../systems/logistics.js';
 import { cancelEvent, confirmEdition, scheduleEvent } from '../systems/agenda.js';
-import { closeClub, clubBudget, foundClub, upgradeCt } from '../systems/sports.js';
+import {
+  acceptOffer, closeClub, clubBudget, foundClub, openAcademy, promoteYouth, rejectOffer, upgradeCt,
+} from '../systems/sports.js';
 
 // Ferramentas que vêm da pesquisa (efeito { tool } em techs.js).
 export const TOOL_TECH = {
@@ -152,6 +157,10 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'clubBudget') return clubBudget(state, rt, cmd);
   if (cmd.type === 'clubCt') return upgradeCt(state, rt, cmd);
   if (cmd.type === 'closeClub') return closeClub(state, rt, cmd);
+  if (cmd.type === 'clubAcademy') return openAcademy(state, rt, cmd);
+  if (cmd.type === 'promoteYouth') return promoteYouth(state, rt, cmd);
+  if (cmd.type === 'acceptOffer') return acceptOffer(state, rt, cmd);
+  if (cmd.type === 'rejectOffer') return rejectOffer(state, rt, cmd);
   if (cmd.type === 'policy') {
     const result = setPolicy(state, rt, cmd.id, cmd.on);
     if (result.ok) computeMods(state, rt);

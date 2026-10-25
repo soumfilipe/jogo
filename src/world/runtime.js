@@ -223,6 +223,15 @@ export function addCitizen(state, rt, citizen) {
   return citizen;
 }
 
+/** Família de um cidadão: quem mora na mesma casa com o mesmo sobrenome (ele incluído), em ordem de id. */
+export function familyOf(rt, citizen) {
+  const surname = citizen.name.slice(citizen.name.indexOf(' ') + 1);
+  return [...(rt.residents.get(citizen.home) ?? [])].filter((id) => {
+    const m = rt.citizenById.get(id);
+    return m && m.name.slice(m.name.indexOf(' ') + 1) === surname;
+  }).sort((a, b) => a - b);
+}
+
 export function removeCitizen(state, rt, id) {
   const citizen = rt.citizenById.get(id);
   if (!citizen) return;

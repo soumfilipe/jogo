@@ -17,6 +17,16 @@
 //               d, l, f, a }] (na ordem de teams), done }]
 //   history: últimas temporadas dos clubes da cidade [{ season, sport, club,
 //               name, division, position, teams, promoted, relegated, prize }]
+//   offers:  propostas de clubes de fora pelos craques [{ id, club, player,
+//               name, buyer, value, until (tick), status: 'aberta' | 'recusada' }]
+//               (a recusada fica até `until` só para o comprador não voltar logo)
+//   sales:   últimas vendas [{ id, club, clubName, name, buyer, value, day, people }]
+//
+// Escolinha (base): o clube tem `academy` (0 a 3: categorias abertas, da
+// sub-17 para a sub-11), `youthBudget` (verba mensal) e `youth` (ids de
+// crianças e adolescentes da cidade). O jovem tem `youth` (id do clube) e
+// `skill`; continua estudando. Aos 18 anos sobe ao time adulto (ou é
+// dispensado, se não for melhor que o pior do elenco cheio).
 //
 // Atleta: cidadão com `athlete` (id do clube), `skill` (habilidade, 0 a 1) e
 // `fullTime = 'esporte'` (não procura emprego; conta como empregado no
@@ -28,9 +38,9 @@
 // público do jogo em casa anda até o local à tarde (ver tourism.js).
 
 import { SPORTS } from '../world/catalog.js';
-import { TICKS_PER_DAY } from '../core/time.js';
-import { pick, random, randomInt } from '../core/rng.js';
-import { sendHome, setJob } from '../world/runtime.js';
+import { TICKS_PER_DAY, TICKS_PER_MONTH } from '../core/time.js';
+import { chance, pick, random, randomInt } from '../core/rng.js';
+import { familyOf, removeCitizen, sendHome, setJob } from '../world/runtime.js';
 import { canWork } from '../agents/citizens.js';
 import { entryTiles } from './tourism.js';
 import { mod } from './mods.js';
@@ -44,7 +54,7 @@ const yearOf = (day) => Math.floor(day / DAYS_PER_YEAR) + 1;
 const PRIZE_SHARE = [1, 0.5, 0.3, 0.2];
 
 export function createSports() {
-  return { clubs: [], rivals: [], leagues: [], history: [], nextId: 1 };
+  return { clubs: [], rivals: [], leagues: [], history: [], offers: [], sales: [], nextId: 1 };
 }
 
 /** Modalidades que a cidade já pode ter. */
@@ -76,10 +86,21 @@ export function clubStrength(state, rt, club) {
   return clamp(avg + bonus + club.ct * SPORTS.ct.strength);
 }
 
-/** Despesas do mês do clube: salários e treino. */
+/** Jovens da escolinha do clube que ainda moram na cidade. */
+export function academyKids(state, rt, club) {
+  return (club.youth ?? []).map((id) => rt.citizenById.get(id)).filter((c) => c && c.youth === club.id);
+}
+
+/** Categoria de base (do catálogo) de quem tem `age` anos, entre as `level` abertas. */
+export function youthCategory(age, level = SPORTS.academy.categories.length) {
+  return SPORTS.academy.categories.slice(0, level).find((c) => age >= c.ages[0] && age <= c.ages[1]) ?? null;
+}
+
+/** Despesas do mês do clube: salários, treino e a base (alunos e verba). */
 export function clubCosts(state, rt, club) {
-  const salaries = squad(state, rt, club).reduce((s, c) => s + SPORTS.salary * (0.5 + (c.skill ?? 0)), 0);
-  return { salaries: Math.round(salaries), training: club.training, total: Math.round(salaries) + club.training };
+  const salaries = Math.round(squad(state, rt, club).reduce((s, c) => s + SPORTS.salary * (0.5 + (c.skill ?? 0)), 0));
+  const youth = academyKids(state, rt, club).length * SPORTS.academy.perKid + (club.youthBudget ?? 0);
+  return { salaries, training: club.training, youth, total: salaries + club.training + youth };
 }
 
 /** Receitas do mês do clube (sem os ingressos): patrocínio, transmissão e o repasse da prefeitura. */
@@ -154,6 +175,7 @@ export function foundClub(state, rt, cmd) {
   const club = {
     id: sports.nextId++, name, sport: cmd.sport, home: b.id, division: 0, cash: SPORTS.foundCost, training: 2_000, subsidy: 0,
     reinvest: true, ct: 0, fans: 0.2, players: [], founded: state.time.tick, trophies: 0, red: 0,
+    academy: 0, youthBudget: 0, youth: [],
   };
   sports.clubs.push(club);
   state.economy.money -= SPORTS.foundCost;
@@ -167,8 +189,9 @@ export function clubBudget(state, rt, cmd) {
   const club = activeClubs(state).find((c) => c.id === cmd.id);
   if (!club) return { ok: false, cost: 0, reason: 'Clube não encontrado.' };
   const valid = (v) => v === undefined || (Number.isFinite(v) && v >= 0 && v <= 1_000_000);
-  if (!valid(cmd.training) || !valid(cmd.subsidy)) return { ok: false, cost: 0, reason: 'Valores inválidos.' };
+  if (!valid(cmd.training) || !valid(cmd.subsidy) || !valid(cmd.youthBudget)) return { ok: false, cost: 0, reason: 'Valores inválidos.' };
   if (cmd.training !== undefined) club.training = Math.round(cmd.training);
+  if (cmd.youthBudget !== undefined) club.youthBudget = Math.round(cmd.youthBudget);
   if (cmd.subsidy !== undefined) club.subsidy = Math.round(cmd.subsidy);
   if (cmd.reinvest !== undefined) club.reinvest = Boolean(cmd.reinvest);
   return { ok: true, cost: 0 };
@@ -191,8 +214,11 @@ export function closeClub(state, rt, cmd) {
   const club = activeClubs(state).find((c) => c.id === cmd.id);
   if (!club) return { ok: false, cost: 0, reason: 'Clube não encontrado.' };
   for (const c of squad(state, rt, club)) release(state, rt, c);
+  for (const c of academyKids(state, rt, club)) delete c.youth;
   club.players = [];
+  club.youth = [];
   club.closed = true;
+  state.sports.offers = state.sports.offers.filter((o) => o.club !== club.id);
   return { ok: true, cost: 0 };
 }
 
@@ -459,20 +485,155 @@ export function runSportsOfDay(state, rt) {
   sports.leagues = sports.leagues.filter((l) => l.season >= year - 1);
 }
 
-/** Fim do mês: caixa dos clubes, evolução e aposentadoria dos atletas, reposição do elenco. */
+// --- Escolinha (base) ---------------------------------------------------------
+
+/** Abre a próxima categoria da escolinha (comando 'clubAcademy'), paga pela prefeitura. */
+export function openAcademy(state, rt, cmd) {
+  const club = activeClubs(state).find((c) => c.id === cmd.id);
+  if (!club) return { ok: false, cost: 0, reason: 'Clube não encontrado.' };
+  const A = SPORTS.academy;
+  if (club.academy >= A.categories.length) return { ok: false, cost: 0, reason: 'A escolinha já tem todas as categorias.' };
+  const cost = A.cost[club.academy];
+  if (cost > state.economy.money) return { ok: false, cost, reason: `Dinheiro insuficiente (custa $${cost.toLocaleString('pt-BR')}).` };
+  state.economy.money -= cost;
+  const category = A.categories[club.academy];
+  club.academy++;
+  enrollYouth(state, rt, club);
+  report(state, { kind: 'escolinha', club: club.name, sport: club.sport, category: category.name });
+  return { ok: true, cost };
+}
+
+/** Preenche as vagas das categorias abertas: vocação para o esporte primeiro, depois talento. */
+export function enrollYouth(state, rt, club) {
+  const A = SPORTS.academy;
+  club.youth = academyKids(state, rt, club).filter((c) => {
+    if (youthCategory(c.age, club.academy)) return true;
+    delete c.youth; // passou da idade (ou a categoria não está aberta)
+    return false;
+  }).map((c) => c.id);
+  for (const cat of A.categories.slice(0, club.academy)) {
+    const inCat = (c) => c.age >= cat.ages[0] && c.age <= cat.ages[1];
+    const free = A.seats - academyKids(state, rt, club).filter(inCat).length;
+    if (free <= 0) continue;
+    const kids = state.citizens
+      .filter((c) => inCat(c) && c.youth === undefined && c.athlete === undefined)
+      .sort((a, b) => (b.calling === 'esporte') - (a.calling === 'esporte') || (b.talent ?? 0) - (a.talent ?? 0) || a.id - b.id)
+      .slice(0, free);
+    for (const c of kids) {
+      c.youth = club.id;
+      c.skill ??= round3(0.05 + (c.talent ?? 0) * 0.15);
+      club.youth.push(c.id);
+    }
+  }
+}
+
+/**
+ * O jovem sobe ao time adulto. Com o elenco cheio, entra no lugar do pior
+ * (se for melhor que ele, ou se `force`); se não, deixa a base.
+ */
+function promote(state, rt, club, c, force = false) {
+  club.youth = club.youth.filter((id) => id !== c.id);
+  delete c.youth;
+  const players = squad(state, rt, club);
+  if (players.length >= SPORTS.kinds[club.sport].squad) {
+    const worst = [...players].sort((a, b) => a.skill - b.skill || b.id - a.id)[0];
+    if (!force && worst.skill >= c.skill) return false;
+    release(state, rt, worst);
+  }
+  sign(state, rt, c, club);
+  if (c.skill >= 0.45) report(state, { kind: 'revelacao', club: club.name, sport: club.sport, name: c.name, age: c.age, skill: c.skill });
+  return true;
+}
+
+/** Sobe um jovem de 16 ou 17 anos antes da hora (comando 'promoteYouth'). */
+export function promoteYouth(state, rt, cmd) {
+  const club = activeClubs(state).find((c) => c.id === cmd.id);
+  const c = rt.citizenById.get(cmd.player);
+  if (!club || !c || c.youth !== club.id) return { ok: false, cost: 0, reason: 'Jovem não encontrado na base do clube.' };
+  if (c.age < 16) return { ok: false, cost: 0, reason: 'Só sobe ao profissional quem tem 16 anos ou mais.' };
+  promote(state, rt, club, c, true);
+  return { ok: true, cost: 0 };
+}
+
+// --- Mercado ------------------------------------------------------------------
+
+/** Habilidade a partir da qual o atleta do clube é craque (atrai propostas). */
+export function starSkill(club) {
+  const M = SPORTS.market;
+  return Math.min(SPORTS.divisions[club.division].strength + M.star, M.minStar);
+}
+
+/** Clubes de fora fazem propostas pelos craques (uma por atleta de cada vez). */
+function makeOffers(state, rt) {
+  const sports = state.sports;
+  const rng = state.rng;
+  const M = SPORTS.market;
+  const tick = state.time.tick;
+  sports.offers = sports.offers.filter((o) => o.until > tick && rt.citizenById.get(o.player)?.athlete === o.club);
+  for (const club of activeClubs(state).sort((a, b) => a.id - b.id)) {
+    const star = starSkill(club);
+    for (const c of squad(state, rt, club).sort((a, b) => a.id - b.id)) {
+      if (c.skill < star || sports.offers.some((o) => o.player === c.id) || !chance(rng, M.chance)) continue;
+      const luck = 0.8 + random(rng) * 0.4;
+      const value = Math.round(M.base * c.skill ** 3 * (c.age < M.youngAge ? M.young : 1) * (1 + club.division * M.division)
+        * luck * mod(rt, 'sports.offers') / 1000) * 1000;
+      const offer = { id: sports.nextId++, club: club.id, player: c.id, name: c.name, buyer: pick(rng, SPORTS.buyers), value, until: tick + M.days * TICKS_PER_DAY, status: 'aberta' };
+      sports.offers.push(offer);
+      report(state, { kind: 'proposta', club: club.name, name: c.name, buyer: offer.buyer, value });
+    }
+  }
+}
+
+/** Vende o atleta (comando 'acceptOffer'): o dinheiro vai para o clube e ele se muda com a família. */
+export function acceptOffer(state, rt, cmd) {
+  const sports = state.sports;
+  const offer = sports.offers.find((o) => o.id === cmd.id && o.status === 'aberta');
+  const club = offer && activeClubs(state).find((c) => c.id === offer.club);
+  const c = offer && rt.citizenById.get(offer.player);
+  if (!offer || !club || !c || c.athlete !== club.id) return { ok: false, cost: 0, reason: 'Essa proposta não está mais de pé.' };
+  const fee = Math.round(offer.value * SPORTS.cityShare);
+  club.cash += offer.value - fee;
+  state.economy.sportsIncome = (state.economy.sportsIncome ?? 0) + fee;
+  const family = familyOf(rt, c);
+  release(state, rt, c);
+  for (const id of family) removeCitizen(state, rt, id);
+  sports.offers = sports.offers.filter((o) => o !== offer);
+  sports.sales.push({ id: offer.id, club: club.id, clubName: club.name, name: offer.name, buyer: offer.buyer, value: offer.value, day: today(state), people: family.length });
+  if (sports.sales.length > SPORTS.market.sales) sports.sales.shift();
+  report(state, { kind: 'venda', club: club.name, name: offer.name, buyer: offer.buyer, value: offer.value, people: family.length });
+  recruit(state, rt, club);
+  return { ok: true, cost: -offer.value };
+}
+
+/** Recusa a proposta (comando 'rejectOffer'): o atleta fica e ninguém volta a oferecer por um tempo. */
+export function rejectOffer(state, rt, cmd) {
+  const offer = state.sports.offers.find((o) => o.id === cmd.id && o.status === 'aberta');
+  if (!offer) return { ok: false, cost: 0, reason: 'Essa proposta não está mais de pé.' };
+  offer.status = 'recusada';
+  offer.until = state.time.tick + SPORTS.market.cooldown * TICKS_PER_MONTH;
+  const club = state.sports.clubs.find((c) => c.id === offer.club);
+  report(state, { kind: 'proposta_recusada', club: club?.name ?? '', name: offer.name, buyer: offer.buyer, value: offer.value });
+  return { ok: true, cost: 0 };
+}
+
+/** Fim do mês: caixa dos clubes, evolução dos atletas e da base, subidas, reposição do elenco e propostas. */
 export function closeSportsMonth(state, rt) {
   const sports = state.sports;
   if (!sports) return;
   const rng = state.rng;
   const { growth, scale } = SPORTS.training;
+  const A = SPORTS.academy;
   for (const club of activeClubs(state).sort((a, b) => a.id - b.id)) {
     club.players = club.players.filter((id) => rt.citizenById.get(id)?.athlete === club.id);
+    club.youth = academyKids(state, rt, club).map((c) => c.id);
     const income = clubIncome(state, rt, club).total;
     let costs = clubCosts(state, rt, club);
-    // Sem dinheiro: o treino é o primeiro corte.
-    if (club.cash + income - costs.total < 0 && club.training > 0) {
-      club.training = 0;
-      costs = clubCosts(state, rt, club);
+    // Sem dinheiro: corta a verba da base e depois o treino.
+    for (const field of ['youthBudget', 'training']) {
+      if (club.cash + income - costs.total < 0 && club[field] > 0) {
+        club[field] = 0;
+        costs = clubCosts(state, rt, club);
+      }
     }
     club.cash += income - costs.total;
     club.red = club.cash < 0 ? club.red + 1 : 0;
@@ -484,10 +645,18 @@ export function closeSportsMonth(state, rt) {
       c.skill = round3(clamp((c.skill ?? 0) + delta + (random(rng) - 0.5) * 0.01));
       if (c.age > SPORTS.ages[1] || c.skill < 0.08) release(state, rt, c); // aposentadoria
     }
+    // Base: evolui mais rápido; quem fez 18 anos sobe (ou deixa a base).
+    const youthGain = A.growth * (0.3 + Math.log(1 + (club.youthBudget ?? 0) / A.scale)) * (1 + club.ct * SPORTS.ct.bonus) * mod(rt, 'sports.youth');
+    for (const c of academyKids(state, rt, club).sort((a, b) => a.id - b.id)) {
+      c.skill = round3(clamp((c.skill ?? 0) + youthGain + (random(rng) - 0.5) * 0.01));
+      if (c.age >= SPORTS.ages[0]) promote(state, rt, club, c);
+    }
     // Muito tempo no vermelho: os melhores vão embora (voltam ao mercado).
     if (club.red >= SPORTS.redMonths) {
       for (const c of squad(state, rt, club).sort((a, b) => b.skill - a.skill || a.id - b.id).slice(0, 2)) release(state, rt, c);
     }
     recruit(state, rt, club);
+    enrollYouth(state, rt, club);
   }
+  makeOffers(state, rt);
 }

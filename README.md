@@ -55,7 +55,7 @@ Salvar, carregar e o resto ficam no menu 💾 Arquivo, no topo.
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `Z` Cultura (ou 🎭 no topo) | artistas em alta, gêneros em moda e o que está em cartaz; agenda, novo evento, séries e histórico |
-| Esporte (no topo) | clubes da cidade, tabela, jogos, elenco e histórico das temporadas |
+| Esporte (no topo) | clubes da cidade, tabela, jogos, elenco, base (escolinha), mercado (propostas) e histórico |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
 | Notícias (no topo) | o que a imprensa publicou, com filtros, e os jornais, rádios, TVs e canais da cidade |
 | Calçadão | rua só de pedestres (depois de *Ruas de lazer*): valoriza o comércio em volta; vira rua de novo se você desenhar uma rua por cima |
@@ -319,6 +319,28 @@ Regras em `src/systems/sports.js`; números em `SPORTS` no catálogo.
   novos cidadãos, e os *Megaeventos* aumentam o patrocínio em 30%.
 - Os resultados, títulos, acessos e rebaixamentos viram notícia (filtro
   **Esporte** no painel de notícias).
+
+### Base e mercado
+
+- **Escolinha**: cada clube pode abrir até três categorias, pagas pela prefeitura:
+  - **Sub-17** (15 a 17 anos), $20 mil;
+  - **Sub-15** (11 a 14 anos), $50 mil;
+  - **Sub-11** (8 a 10 anos), $120 mil.
+- Cada categoria tem 15 vagas para crianças da cidade, primeiro as com vocação para o esporte. Elas treinam no contraturno e
+  continuam na escola. O clube paga $60 por aluno por mês, mais a **verba da base**.
+- A base evolui o dobro do adulto. Começar no sub-11 dá mais anos de evolução e,
+  portanto, mais teto.
+- Aos 18 anos, o jovem **sobe ao time principal** no lugar do pior do elenco,
+  se for melhor que ele; senão, deixa a base. Com 16 ou 17 anos, dá para subir antes
+  (botão "Subir" na aba **Base**).
+- **Mercado**: clubes grandes de fora fazem propostas pelos craques (habilidade
+  acima da força da divisão + 15%, ou de 60%). O valor cresce com a habilidade,
+  é maior para quem tem menos de 23 anos e para as divisões de cima, e as propostas valem 30 dias.
+  - **Vender** (aba **Mercado**): o clube fica com 90% e a prefeitura com 10%. O atleta se
+    muda com a família, e o elenco é reposto.
+  - **Recusar**: ninguém volta a oferecer pelo atleta por 3 meses.
+- *Educação física escolar*: a base evolui 20% mais rápido. *Esporte ao vivo na
+  TV*: as propostas sobem 30%.
 
 ## Notícias e imprensa
 
@@ -752,6 +774,8 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 18 (antes da base) abrem com as escolinhas fechadas e sem propostas.
 
 Saves do formato 17 (antes dos clubes) abrem sem clubes e sem ligas.
 

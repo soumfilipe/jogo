@@ -281,6 +281,46 @@ export const STORIES = {
       ['O resultado deixou tudo em aberto na tabela.', 'Os dois times saíram de campo reclamando da arbitragem.'],
     ],
   },
+  escolinha: {
+    h: ['{clube} abre a categoria {categoria}', 'Escolinha do {clube} recebe a {categoria}'],
+    s: [
+      ['O {clube} abriu a categoria {categoria} da sua escolinha de {modalidade}.'],
+      ['As vagas vão primeiro para as crianças com mais jeito para o esporte.', 'Os treinos são no contraturno da escola.'],
+      ['A diretoria aposta na base para formar os craques do futuro.', 'Os pais já fazem fila para inscrever os filhos.'],
+    ],
+  },
+  revelacao: {
+    h: ['Cria da base, {atleta} sobe ao time principal', '{clube} promove {atleta}, de {idade} anos'],
+    s: [
+      ['{atleta}, de {idade} anos, deixou a base e agora joga no time principal do {clube}.'],
+      ['Os técnicos da escolinha dizem que é o melhor da geração.', 'Quem acompanha a base já conhecia o talento.'],
+      ['A torcida espera muito do garoto.', 'É a prova de que a escolinha está dando resultado.'],
+    ],
+  },
+  proposta: {
+    h: ['{comprador} oferece {valor} por {atleta}', 'Proposta milionária por {atleta}, do {clube}'],
+    s: [
+      ['O {comprador} fez uma proposta de {valor} por {atleta}, do {clube}.'],
+      ['A diretoria tem 30 dias para responder.'],
+      ['A torcida está dividida entre o dinheiro e o craque.', 'Se a venda sair, a família do atleta deve deixar a cidade.'],
+    ],
+  },
+  venda: {
+    h: ['{clube} vende {atleta} ao {comprador}', '{atleta} está de saída: vendido por {valor}'],
+    s: [
+      ['O {clube} aceitou a proposta de {valor} do {comprador} por {atleta}.'],
+      ['{familia}'],
+      ['O dinheiro reforça o caixa do clube.', 'A torcida se despediu do craque com faixas no último treino.'],
+    ],
+  },
+  proposta_recusada: {
+    h: ['{clube} recusa {valor} por {atleta}', '{atleta} fica: {clube} diz não ao {comprador}'],
+    s: [
+      ['O {clube} recusou a proposta de {valor} do {comprador} por {atleta}.'],
+      ['A diretoria diz que o craque não está à venda.'],
+      ['A torcida comemorou a decisão.', 'O {comprador} não deve insistir tão cedo.'],
+    ],
+  },
   clube_fundado: {
     h: ['Nasce o {clube}', '{cidade} ganha um clube de {modalidade}'],
     s: [

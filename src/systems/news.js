@@ -382,6 +382,27 @@ function publishEvent(ctx, e) {
     });
     return;
   }
+  if (e.kind === 'escolinha') {
+    publish(ctx, { cat: 'esporte', story: STORIES.escolinha, vars: { clube: e.club, categoria: e.category, modalidade: SPORTS.kinds[e.sport].name.toLowerCase() } });
+    return;
+  }
+  if (e.kind === 'revelacao') {
+    publish(ctx, { cat: 'esporte', story: STORIES.revelacao, vars: { clube: e.club, atleta: e.name, idade: e.age } });
+    return;
+  }
+  if (e.kind === 'proposta' || e.kind === 'venda' || e.kind === 'proposta_recusada') {
+    const people = e.people ?? 1;
+    publish(ctx, {
+      cat: 'esporte',
+      alert: e.kind === 'proposta',
+      story: STORIES[e.kind],
+      vars: {
+        clube: e.club, atleta: e.name, comprador: e.buyer, valor: `$${count(e.value)}`,
+        familia: people > 1 ? `A família vai junto: ${count(people)} pessoas deixam a cidade.` : 'Ele se muda sozinho para a nova cidade.',
+      },
+    });
+    return;
+  }
   if (e.kind === 'clube_fundado') {
     publish(ctx, { cat: 'esporte', tile: e.tile, story: STORIES.clube_fundado, vars: { clube: e.name, modalidade: SPORTS.kinds[e.sport].name.toLowerCase() } });
     return;
