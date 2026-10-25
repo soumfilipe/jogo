@@ -27,6 +27,7 @@ import {
 } from '../world/techs.js';
 import { MONTHS_PER_YEAR } from '../core/time.js';
 import { computeMods, mod } from './mods.js';
+import { overloadedParents, productivity } from './childcare.js';
 
 const zeros = () => Object.fromEntries(AREA_IDS.map((a) => [a, 0]));
 
@@ -156,6 +157,8 @@ export function researchOutput(state, rt) {
   // Pesquisadores formados em cada área (rendem mais nela) e o peso da pós.
   const byField = zeros();
   const pos = mod(rt, 'posGraduacao', 0) > 0;
+  // Pesquisador sem creche para o filho pequeno rende menos (ver childcare.js).
+  const overloaded = overloadedParents(state, rt);
 
   for (const b of state.buildings) {
     const u = BUILDINGS[b.type].utility;
@@ -169,7 +172,7 @@ export function researchOutput(state, rt) {
       let weight = 0;
       for (const id of rt.workers.get(b.id)) {
         const c = rt.citizenById.get(id);
-        weight += pos && c?.edu >= EDU.POS ? RESEARCH.posWeight : 1;
+        weight += (pos && c?.edu >= EDU.POS ? RESEARCH.posWeight : 1) * productivity(overloaded, id);
         if (c?.field) byField[c.field]++;
       }
       staffing += weight / BUILDINGS[b.type].jobs;

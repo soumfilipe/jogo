@@ -24,6 +24,7 @@ import { updateTrafficMap } from './traffic.js';
 import { collectWaste } from './waste.js';
 import { indexVisitors, planDay, updateVisitors } from './tourism.js';
 import { closeCultureMonth } from './culture.js';
+import { updateStress } from './childcare.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -49,6 +50,8 @@ export function tick(state, rt) {
       applyUtilityEffects(state, rt);
       reviewCompanies(state, rt);
       enrollStudents(state, rt);
+      // Pais sem creche para o filho pequeno: o estresse do dia (depois das matrículas).
+      updateStress(state, rt);
       // Bem-estar do dia: cobertura dos serviços, saúde, crime e satisfação;
       // depois quem está insatisfeito se muda e os incêndios do dia.
       computeCoverage(state, rt);

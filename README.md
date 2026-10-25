@@ -284,6 +284,14 @@ Regras em `src/systems/demography.js` e `src/systems/education.js`, números em
   dois filhos (umas 3 crianças a cada 10 pessoas). Crianças moram com a família,
   não trabalham e ocupam vaga na casa. A escolaridade dos adultos que chegam
   depende do marco do mundo (no primeiro, 5% têm curso superior).
+- **Creches** (desde o começo): quem trabalha e tem filho de 0 a 5 anos sem
+  vaga numa creche rende só 40% no trabalho (nos impostos, nas empresas e na
+  pesquisa) e acumula estresse a cada dia, o que tira satisfação e saúde da
+  casa. Com o filho na creche, a penalidade cai para 25% (rende 85%) e, depois
+  da pesquisa *Educação infantil*, some. Sem penalidade, o estresse baixa aos
+  poucos. O inspetor mostra os pais sem vaga, os com filho na creche e o
+  estresse de cada casa e de cada cidadão (regras em
+  `src/systems/childcare.js`, números em `CHILDCARE`).
 - **Aniversários**: cada cidadão faz aniversário num mês do ano. Nele, envelhece,
   soma um ano de curso se estuda, pode ter um filho (adultos de 20 a 40 anos,
   se a casa tem vaga) e pode morrer (a chance cresce depois dos 60). Aos 65 se

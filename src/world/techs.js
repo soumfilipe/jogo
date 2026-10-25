@@ -863,7 +863,7 @@ const TREE = [
 const MECHANICS = {
   escola_primaria: ['Prédio', 'cobertura educacao', 'Escola primária: ensino fundamental (6 a 14 anos), 300 vagas num raio de 12 tiles.'],
   escola_tecnica: ['Prédio', 'cobertura educacao', 'Escola técnica: curso noturno de 2 anos, aceita quem trabalha, e forma no nível médio.'],
-  jardim_infancia: ['Prédio', 'cobertura educacao demografia', 'Creche (0 a 5 anos): quem passou por ela começa o fundamental um ano adiantado.'],
+  jardim_infancia: ['Modificador', 'cobertura educacao demografia', 'Pais com filho na creche trabalham sem perder rendimento nem acumular estresse.'],
   ensino_medio: ['Prédio', 'cobertura educacao', 'Escola de ensino médio (15 a 19 anos). Sem ela, ninguém entra na universidade.'],
   escola_normal: ['Modificador', 'educacao cobertura', 'Escolas com 25% mais vagas.'],
   universidade: ['Prédio', 'cobertura educacao pesquisa especiais', 'Universidade: graduação (cursos distribuídos por área no painel Pesquisa) e pesquisa feita pelos professores.'],
@@ -1161,7 +1161,7 @@ export const EFFECTS = {
   parque_tecnologico: [{ unlock: 'parque_tecnologico' }],
   escola_primaria: [{ unlock: 'escola' }],
   biblioteca: [{ unlock: 'biblioteca' }],
-  jardim_infancia: [{ unlock: 'creche' }],
+  jardim_infancia: [{ mod: 'childcare.full', add: 1 }],
   escola_tecnica: [{ unlock: 'escola_tecnica' }],
   ensino_medio: [{ unlock: 'escola_media' }],
   escola_normal: [{ mod: 'schoolSeats', mul: 1.25 }],

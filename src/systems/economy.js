@@ -18,13 +18,16 @@ import { researchOutput } from './research.js';
 import { policiesCost } from './policies.js';
 import { freightFactor } from './logistics.js';
 import { foodBalance } from './food.js';
+import { effectiveWorkers, overloadedParents, productivity } from './childcare.js';
 
 const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
 
 export function monthlyBudget(state, rt) {
   const taxes = state.economy.taxes;
+  // Pais sem creche para o filho pequeno rendem menos (ver childcare.js).
+  const overloaded = overloadedParents(state, rt);
   let employed = 0;
-  for (const c of state.citizens) if (c.job !== null) employed++;
+  for (const c of state.citizens) if (c.job !== null) employed += productivity(overloaded, c.id);
 
   // Vagas ocupadas, já pesadas pelo modificador de imposto do nível do prédio.
   const jobsFilled = { commercial: 0, industrial: 0, rural: 0 };
@@ -32,7 +35,7 @@ export function monthlyBudget(state, rt) {
   let statal = 0;
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
-    const workers = rt.workers.get(b.id).size;
+    const workers = effectiveWorkers(overloaded, rt.workers.get(b.id));
     if (info.utility) {
       utilities += utilityUpkeep(rt, b.type);
       // Receita que vem da pesquisa (ex.: transmissão dos jogos) só depois dela.
