@@ -10,11 +10,13 @@
 // no fechamento do mês.
 //
 // Formato de um visitante no estado (state.visitors):
-//   { id, src: tile de onde veio (e para onde volta), dest: id da atração,
+//   { id, src: tile de onde veio (e para onde volta), dest: id da atração
+//     (null quando o destino é um tile de rua, destTile, como um calçadão),
 //     until: minuto do dia em que vai embora, fan: torcedor da cidade?,
+//     event?: id do evento da agenda (ver agenda.js),
 //     state: 'indo' | 'visitando' | 'voltando', x, y, path, step }
 
-import { BUILDINGS, TOURISM, ZONE } from '../world/catalog.js';
+import { BUILDINGS, CULTURE, TOURISM, ZONE } from '../world/catalog.js';
 import { CITIZEN_SPEED } from '../world/catalog.js';
 import { MINUTES_PER_DAY, calendar } from '../core/time.js';
 import { randomInt } from '../core/rng.js';
@@ -22,6 +24,7 @@ import { findRoadPath } from '../agents/pathfinding.js';
 import { attractionAppeal, eventMultiplier, todaysEvents } from './events.js';
 import { congestionFactor, roadSpeed } from './traffic.js';
 import { mod } from './mods.js';
+import { eventsToday, venueOf } from './agenda.js';
 
 export function createTourism() {
   return { plan: [] }; // { at: minuto do dia, dest, src, until, fan }
@@ -114,11 +117,23 @@ export function touristSpending(state, rt, tourists) {
 export function planDay(state, rt) {
   const events = todaysEvents(state, rt);
   const { visits, entries } = todaysVisits(state, rt, events);
+  // Público dos eventos da agenda (já sorteado por runEventsOfDay): parte da
+  // cidade, parte de fora (se há por onde chegar).
+  const crowds = eventsToday(state).map((ev) => {
+    const venue = venueOf(state, rt, ev.venue);
+    const total = ev.results[ev.results.length - 1] ?? 0;
+    const fromOutside = entries.length ? Math.round(total * (1 - TOURISM.localFans)) : 0;
+    return { ev, venue, total, fromOutside };
+  }).filter((c) => c.venue && c.total > 0);
   let outside = parkTourists(state, rt);
   let wanted = 0;
   for (const v of visits) {
     outside += v.tourists;
     wanted += v.tourists + v.fans;
+  }
+  for (const c of crowds) {
+    outside += c.fromOutside;
+    wanted += c.total;
   }
   state.economy.tourism = (state.economy.tourism ?? 0) + touristSpending(state, rt, outside);
   state.tourism.today = { tourists: outside, fans: visits.reduce((s, v) => s + v.fans, 0) };
@@ -138,7 +153,23 @@ export function planDay(state, rt) {
     add(Math.round(v.tourists * scale), () => entries[randomInt(state.rng, 0, entries.length - 1)], false);
     if (homes.length) add(Math.round(v.fans * scale), () => rt.access.get(homes[randomInt(state.rng, 0, homes.length - 1)].id), true);
   }
-  plan.sort((a, b) => a.at - b.at || a.dest - b.dest || a.src - b.src);
+  // Público dos eventos: chega de 2h a 10 min antes e vai embora no fim.
+  for (const { ev, venue, total, fromOutside } of crowds) {
+    const [h0, h1] = CULTURE.eventTypes[ev.type].hours;
+    const until = Math.min(MINUTES_PER_DAY - 30, h1 * 60);
+    const dest = venue.building;
+    const destTile = dest === null ? venue.tile : undefined;
+    const add = (count, src, fan) => {
+      for (let i = 0; i < count; i++) {
+        const p = { at: randomInt(state.rng, h0 * 60 - 120, h0 * 60 - 10), dest, src: src(), until, fan, event: ev.id };
+        if (destTile !== undefined) p.destTile = destTile;
+        plan.push(p);
+      }
+    };
+    add(Math.round(fromOutside * scale), () => entries[randomInt(state.rng, 0, entries.length - 1)], false);
+    if (homes.length) add(Math.round((total - fromOutside) * scale), () => rt.access.get(homes[randomInt(state.rng, 0, homes.length - 1)].id), true);
+  }
+  plan.sort((a, b) => a.at - b.at || (a.dest ?? -1) - (b.dest ?? -1) || (a.destTile ?? -1) - (b.destTile ?? -1) || a.src - b.src);
   state.tourism.plan = plan;
 
   // Aviso na tela no primeiro dia de cada festa.
@@ -181,28 +212,31 @@ export function updateVisitors(state, rt) {
   // Chegadas deste minuto.
   while (plan.length && plan[0].at <= minute) {
     const p = plan.shift();
-    const dest = rt.buildingById.get(p.dest);
-    const access = dest ? rt.access.get(dest.id) : -1;
+    const dest = p.dest !== null ? rt.buildingById.get(p.dest) : null;
+    const access = dest ? rt.access.get(dest.id) : p.dest === null && state.map.road[p.destTile] ? p.destTile : -1;
     if (access < 0 || !state.map.road[p.src] || rt.roadComponent[p.src] !== rt.roadComponent[access]) continue;
     const r = route(state, rt, p.src, access);
     if (!r) continue;
-    addVisitor(state, rt, {
+    const v = {
       id: 0, src: p.src, dest: p.dest, until: p.until, fan: p.fan, state: 'indo',
-      x: (p.src % width) + 0.5, y: Math.floor(p.src / width) + 0.5, path: [...r, dest.tile], step: 0,
-    });
+      x: (p.src % width) + 0.5, y: Math.floor(p.src / width) + 0.5, path: dest ? [...r, dest.tile] : [...r], step: 0,
+    };
+    if (p.dest === null) v.destTile = p.destTile;
+    if (p.event) v.event = p.event;
+    addVisitor(state, rt, v);
   }
 
   // Hora de ir embora.
   for (const v of [...state.visitors]) {
     if (v.state !== 'visitando' || minute < v.until) continue;
-    const dest = rt.buildingById.get(v.dest);
-    const access = dest ? rt.access.get(dest.id) : -1;
+    const dest = v.dest !== null ? rt.buildingById.get(v.dest) : null;
+    const access = dest ? rt.access.get(dest.id) : v.dest === null && state.map.road[v.destTile] ? v.destTile : -1;
     const r = access >= 0 && state.map.road[v.src] ? route(state, rt, access, v.src) : null;
     if (!r) {
       removeVisitor(state, rt, v);
       continue;
     }
-    Object.assign(v, { state: 'voltando', path: [dest.tile, ...r], step: 0 });
+    Object.assign(v, { state: 'voltando', path: dest ? [dest.tile, ...r] : [...r], step: 0 });
     rt.visitorMovers.add(v.id);
   }
 
@@ -243,7 +277,7 @@ function moveVisitors(state, rt) {
       }
     }
     if (v.step >= v.path.length - 1) {
-      if (v.state === 'voltando' || !rt.buildingById.has(v.dest)) {
+      if (v.state === 'voltando' || (v.dest !== null && !rt.buildingById.has(v.dest))) {
         removeVisitor(state, rt, v);
       } else {
         Object.assign(v, { state: 'visitando', path: null, step: 0 });

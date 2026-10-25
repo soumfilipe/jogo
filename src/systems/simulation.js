@@ -24,6 +24,7 @@ import { updateTrafficMap } from './traffic.js';
 import { collectWaste } from './waste.js';
 import { indexVisitors, planDay, updateVisitors } from './tourism.js';
 import { closeCultureMonth } from './culture.js';
+import { runEventsOfDay } from './agenda.js';
 import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
@@ -69,6 +70,9 @@ export function tick(state, rt) {
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
       // Turistas de hoje (meia-noite): plano de chegadas e gasto do dia.
+      // Eventos de hoje (público sorteado, encerramentos, séries) e, com eles,
+      // os turistas e o público que vão andar pela cidade.
+      runEventsOfDay(state, rt);
       planDay(state, rt);
       // Notícias do dia, com a cidade já atualizada.
       dailyNews(state, rt);

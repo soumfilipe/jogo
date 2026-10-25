@@ -41,6 +41,7 @@ export function createWorld({
       lastMonth: null,
       fares: 0, // passagens do transporte público no mês (entram no fechamento)
       tourism: 0, // gasto dos turistas no mês (ver systems/tourism.js)
+      eventsIncome: 0, // ingressos dos eventos no mês (ver systems/agenda.js)
     },
     map: {
       width,

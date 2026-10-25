@@ -566,7 +566,13 @@ const research = new ResearchPanel($('research'), {
 });
 $('btn-research').onclick = () => toggleResearch();
 // Cultura: artistas, gêneros e o que está em cartaz (botão no topo ou tecla Z).
-const culture = new CulturePanel($('culture'));
+const culture = new CulturePanel($('culture'), {
+  act: (cmd) => {
+    const result = applyCommand(state, rt, cmd);
+    if (result.ok) dirty = true;
+    return result;
+  },
+});
 $('btn-culture').onclick = () => toggleCulture();
 // Notícias: o que a imprensa publicou e os veículos da cidade (botão Notícias no topo).
 const newsPanel = new NewsPanel($('news'));
@@ -967,6 +973,9 @@ $('inspector-body').addEventListener('click', (e) => {
     select({ type: 'building', id: Number(target.dataset.building) });
     const b = rt.buildingById.get(selection.id);
     centerOn(cam, (b.tile % state.map.width) + 0.5, Math.floor(b.tile / state.map.width) + 0.5);
+  } else if ('planEvent' in target.dataset) {
+    culture.planAt(selection.id);
+    toggleCulture(true);
   } else if ('follow' in target.dataset) {
     following = !following;
     updateInspector();

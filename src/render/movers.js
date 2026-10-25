@@ -23,9 +23,10 @@ const PERSON = 0.07;
 export const MODE_COLORS = { onibus: '#e8b931', brt: '#c0392b', vlt: '#16a085' };
 
 // Turistas e torcedores (em dia de jogo).
-export const VISITOR_COLORS = { tourist: '#1abc9c', fan: '#e05a47' };
+export const VISITOR_COLORS = { tourist: '#1abc9c', fan: '#e05a47', event: '#9b59b6' };
 
 export function visitorColor(v) {
+  if (v.event) return VISITOR_COLORS.event;
   return v.fan ? VISITOR_COLORS.fan : VISITOR_COLORS.tourist;
 }
 

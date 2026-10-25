@@ -21,10 +21,11 @@ import { EDUCATION } from '../world/catalog.js';
 import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { createRng, hash2 } from '../core/rng.js';
 import { createCulture } from '../systems/culture.js';
+import { talentOf } from '../agents/citizens.js';
 import { createNews } from '../systems/news.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -219,6 +220,22 @@ const MIGRATIONS = {
     const data = save.data;
     data.news ??= createNews(data.seed, data.research);
     save.version = 16;
+    return save;
+  },
+  // v16 -> v17: agenda de eventos e talento/vocação dos cidadãos (de um hash
+  // do id, para não mexer no sorteio da simulação).
+  16: (save) => {
+    const data = save.data;
+    data.culture.events ??= [];
+    data.culture.series ??= [];
+    data.culture.history ??= [];
+    data.economy.eventsIncome ??= 0;
+    const citizens = decodeTable(data.citizens, { moves: { path: data.map.width } });
+    for (const c of citizens) {
+      if (c.talent === undefined) Object.assign(c, talentOf(hash2(c.id, 71), hash2(c.id, 72)));
+    }
+    data.citizens = encodeTable(citizens, { moves: { path: data.map.width } });
+    save.version = 17;
     return save;
   },
 };

@@ -16,12 +16,16 @@
 //   path:  tiles da viagem atual | null,   step: índice no path
 //   edu, field, school, stage, study: escolaridade e estudo (ver systems/education.js)
 //   mode:  transporte da viagem atual ('onibus', 'brt', 'vlt', 'metro'; null = carro)
+//   talent: talento (0 a 1);  calling: vocação ('arte' | 'esporte' | null)
+//   artist?: id do artista (state.culture) quando é artista da cidade;
+//            fullTime?: vive da arte (não procura emprego)
+//   stress?: ver systems/childcare.js
 // }
 //
 // Crianças moram com a família e estudam; trabalham dos 18 aos 64 anos (ver
 // systems/demography.js), menos quem estuda em tempo integral.
 
-import { BUILDINGS, CITIZEN_SPEED, SECTORS, SHIFTS, TRAFFIC } from '../world/catalog.js';
+import { BUILDINGS, CITIZEN_SPEED, CULTURE, SECTORS, SHIFTS, TRAFFIC } from '../world/catalog.js';
 import { congestionFactor, countOccupancy, roadSpeed } from '../systems/traffic.js';
 import { chooseMode, payFare } from '../systems/transit.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
@@ -75,11 +79,22 @@ export function createCitizen(state, rt, home, { age, edu = 1, lastName } = {}) 
     path: null,
     step: 0,
     mode: null,
+    ...talentOf(random(state.rng), random(state.rng)),
   });
 }
 
+/**
+ * Talento e vocação a partir de dois sorteios de 0 a 1 (a migração de saves
+ * antigos usa um hash do id no lugar do sorteio).
+ */
+export function talentOf(roll, callRoll) {
+  const { arte, esporte } = CULTURE.calling;
+  const calling = callRoll < arte ? 'arte' : callRoll < arte + esporte ? 'esporte' : null;
+  return { talent: Math.round(roll * 1000) / 1000, calling };
+}
+
 export function canWork(citizen) {
-  return citizen.age >= WORKING_AGE[0] && citizen.age <= WORKING_AGE[1] && !isFullTimeStudent(citizen);
+  return citizen.age >= WORKING_AGE[0] && citizen.age <= WORKING_AGE[1] && !isFullTimeStudent(citizen) && !citizen.fullTime;
 }
 
 /**

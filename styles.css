@@ -483,6 +483,32 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .culture .fame { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .culture .up { color: #51cf66; }
 .culture .down { color: #ff8a80; }
+.culture .small, .culture small { font-size: 12px; }
+.culture .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 10px; }
+.culture .tabs button { padding: 3px 8px; font-size: 12px; }
+.culture .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.culture .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.culture .events li { border-bottom: 1px solid var(--border); padding-bottom: 8px; font-size: 13px; }
+.culture .events .row { margin-top: 4px; flex-wrap: wrap; }
+.culture .meter.inline { display: inline-block; width: 80px; vertical-align: middle; margin: 0 4px; }
+.culture .form { display: grid; gap: 6px; font-size: 13px; }
+.culture .form label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.culture .form input[type=number] { width: 72px; }
+.culture .form input[type=range] { flex: 1; min-width: 120px; }
+.culture .form input[type=text] { flex: 1; min-width: 0; }
+.culture .lineup .row { align-items: center; margin: 0 0 4px; }
+.culture .artist-pick { list-style: none; margin: 0; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; }
+.culture .artist-pick label { display: flex; gap: 6px; align-items: center; padding: 3px 6px; font-size: 12px; }
+.culture .artist-pick label > span:first-of-type { flex: 1; min-width: 0; }
+.culture .preview { display: grid; gap: 2px; margin: 10px 0 4px; padding: 8px; border-radius: 4px; background: #1e2127; font-size: 13px; }
+.culture .preview div { display: flex; justify-content: space-between; gap: 8px; }
+.culture .preview .total { border-top: 1px solid var(--border); padding-top: 3px; font-weight: 600; }
+.culture .history { width: 100%; border-collapse: collapse; font-size: 12px; }
+.culture .history td, .culture .history th { text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.culture .history tr.good td:last-child { color: #51cf66; }
+.culture .history tr.bad td:last-child { color: #ff8a80; }
+.culture .error { color: #ff8a80; }
+.culture .ok { color: #51cf66; }
 
 /* --- Ícones (src/ui/icons.js) -------------------------------------------- */
 .icon {

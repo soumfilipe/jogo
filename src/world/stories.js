@@ -256,6 +256,54 @@ export const STORIES = {
       ['A torcida lotou as arquibancadas e o trânsito ficou complicado na saída.', 'O técnico disse que o time ainda pode melhorar.'],
     ],
   },
+  evento_sucesso: {
+    h: ['{evento} lota e vira o assunto da cidade', 'Sucesso: {publico} pessoas no {evento}', '{evento} esgota os ingressos'],
+    s: [
+      ['O {evento} reuniu {publico} pessoas, {lotacao} da capacidade, na {regiao}.', 'Foram {publico} pessoas no {evento}, um sucesso de público.'],
+      ['{atracoes}'],
+      ['O comércio em volta comemorou o movimento.', 'Quem foi já pergunta quando será a próxima edição.'],
+    ],
+  },
+  evento_morno: {
+    h: ['{evento} reúne {publico} pessoas', 'Público morno no {evento}'],
+    s: [
+      ['O {evento} recebeu {publico} pessoas, {lotacao} da capacidade.'],
+      ['{atracoes}'],
+      ['Os organizadores esperavam mais gente.', 'Faltou divulgação, dizem os frequentadores.'],
+    ],
+  },
+  evento_fracasso: {
+    h: ['{evento} tem público abaixo do esperado', 'Fracasso: {evento} com arquibancadas vazias', 'Cadê o público? {evento} decepciona'],
+    s: [
+      ['Só {publico} pessoas foram ao {evento}, {lotacao} da capacidade.'],
+      ['{atracoes}'],
+      ['Críticos culpam o preço do ingresso e a pouca propaganda.', 'A prefeitura vai rever a programação cultural.'],
+    ],
+  },
+  festival_anuncio: {
+    h: ['{evento} anuncia a programação', 'Vem aí o {evento}'],
+    s: [
+      ['A prefeitura confirmou o {evento} para daqui a {dias} dias.'],
+      ['{atracoes}'],
+      ['Os ingressos já estão à venda.', 'Fãs de toda a região já se organizam para vir.'],
+    ],
+  },
+  artista_saiu: {
+    h: ['{artista} deixa {cidade}', 'Sem palco na cidade, {artista} se muda', '{artista} vai embora em busca de oportunidades'],
+    s: [
+      ['Revelação da cidade, {artista} decidiu se mudar com a família.', '{artista}, nome do {genero} que nasceu aqui, está de mudança.'],
+      ['Segundo pessoas próximas, faltaram shows e palcos em {cidade}.', 'Há mais de um ano sem tocar na cidade, a carreira seguia só em turnê.'],
+      ['Fãs lamentam e cobram mais eventos culturais.'],
+    ],
+  },
+  serie_confirmar: {
+    h: ['{evento}: a próxima edição espera confirmação', 'Vai ter {evento} este ano?'],
+    s: [
+      ['Faltam {dias} dias para a data do {evento}, e a prefeitura ainda não confirmou a programação.'],
+      ['Sem confirmação até uma semana antes, a edição será cancelada.'],
+      ['Cancelar uma edição costuma afastar o público das próximas.', 'Os fãs aguardam o anúncio das atrações.'],
+    ],
+  },
   cultura: {
     h: ['{artista} é o nome do momento', 'Ninguém escuta outra coisa: {artista} lidera as paradas', 'O sucesso de {artista}'],
     s: [
