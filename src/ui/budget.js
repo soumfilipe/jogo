@@ -53,6 +53,7 @@ export class BudgetPanel {
         <dt>Impostos</dt><dd data-line="income"></dd>
         <dt data-statal>Estatais</dt><dd data-statal data-line="statal"></dd>
         <dt data-fares>Passagens</dt><dd data-fares data-line="fares"></dd>
+        <dt data-tourism>Turismo</dt><dd data-tourism data-line="tourism"></dd>
         <dt data-food-export>Exportação de alimentos</dt><dd data-food-export data-line="food-export"></dd>
         <dt>Manutenção das ruas</dt><dd data-line="roads"></dd>
         <dt>Serviços públicos</dt><dd data-line="utilities"></dd>
@@ -142,7 +143,10 @@ export class BudgetPanel {
       q(`[data-tax-income="${zone}"]`).textContent = `${money(budget.income[zone])}/mês`;
     }
 
-    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal - budget.income.fares - budget.income.food);
+    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal - budget.income.fares
+      - budget.income.food - budget.income.tourism);
+    for (const el of this.el.querySelectorAll('[data-tourism]')) el.hidden = budget.income.tourism === 0;
+    q('[data-line="tourism"]').textContent = money(budget.income.tourism);
     for (const el of this.el.querySelectorAll('[data-food-export]')) el.hidden = budget.income.food === 0;
     q('[data-line="food-export"]').textContent = money(budget.income.food);
     for (const el of this.el.querySelectorAll('[data-food-import]')) el.hidden = budget.expenses.food === 0;

@@ -4,7 +4,9 @@ import { radiusOf, seatsOf } from './systems/education.js';
 import { serviceRadius } from './systems/services.js';
 
 const SERVICE_NAMES = { saude: 'saúde', policia: 'menos crime', bombeiros: 'apaga incêndios', lazer: 'lazer' };
-import { applyCommand, costs, lineTiles, planCommand, rectTiles, roadCost, roadUnlocked } from './world/commands.js';
+import {
+  TOOL_TECH, applyCommand, costs, lineTiles, planCommand, rectTiles, roadCost, roadUnlocked,
+} from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
 import { advance, prepare, tick } from './systems/simulation.js';
@@ -42,6 +44,9 @@ const TOOLS = [
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
   })),
   { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)' },
+  // Ferramentas que vêm da pesquisa (ficam escondidas até liberar).
+  { id: 'parque', name: 'Parque de conservação', label: 'Conservação', shape: 'rect', tech: TOOL_TECH.parque, color: 'rgba(63,138,82,0.55)', swatch: '#3f8a52', group: 'tourism' },
+  { id: 'revitalizar', name: 'Revitalizar indústria abandonada', label: 'Revitalizar', shape: 'single', tech: TOOL_TECH.revitalizar, color: 'rgba(142,68,173,0.5)', swatch: '#8e44ad', group: 'tourism' },
   // Prédios do jogador: um clique coloca (precisa encostar numa rua). Os que
   // dependem de pesquisa ficam escondidos (no celular, com cadeado) até liberar.
   ...[
@@ -64,6 +69,10 @@ const TOOLS = [
     ['base_samu', 'SAMU', '#e05a47', 'services'],
     ['mercado_municipal', 'Mercado', '#e9d48a', 'food'], ['restaurante_popular', 'Restaurante', '#d9822b', 'food'],
     ['ceasa', 'Ceasa', '#3d8f5a', 'food'],
+    ['museu', 'Museu', '#f0e6d2', 'tourism'], ['campo_futebol', 'Campo', '#4f9a48', 'tourism'],
+    ['estadio', 'Estádio', '#d9dde2', 'tourism'], ['parque_tematico', 'Parque temático', '#e8b931', 'tourism'],
+    ['hotel', 'Hotel', '#9fc3e0', 'tourism'], ['arena_esports', 'eSports', '#8e44ad', 'tourism'],
+    ['aeroporto', 'Aeroporto', '#5b7fa8', 'tourism'],
     ['lixao', 'Lixão', '#7a6a4f', 'waste'], ['aterro', 'Aterro', '#6f8a4f', 'waste'],
     ['centro_reciclagem', 'Reciclagem', '#3d8f5a', 'waste'], ['estacao_esgoto', 'Esgoto', '#5f8a7a', 'waste'],
     ['parque', 'Praça', '#7fb069', 'leisure'], ['cinema', 'Cinema', '#8e44ad', 'leisure'], ['ginasio', 'Ginásio', '#3f6fc0', 'leisure'],
@@ -337,12 +346,16 @@ function utilityTitle(id) {
 
 /** Tecnologia que falta para um prédio, em texto curto ("Usina solar, marco 4"). */
 function lockText(t) {
-  const tech = TECH_BY_ID.get(t.road ? ROAD_TYPES[t.road].tech : BUILDING_TECH[t.building]);
+  const tech = TECH_BY_ID.get(t.tech ?? (t.road ? ROAD_TYPES[t.road].tech : BUILDING_TECH[t.building]));
   return `${tech.name} · marco ${tech.marco}`;
 }
 
 /** A ferramenta ainda depende de pesquisa? */
-const toolLocked = (t) => (t.building ? !isUnlocked(rt, t.building) : t.road ? !roadUnlocked(rt, t.road) : false);
+const toolLocked = (t) => {
+  if (t.building) return !isUnlocked(rt, t.building);
+  if (t.road) return !roadUnlocked(rt, t.road);
+  return t.tech ? !rt.techDone?.has(t.tech) : false;
+};
 
 // Liberações e preços mudam com a pesquisa: atualiza os botões.
 let toolsKey = '';
@@ -441,10 +454,14 @@ function announceEvents() {
   if (events.some((e) => e.kind === 'epidemia')) {
     lines.push('<b>🦠 Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>');
   }
+  for (const e of events.filter((x) => x.kind === 'festa')) {
+    lines.push(`<b>🎉 ${escapeHtml(e.name)}</b><span>${escapeHtml(e.text)}</span>`);
+  }
   const toast = $('toast');
   toast.innerHTML = lines.join('');
   toast.hidden = false;
-  status([burned ? 'Incêndio' : null, events.some((e) => e.kind === 'epidemia') ? 'Epidemia' : null].filter(Boolean).join(', '));
+  status([burned ? 'Incêndio' : null, events.some((e) => e.kind === 'epidemia') ? 'Epidemia' : null,
+    ...events.filter((e) => e.kind === 'festa').map((e) => e.name)].filter(Boolean).join(', '));
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
 }
@@ -546,6 +563,7 @@ function toolCommand() {
   if (!tool.shape || !hover) return null;
   const { width } = state.map;
   // Colocar serviço público: a prévia aparece só passando o mouse.
+  if (tool.id === 'revitalizar') return { type: 'revitalize', tile: hover.y * width + hover.x };
   if (tool.shape === 'single') return { type: 'place', building: tool.building, tile: hover.y * width + hover.x };
   if (!drag || drag.kind !== 'tool') return null;
   const { start } = drag;
@@ -554,6 +572,7 @@ function toolCommand() {
     : rectTiles(width, start.x, start.y, hover.x, hover.y);
   if (tool.road) return { type: 'road', road: tool.road, tiles };
   if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
+  if (tool.id === 'parque') return { type: 'park', tiles };
   return usesDensity(tool) ? { type: 'zone', zone: tool.zone, density, tiles } : { type: 'zone', zone: tool.zone, tiles };
 }
 

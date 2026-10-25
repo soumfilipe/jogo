@@ -953,6 +953,98 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  museu(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#d9d4c8', lift: 0 }];
+    // Prédio com colunas na frente, frontão e um jardim.
+    const w = r.pick([wall('#f0e6d2', '#d4c8b0'), wall('#e6e2da', '#c9c4ba')]);
+    parts.push(block([0.2, 0.2, 1.8, 1.2], 0, 1.1, w, { roof: { kind: 'gable-x', color: '#8a8f86', rise: 0.3 }, doors: { count: 1, color: '#6f4e37' } }));
+    for (let k = 0; k < 6; k++) {
+      parts.push({ kind: 'cylinder', cx: 0.35 + k * 0.26, cy: 1.32, r: 0.05, lift: 0, h: 1.0, color: '#f4f1ea', top: '#f4f1ea' });
+    }
+    parts.push(block([0.25, 1.25, 1.75, 1.4], 1.0, 0.1, w));
+    parts.push({ kind: 'slab', box: [0.3, 1.55, 1.7, 1.9], color: '#7fb069', lift: 0.01 });
+    return parts;
+  },
+
+  campo_futebol(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8a8f86', lift: 0 }];
+    parts.push({ kind: 'slab', box: [0.2, 0.3, 1.8, 1.7], color: '#4f9a48', lines: true, lift: 0.01 });
+    // Arquibancadas baixas dos dois lados.
+    const c = r.pick(['#c0392b', '#2c3e50', '#3f6fc0', '#3d8f5a']);
+    parts.push(block([0.2, 0.08, 1.8, 0.26], 0, 0.3, wall(c, mixHex(c, '#000000', 0.2))));
+    parts.push(block([0.2, 1.74, 1.8, 1.92], 0, 0.3, wall(c, mixHex(c, '#000000', 0.2))));
+    for (const [x, y] of [[0.1, 0.1], [1.9, 1.9]]) parts.push({ kind: 'cylinder', cx: x, cy: y, r: 0.03, lift: 0, h: 1.2, color: '#b9bcc2', top: '#f7dc6f' });
+    return parts;
+  },
+
+  estadio(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#9a9a8a', lift: 0 }];
+    const c = r.pick(['#c0392b', '#2c3e50', '#3f6fc0', '#3d8f5a']);
+    const stand = wall('#d9dde2', '#b9bec7');
+    // Anel de arquibancadas em volta do campo.
+    parts.push(block([0.2, 0.2, 2.8, 0.7], 0, 0.9, stand, { bands: [{ at: 0.75, thick: 0.1, color: c }] }));
+    parts.push(block([0.2, 2.3, 2.8, 2.8], 0, 0.9, stand, { bands: [{ at: 0.75, thick: 0.1, color: c }] }));
+    parts.push(block([0.2, 0.7, 0.7, 2.3], 0, 0.9, stand, { bands: [{ at: 0.75, thick: 0.1, color: c }] }));
+    parts.push(block([2.3, 0.7, 2.8, 2.3], 0, 0.9, stand, { bands: [{ at: 0.75, thick: 0.1, color: c }] }));
+    parts.push({ kind: 'slab', box: [0.7, 0.7, 2.3, 2.3], color: '#4f9a48', lines: true, lift: 0.02 });
+    for (const [x, y] of [[0.25, 0.25], [2.75, 0.25], [0.25, 2.75], [2.75, 2.75]]) {
+      parts.push({ kind: 'cylinder', cx: x, cy: y, r: 0.04, lift: 0.9, h: 1.0, color: '#b9bcc2', top: '#f7dc6f' });
+    }
+    return parts;
+  },
+
+  parque_tematico(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#7fb069', lift: 0 }];
+    parts.push({ kind: 'slab', box: [0.1, 1.35, 2.9, 1.65], color: '#d9c79a', lift: 0.01 });
+    // Roda-gigante (um disco alto), montanha-russa (blocos em degrau) e castelo.
+    parts.push({ kind: 'cylinder', cx: 0.7, cy: 0.7, r: 0.45, lift: 0.3, h: 0.08, color: '#e8b931', top: '#f7dc6f' });
+    parts.push({ kind: 'cylinder', cx: 0.7, cy: 0.7, r: 0.05, lift: 0, h: 0.75, color: '#5b5f66', top: '#5b5f66' });
+    const colors = ['#c0392b', '#3f6fc0', '#8e44ad', '#d9822b'];
+    for (let k = 0; k < 5; k++) parts.push(block([1.4 + k * 0.28, 0.3, 1.62 + k * 0.28, 0.55], 0, 0.3 + 0.25 * ((k * 3) % 5), wall(r.pick(colors), '#2c3e50')));
+    const castle = wall('#e3b5ae', '#c9968f');
+    parts.push(block([0.9, 1.9, 2.1, 2.7], 0, 0.8, castle, { doors: { count: 1, color: '#8e44ad' } }));
+    for (const [x, y] of [[0.9, 1.9], [1.95, 1.9], [0.9, 2.55], [1.95, 2.55]]) parts.push(block([x, y, x + 0.15, y + 0.15], 0.8, 0.45, castle, { roof: { kind: 'hip', color: '#3f6fc0', rise: 0.35 } }));
+    return parts;
+  },
+
+  hotel(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#b5b0a6', lift: 0 }];
+    const w = r.pick(GLASS);
+    parts.push(storeys([0.15, 0.15, 0.85, 0.75], 0, 7, OFFICE_FLOOR, w, { windows: { cols: 3, style: 'grid' }, doors: { count: 1, color: '#c9b27a' } }));
+    parts.push(block([0.2, 0.75, 0.8, 0.88], 0, 0.25, wall('#c9b27a', '#a99260'), { top: '#e9d48a' }));
+    return parts;
+  },
+
+  arena_esports(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5b5f66', lift: 0 }];
+    parts.push({ kind: 'cylinder', cx: 1, cy: 1, r: 0.8, lift: 0, h: 0.9, color: r.pick(['#2c3e50', '#22303e']), top: '#8e44ad' });
+    parts.push({ kind: 'cylinder', cx: 1, cy: 1, r: 0.6, lift: 0.9, h: 0.1, color: '#5fb7d8', top: '#5fb7d8' });
+    return parts;
+  },
+
+  aeroporto() {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#9a9a8a', lift: 0 }];
+    // Pista, terminal, torre de controle e um avião.
+    parts.push({ kind: 'slab', box: [0.15, 0.2, 2.85, 0.75], color: '#4a4d52', lines: true, lift: 0.01 });
+    parts.push(block([0.3, 1.9, 2.0, 2.7], 0, 0.6, wall('#9fc3e0', '#7ea3c2'), { windows: { cols: 6, style: 'bands' }, doors: { count: 3, color: '#2c3e50' } }));
+    parts.push(block([2.3, 1.9, 2.55, 2.15], 0, 1.4, wall('#e6e2da', '#c9c4ba')));
+    parts.push(block([2.2, 1.8, 2.65, 2.25], 1.4, 0.25, wall('#5b7fa8', '#486889')));
+    parts.push(block([0.8, 1.05, 2.0, 1.2], 0.05, 0.1, wall('#f4f5f6', '#d6d9dd')));
+    parts.push(block([1.3, 0.85, 1.45, 1.4], 0.08, 0.05, wall('#f4f5f6', '#d6d9dd')));
+    return parts;
+  },
+
+  centro_cultural(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#9a9a8a', lift: 0 }];
+    // Galpão de fábrica pintado de novo, com a chaminé antiga e um mural.
+    parts.push(block([0.1, 0.1, 0.9, 0.75], 0, 0.6, wall('#c98262', '#ab6a4d'), {
+      roof: { kind: 'gable-x', color: '#6f5b4b', rise: 0.25 }, doors: { count: 2, color: '#8e44ad' },
+      bands: [{ at: 0.3, thick: 0.12, color: r.pick(['#e8b931', '#16a085', '#e05a47']) }],
+    }));
+    parts.push(block([0.75, 0.78, 0.88, 0.91], 0, 1.1, wall('#8d6e5a', '#74584a'), { top: '#3d3330' }));
+    return parts;
+  },
+
   lixao(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7a6a4f', lift: 0 }];
     // Montes de lixo de várias cores e uma cerca baixa.

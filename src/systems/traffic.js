@@ -51,6 +51,13 @@ export function countOccupancy(state, rt) {
     if (occ[t] === 0) rt.occupied.push(t);
     occ[t] += w;
   }
+  // Turistas andando de carro.
+  for (const id of rt.visitorMovers ?? []) {
+    const v = rt.visitorById.get(id);
+    const t = Math.floor(v.y) * width + Math.floor(v.x);
+    if (occ[t] === 0) rt.occupied.push(t);
+    occ[t] += 1;
+  }
   return occ;
 }
 

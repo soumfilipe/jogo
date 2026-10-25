@@ -39,7 +39,7 @@ export function computeLandValue(state, rt) {
   const river = computeSanitation(state, rt).river;
   for (let i = 0; i < n; i++) {
     if (terrain[i] === TERRAIN.WATER) nature[i] = 1 - 0.5 * river;
-    else if (terrain[i] === TERRAIN.FOREST) nature[i] = 1;
+    else if (terrain[i] === TERRAIN.FOREST) nature[i] = state.map.park?.[i] ? 1.6 : 1; // parque vale mais
     else if (terrain[i] === TERRAIN.SAND) nature[i] = 0.5;
   }
   const industryPollution = mod(rt, 'pollution.industry');
