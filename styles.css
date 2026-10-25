@@ -282,7 +282,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
     font-size: 12px;
   }
   #city-name { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar [title="Empregados / desempregados"], #btn-research { display: none; }
+  .topbar [title="Empregados / desempregados"], #btn-research, #btn-culture { display: none; }
   .topbar .spacer { display: none; }
   .speeds { margin-left: auto; }
   .speeds button { min-width: 40px; padding: 6px 8px; font-size: 12px; }
@@ -293,7 +293,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   /* Barra inferior, como as abas do iOS. */
   .mobile-nav {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     background: var(--panel);
     border-top: 1px solid #23262d;
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
@@ -301,7 +301,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   .mobile-nav button {
     display: flex; flex-direction: column; align-items: center; gap: 2px;
     background: none; border: none; border-radius: 8px; padding: 6px 2px;
-    color: var(--muted); font-size: 11px; min-width: 0;
+    color: var(--muted); font-size: 10px; min-width: 0;
   }
   .mobile-nav button span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-nav .ico { font-size: 20px; line-height: 1; }
@@ -380,3 +380,14 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+
+/* Painel da cultura */
+.culture .genres { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.culture .genre { font-size: 12px; }
+.culture .artists { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.culture .artists li, .culture .works li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.culture .works { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.culture .works .meter { width: 60px; flex: none; margin-top: 6px; }
+.culture .fame { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.culture .up { color: #51cf66; }
+.culture .down { color: #ff8a80; }

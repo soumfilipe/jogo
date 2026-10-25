@@ -21,6 +21,7 @@ import {
 import { renderInspector } from './ui/inspector.js';
 import { BudgetPanel } from './ui/budget.js';
 import { ResearchPanel } from './ui/research.js';
+import { CulturePanel } from './ui/culture.js';
 import { Sheets } from './ui/sheets.js';
 import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
@@ -39,6 +40,7 @@ const TOOLS = [
   // Avenida e via expressa: sobre uma rua, melhoram ela (paga só a diferença).
   { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57' },
   { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047' },
+  { id: 'calcadao', name: 'Calçadão', shape: 'line', road: 4, color: 'rgba(216,207,189,0.7)', swatch: '#d8cfbd' },
   ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL].map((zone) => ({
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
@@ -71,7 +73,8 @@ const TOOLS = [
     ['ceasa', 'Ceasa', '#3d8f5a', 'food'],
     ['museu', 'Museu', '#f0e6d2', 'tourism'], ['campo_futebol', 'Campo', '#4f9a48', 'tourism'],
     ['estadio', 'Estádio', '#d9dde2', 'tourism'], ['parque_tematico', 'Parque temático', '#e8b931', 'tourism'],
-    ['hotel', 'Hotel', '#9fc3e0', 'tourism'], ['arena_esports', 'eSports', '#8e44ad', 'tourism'],
+    ['hotel', 'Hotel', '#9fc3e0', 'tourism'], ['arena_eventos', 'Arena', '#8e44ad', 'tourism'],
+    ['teatro', 'Teatro', '#c0392b', 'tourism'],
     ['aeroporto', 'Aeroporto', '#5b7fa8', 'tourism'],
     ['lixao', 'Lixão', '#7a6a4f', 'waste'], ['aterro', 'Aterro', '#6f8a4f', 'waste'],
     ['centro_reciclagem', 'Reciclagem', '#3d8f5a', 'waste'], ['estacao_esgoto', 'Esgoto', '#5f8a7a', 'waste'],
@@ -207,6 +210,7 @@ function throttledHud() {
   if (selection) updateInspector();
   budget.render(state, rt);
   research.render(state, rt);
+  culture.render(state, rt);
   refreshTools();
   announceResearch();
 }
@@ -414,16 +418,34 @@ const research = new ResearchPanel($('research'), {
   },
 });
 $('btn-research').onclick = () => toggleResearch();
+// Cultura: artistas, gêneros e o que está em cartaz (botão 🎭 ou tecla Z).
+const culture = new CulturePanel($('culture'));
+$('btn-culture').onclick = () => toggleCulture();
 
+// Orçamento, pesquisa e cultura ocupam o mesmo canto: abrir um fecha os outros.
 function toggleBudget(force) {
   budget.toggle(force);
-  if (budget.open) research.toggle(false);
+  if (budget.open) {
+    research.toggle(false);
+    culture.toggle(false);
+  }
   budget.render(state, rt);
 }
 function toggleResearch(force) {
   research.toggle(force);
-  if (research.open) budget.toggle(false);
+  if (research.open) {
+    budget.toggle(false);
+    culture.toggle(false);
+  }
   research.render(state, rt);
+}
+function toggleCulture(force) {
+  culture.toggle(force);
+  if (culture.open) {
+    budget.toggle(false);
+    research.toggle(false);
+  }
+  culture.render(state, rt);
 }
 
 // Aviso de tecnologia concluída (a simulação deixa os ids em rt.researchEvents).
@@ -540,6 +562,9 @@ for (const button of $('mobile-nav').children) {
     } else if (button.dataset.mobile === 'research') {
       sheets.close();
       toggleResearch();
+    } else if (button.dataset.mobile === 'culture') {
+      sheets.close();
+      toggleCulture();
     }
   };
 }
@@ -807,12 +832,15 @@ window.addEventListener('keydown', (e) => {
     select(null);
     budget.toggle(false);
     research.toggle(false);
+    culture.toggle(false);
   } else if (key === DENSITY_KEY) {
     setDensity((density + 1) % Object.keys(DENSITY_INFO).length);
   } else if (key === 'o') {
     toggleBudget();
   } else if (key === 't') {
     toggleResearch();
+  } else if (key === 'z') {
+    toggleCulture();
   } else if (PAN_KEYS[key]) {
     e.preventDefault();
     keysDown.add(key);

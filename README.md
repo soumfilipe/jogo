@@ -33,7 +33,9 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
+| `Z` Cultura (ou 🎭 no topo) | artistas em alta, gêneros em moda, novatos do ano e o que está em cartaz |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
+| Calçadão | rua só de pedestres (depois de *Ruas de lazer*): valoriza o comércio em volta; vira rua de novo se você desenhar uma rua por cima |
 | Avenida / Via expressa | como a estrada, mas mais rápidas e com mais capacidade (depois da pesquisa *Via expressa*); sobre uma rua, melhoram ela pagando só a diferença |
 | `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` / `Q` / `Y` Mapas | valor do terreno, poluição (também nos rios), energia, água, escolas, saúde, crime, satisfação, trânsito, alimentos ou lixo sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
@@ -187,6 +189,25 @@ catálogo.
   ser desmatada, atrai turistas e valoriza o terreno; demolir tira o parque) e
   *Revitalizar* transforma uma indústria abandonada em centro cultural. Com o
   esporte na TV, campos e estádios dão receita todo mês.
+
+## Cena cultural
+
+Regras em `src/systems/culture.js`; números em `CULTURE` no catálogo.
+
+- **Artistas inventados** (nenhuma pessoa real), com gênero, fama e
+  tendência: a fama sobe e cai mês a mês, veteranos tendem a cair e quem fica
+  esquecido se aposenta. Todo janeiro surgem novatos, mais numa cidade grande.
+- **Gêneros** aparecem com o tempo do mundo (samba e choro desde 1910, rock
+  nos anos 50, MPB nos 60, funk e eletrônica nos 90…) e entram e saem de moda.
+- **Filmes e peças** estreiam todo mês e têm temporada: o público sobe até o
+  auge e cai até saírem de cartaz. Cinemas e teatros atraem turistas pelo que
+  está em cartaz.
+- **Locais**: teatro (desde o começo) e arena de eventos (com o ginásio; a
+  antiga arena de eSports virou arena de eventos). O **calçadão** é uma rua
+  só de pedestres: quem passa anda a pé, devagar, sem engarrafar, e as rotas
+  só usam o calçadão quando precisam.
+- O painel **Cultura** (`Z` ou 🎭) mostra o ranking, os gêneros em moda, os
+  novatos e o que está em cartaz.
 
 ## Lixo e esgoto
 
@@ -574,6 +595,9 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 14 (antes da cena cultural) abrem com artistas e obras
+gerados pela semente da cidade; arenas de eSports viram arenas de eventos.
 
 Saves do formato 13 (antes do turismo) abrem sem turistas e sem parques de
 conservação.

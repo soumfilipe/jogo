@@ -5,6 +5,7 @@
 
 import { hash2 } from '../core/rng.js';
 import { worldToScreen } from './camera.js';
+import { ROAD_TYPES } from '../world/catalog.js';
 
 export const CAR_COLORS = [
   '#d64541', '#e8eaed', '#b8bcc4', '#3b3f46', '#2f6fd1', '#f2c230',
@@ -16,6 +17,7 @@ const LANE_OFFSET = 0.2;
 const CAR_LENGTH = 0.26;
 const CAR_WIDTH = 0.14;
 const BUS_LENGTH = 0.5;
+const PERSON = 0.07;
 
 // Cor dos veículos de cada modo de transporte público.
 export const MODE_COLORS = { onibus: '#e8b931', brt: '#c0392b', vlt: '#16a085' };
@@ -58,17 +60,21 @@ export function moverPose(state, c) {
   dx /= norm;
   dy /= norm;
   // Com y crescendo "para baixo", a direita de (dx, dy) é (-dy, dx).
+  // No calçadão a pessoa anda a pé: um pontinho, mais perto do meio.
+  if (ROAD_TYPES[road[ty * width + tx]]?.pedestrian) {
+    return { x: c.x - dy * 0.1, y: c.y + dx * 0.1, dx, dy, length: PERSON, width: PERSON, depth: tx + ty };
+  }
   const length = c.mode ? BUS_LENGTH : CAR_LENGTH;
   return { x: c.x - dy * LANE_OFFSET, y: c.y + dx * LANE_OFFSET, dx, dy, length, depth: tx + ty };
 }
 
 /** Adiciona ao `path` o carrinho (um retângulo no chão, alinhado à rua). */
 export function addCar(path, cam, pose) {
-  const { x, y, dx, dy, length = CAR_LENGTH } = pose;
+  const { x, y, dx, dy, length = CAR_LENGTH, width = CAR_WIDTH } = pose;
   const lx = dx * length / 2;
   const ly = dy * length / 2;
-  const wx = -dy * CAR_WIDTH / 2;
-  const wy = dx * CAR_WIDTH / 2;
+  const wx = -dy * width / 2;
+  const wy = dx * width / 2;
   const corners = [
     worldToScreen(cam, x + lx + wx, y + ly + wy),
     worldToScreen(cam, x + lx - wx, y + ly - wy),

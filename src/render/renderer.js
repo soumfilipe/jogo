@@ -9,7 +9,7 @@
 //
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
-import { BUILDINGS, DENSITY, FOREST, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
+import { BUILDINGS, DENSITY, FOREST, ROAD_TYPES, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
@@ -60,8 +60,9 @@ const FOREST_GROUNDS = ['#6aa452', '#609b4b', '#578f45', '#4e843f'];
 const SAND = '#d9c98f';
 // Chão dos parques de conservação (mata protegida).
 const PARK_GROUND = '#3f8a52';
-// Rua, avenida e via expressa (ver ROAD_TYPES): quanto mais larga, mais escura.
-const ROAD_COLORS = [null, '#5c5f68', '#4c4f57', '#3d4047'];
+// Rua, avenida e via expressa (ver ROAD_TYPES): quanto mais larga, mais
+// escura; o calçadão é de pedra clara.
+const ROAD_COLORS = [null, '#5c5f68', '#4c4f57', '#3d4047', '#d8cfbd'];
 const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
 // Cor dos lotes vazios por zona e densidade: quanto mais densa, mais forte.
 const DENSITY_TINT = { [DENSITY.LOW]: 0.28, [DENSITY.MEDIUM]: 0.45, [DENSITY.HIGH]: 0.65 };
@@ -486,7 +487,7 @@ export class Renderer {
       // Sem closePath: com dezenas de milhares de losangos no mesmo caminho,
       // closePath fica lento no Chromium; o fill fecha cada contorno sozinho.
 
-      if (road[tile] && z >= 0.5) addRoadMarkings(roadLines, state, cam, x, y);
+      if (road[tile] && z >= 0.5 && !ROAD_TYPES[road[tile]].pedestrian) addRoadMarkings(roadLines, state, cam, x, y);
 
       if (terrain[tile] === TERRAIN.WATER && !road[tile]) {
         // Espuma nas bordas que encostam em terra.

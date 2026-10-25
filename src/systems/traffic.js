@@ -43,11 +43,13 @@ export function countOccupancy(state, rt) {
   const occ = rt.occupancy;
   for (const t of rt.occupied) occ[t] = 0;
   rt.occupied.length = 0;
+  const road = state.map.road;
   for (const id of rt.movers) {
     const c = rt.citizenById.get(id);
     const w = weightOf(c);
     if (!w) continue;
     const t = Math.floor(c.y) * width + Math.floor(c.x);
+    if (ROAD_TYPES[road[t]]?.pedestrian) continue; // a pé, no calçadão
     if (occ[t] === 0) rt.occupied.push(t);
     occ[t] += w;
   }
@@ -55,6 +57,7 @@ export function countOccupancy(state, rt) {
   for (const id of rt.visitorMovers ?? []) {
     const v = rt.visitorById.get(id);
     const t = Math.floor(v.y) * width + Math.floor(v.x);
+    if (ROAD_TYPES[road[t]]?.pedestrian) continue;
     if (occ[t] === 0) rt.occupied.push(t);
     occ[t] += 1;
   }

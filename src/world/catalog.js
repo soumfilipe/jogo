@@ -258,7 +258,7 @@ export const BUILDINGS = {
   },
   cinema: {
     name: 'Cinema', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
-    utility: { power: 0, water: 0, cost: 6_000, upkeep: 100, pollution: 0, income: 300, area: 'cultura', service: { kind: 'lazer', radius: 14, strength: 0.7 } },
+    utility: { power: 0, water: 0, cost: 6_000, upkeep: 100, pollution: 0, income: 300, area: 'cultura', service: { kind: 'lazer', radius: 14, strength: 0.7 }, tourism: { appeal: 0, works: 'filme' } },
   },
   ginasio: {
     name: 'Ginásio poliesportivo', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 10,
@@ -282,6 +282,7 @@ export const BUILDINGS = {
   //     `game` em dia de jogo (domingo), `weekend` no sábado e no domingo
   //   utility.hotel: quartos (turistas que dormem na cidade gastam mais)
   //   utility.gateway: turistas chegam por aqui (além das estradas da borda)
+  //   tourism.works: 'filme' | 'peca' — o público vem das obras em cartaz
   museu: {
     name: 'Museu', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 12,
     utility: { power: 0, water: 0, cost: 14_000, upkeep: 250, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 12, strength: 0.7 }, tourism: { appeal: 25 } },
@@ -308,9 +309,15 @@ export const BUILDINGS = {
     name: 'Hotel', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 20,
     utility: { power: 0, water: 0, cost: 12_000, upkeep: 200, pollution: 0, area: 'cultura', hotel: { rooms: 60 } },
   },
-  arena_esports: {
-    name: 'Arena de eSports', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 15,
-    utility: { power: 0, water: 0, cost: 20_000, upkeep: 350, pollution: 0, income: 500, area: 'computacao', service: { kind: 'lazer', radius: 14, strength: 0.7 }, tourism: { appeal: 20, weekend: 40 } },
+  // Arena de eventos: shows, festivais e torneios (a agenda é da parte B).
+  arena_eventos: {
+    name: 'Arena de eventos', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 15,
+    utility: { power: 0, water: 0, cost: 20_000, upkeep: 350, pollution: 0, income: 500, area: 'cultura', service: { kind: 'lazer', radius: 14, strength: 0.7 }, tourism: { appeal: 10, weekend: 40 } },
+  },
+  // Teatro: as peças em cartaz (ver systems/culture.js) chamam o público.
+  teatro: {
+    name: 'Teatro', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 8_000, upkeep: 150, pollution: 0, income: 200, area: 'cultura', service: { kind: 'lazer', radius: 12, strength: 0.7 }, tourism: { appeal: 0, works: 'peca' } },
   },
   aeroporto: {
     name: 'Aeroporto', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 50,
@@ -501,6 +508,9 @@ export const ROAD_TYPES = {
   1: { id: 'rua', name: 'Rua', speed: 1, capacity: 3, cost: 10, noise: 0 },
   2: { id: 'avenida', name: 'Avenida', speed: 1.4, capacity: 6, cost: 25, noise: 0.03, tech: 'via_expressa' },
   3: { id: 'expressa', name: 'Via expressa', speed: 2, capacity: 10, cost: 60, noise: 0.08, tech: 'via_expressa' },
+  // Calçadão: só pedestres (quem passa anda a pé, devagar, e não engarrafa);
+  // valoriza o comércio em volta como `commerce` lojas a mais.
+  4: { id: 'calcadao', name: 'Calçadão', speed: 0.5, capacity: 99, cost: 30, noise: 0, pedestrian: true, commerce: 1.5, tech: 'ciclovia_lazer' },
 };
 
 // Trânsito (ver systems/traffic.js): acima da capacidade do tile, os carros
@@ -558,6 +568,59 @@ export const TAX_ZONES = ['residential', 'commercial', 'industrial', 'rural'];
 
 // Alimentos (ver systems/food.js), em unidades por mês.
 // Lixo (ver systems/waste.js), em unidades por dia.
+// Cena cultural (ver systems/culture.js): artistas inventados com carreira,
+// gêneros que entram e saem de moda, filmes e peças com temporada.
+export const CULTURE = {
+  // Artistas: quantos no começo, limite da lista e novatos por ano
+  // (mais 1 a cada `newPerPeople` moradores, até `newMax`).
+  startArtists: 40,
+  maxArtists: 120,
+  newBase: 2,
+  newPerPeople: 2_000,
+  newMax: 8,
+  // Carreira: anos até começar a cair, meses com fama quase zero até se aposentar.
+  veteranYears: 25,
+  retireMonths: 18,
+  // Gêneros: a partir de que ano do mundo surgem novatos (e até quando).
+  genres: {
+    samba: { name: 'Samba', kind: 'musica', from: 1910 },
+    choro: { name: 'Choro', kind: 'musica', from: 1910, until: 1960 },
+    marchinha: { name: 'Marchinha', kind: 'musica', from: 1920, until: 1970 },
+    sertanejo: { name: 'Sertanejo', kind: 'musica', from: 1930 },
+    forro: { name: 'Forró', kind: 'musica', from: 1945 },
+    rock: { name: 'Rock', kind: 'musica', from: 1955 },
+    bossa: { name: 'Bossa nova', kind: 'musica', from: 1958, until: 1990 },
+    mpb: { name: 'MPB', kind: 'musica', from: 1965 },
+    pop: { name: 'Pop', kind: 'musica', from: 1965 },
+    pagode: { name: 'Pagode', kind: 'musica', from: 1980 },
+    axe: { name: 'Axé', kind: 'musica', from: 1985 },
+    rap: { name: 'Rap', kind: 'musica', from: 1988 },
+    funk: { name: 'Funk', kind: 'musica', from: 1990 },
+    eletronica: { name: 'Eletrônica', kind: 'musica', from: 1990 },
+    comedia: { name: 'Comédia', kind: 'teatro', from: 1910 },
+    drama: { name: 'Drama', kind: 'teatro', from: 1910 },
+    musical: { name: 'Musical', kind: 'teatro', from: 1930 },
+  },
+  // Filmes e peças: gêneros, quantos estreiam por mês e duração em cartaz (dias).
+  workGenres: {
+    filme: ['comédia', 'drama', 'ação', 'romance', 'terror', 'aventura', 'animação'],
+    peca: ['comédia', 'drama', 'musical', 'infantil'],
+  },
+  premieres: { filme: 3, peca: 2 },
+  run: { filme: [28, 70], peca: [42, 112] },
+  peak: [14, 28],
+  // Turistas por dia de cada cinema/teatro com uma obra no auge.
+  appeal: { filme: 15, peca: 10 },
+  // Palavras para os nomes inventados.
+  stagePrefix: { rap: 'MC', funk: 'MC', eletronica: 'DJ' },
+  // Bandas: substantivo no plural + complemento que concorda com qualquer gênero.
+  bandNouns: ['Luas', 'Estrelas', 'Tambores', 'Ventos', 'Cometas', 'Raízes', 'Ondas', 'Faróis', 'Corsários', 'Girassóis', 'Trovões', 'Andorinhas', 'Cactos', 'Vagalumes', 'Pandeiros'],
+  bandAdjectives: ['Azuis', 'do Norte', 'Selvagens', 'de Prata', 'do Cais', 'Livres', 'do Morro', 'Errantes', 'de Neon', 'Gigantes', 'do Asfalto', 'Imortais'],
+  // Títulos: o artigo vem junto (concorda com o substantivo).
+  titleNouns: ['O Segredo', 'O Caminho', 'O Silêncio', 'O Último Verão', 'O Farol', 'O Herdeiro', 'O Baile', 'A Viagem', 'O Sonho', 'O Retrato', 'A Noite', 'O Rio', 'O Jardim', 'A Promessa', 'A Herança'],
+  titlePlaces: ['da Serra', 'do Sertão', 'da Cidade', 'de Copacabana', 'do Interior', 'da Praia', 'do Morro', 'de Ninguém', 'do Porto', 'da Estação'],
+};
+
 // Turismo (ver systems/tourism.js).
 export const TOURISM = {
   // Gasto de um turista que vem passar o dia, e a mais de quem dorme num hotel.

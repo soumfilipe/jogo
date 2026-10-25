@@ -23,6 +23,7 @@ import { computeFreight } from './logistics.js';
 import { updateTrafficMap } from './traffic.js';
 import { collectWaste } from './waste.js';
 import { indexVisitors, planDay, updateVisitors } from './tourism.js';
+import { closeCultureMonth } from './culture.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -77,6 +78,7 @@ export function tick(state, rt) {
     closeDemographyMonth(state, rt);
     closeHealthMonth(state, rt);
     closeResearchMonth(state, rt);
+    closeCultureMonth(state, rt);
   }
 }
 

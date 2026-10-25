@@ -8,6 +8,7 @@ import { createResearch } from '../systems/research.js';
 import { createEducation } from '../systems/education.js';
 import { createPolicies } from '../systems/policies.js';
 import { createTourism } from '../systems/tourism.js';
+import { createCulture } from '../systems/culture.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -19,6 +20,7 @@ export function createWorld({
   startMarco = 1,
 } = {}) {
   const terrain = generateTerrain(width, height, seed);
+  const research = createResearch(startMarco);
   return {
     city: { name },
     seed,
@@ -61,7 +63,9 @@ export function createWorld({
     // públicos; acaba quando o jogador constrói a primeira usina/bomba).
     utilities: { imported: { power: false, water: false } },
     // Pesquisa e tecnologias (ver systems/research.js).
-    research: createResearch(startMarco),
+    research,
+    // Artistas, gêneros, filmes e peças (ver systems/culture.js).
+    culture: createCulture(createRng((seed ^ 0x5eed5) >>> 0), research.world, 7 * 60),
     // Cursos da universidade (ver systems/education.js).
     education: createEducation(),
     // Leis ativas (systems/policies.js), epidemia e médias do dia (wellbeing.js).

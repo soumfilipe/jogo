@@ -10,6 +10,7 @@
 import { BUILDINGS, TOURISM } from '../world/catalog.js';
 import { calendar } from '../core/time.js';
 import { mod } from './mods.js';
+import { showingAppeal } from './culture.js';
 
 const has = (state, type) => state.buildings.some((b) => b.type === type);
 
@@ -32,11 +33,15 @@ export function eventMultiplier(events) {
   return (events.carnaval ? TOURISM.carnaval.multiplier : 1) * (events.mega ? TOURISM.mega.multiplier : 1);
 }
 
-/** Turistas por dia que a atração chama hoje (sem os multiplicadores da cidade). */
-export function attractionAppeal(type, events) {
+/**
+ * Turistas por dia que a atração chama hoje (sem os multiplicadores da
+ * cidade). Cinema e teatro dependem dos filmes e peças em cartaz.
+ */
+export function attractionAppeal(type, events, culture = null, tick = 0) {
   const t = BUILDINGS[type].utility?.tourism;
   if (!t) return 0;
   let appeal = t.appeal ?? 0;
+  if (t.works) appeal += showingAppeal(culture, t.works, tick);
   if (events.game && t.game) appeal = Math.max(appeal, t.game);
   if (events.weekend && t.weekend) appeal = Math.max(appeal, t.weekend);
   return appeal;

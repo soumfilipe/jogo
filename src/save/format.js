@@ -19,10 +19,11 @@ import { createResearch } from '../systems/research.js';
 import { createEducation } from '../systems/education.js';
 import { EDUCATION } from '../world/catalog.js';
 import { AREA_IDS, marcoAt } from '../world/techs.js';
-import { hash2 } from '../core/rng.js';
+import { createRng, hash2 } from '../core/rng.js';
+import { createCulture } from '../systems/culture.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -200,7 +201,21 @@ const MIGRATIONS = {
     save.version = 14;
     return save;
   },
+  // v14 -> v15: cena cultural (artistas e obras, gerados pela semente como num
+  // jogo novo) e a arena de eSports vira arena de eventos.
+  14: (save) => {
+    const data = save.data;
+    data.culture ??= createCulture(cultureRng(data.seed), Math.floor(data.research.world), data.time.tick);
+    const buildings = decodeTable(data.buildings);
+    for (const b of buildings) if (b.type === 'arena_esports') b.type = 'arena_eventos';
+    data.buildings = encodeTable(buildings);
+    save.version = 15;
+    return save;
+  },
 };
+
+/** Sorteio próprio da cena inicial (não mexe no sorteio da simulação). */
+export const cultureRng = (seed) => createRng((seed ^ 0x5eed5) >>> 0);
 
 // Prédios, cidadãos e empresas: de listas de objetos para tabelas em colunas (e volta).
 function packLists(data) {

@@ -35,7 +35,9 @@ import { computeTransit } from '../systems/transit.js';
 import { computeFreight } from '../systems/logistics.js';
 
 // Ferramentas que vêm da pesquisa (efeito { tool } em techs.js).
-export const TOOL_TECH = { avenida: 'via_expressa', expressa: 'via_expressa', parque: 'parque_nacional', revitalizar: 'revitalizacao' };
+export const TOOL_TECH = {
+  avenida: 'via_expressa', expressa: 'via_expressa', calcadao: 'ciclovia_lazer', parque: 'parque_nacional', revitalizar: 'revitalizacao',
+};
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
@@ -65,10 +67,14 @@ export function planCommand(state, rt, cmd) {
       if (!forest || park?.[tile] || road[tile] || rt.buildingAt[tile]) continue;
       cost += COSTS.park * mod(rt, 'buildCost');
     } else if (cmd.type === 'road') {
-      if (road[tile] >= roadType || rt.buildingAt[tile] || !isBuildable(state, tile)) continue;
-      // Rua nova paga o tipo inteiro; melhorar uma rua paga só a diferença.
+      if (rt.buildingAt[tile] || !isBuildable(state, tile)) continue;
+      // O calçadão troca com qualquer rua (nos dois sentidos); entre as vias de
+      // carro, só se melhora (avenida sobre expressa não piora a via).
+      const pedestrian = ROAD_TYPES[roadType].pedestrian || ROAD_TYPES[road[tile]]?.pedestrian;
+      if (pedestrian ? road[tile] === roadType : road[tile] >= roadType) continue;
+      // Rua nova paga o tipo inteiro; mudar uma rua paga só a diferença (no mínimo uma rua).
       cost += road[tile]
-        ? roadCost(rt, roadType) - roadCost(rt, road[tile])
+        ? Math.max(roadCost(rt, 1), roadCost(rt, roadType) - roadCost(rt, road[tile]))
         : roadCost(rt, roadType) + (forest ? c.clearForest : 0);
     } else if (cmd.type === 'zone') {
       if (road[tile] || !isBuildable(state, tile)) continue;
