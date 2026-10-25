@@ -638,6 +638,66 @@ export const CULTURE = {
 };
 
 // Turismo (ver systems/tourism.js).
+// Notícias (ver systems/news.js): a imprensa da cidade transforma o que
+// acontece em notícias, que são também os avisos para o jogador.
+export const NEWS = {
+  // Do mais antigo ao mais novo: o veículo, o ícone (ui/icons.js) e a tecnologia que o libera
+  // (o setor de empresa de cada um está em SECTORS).
+  media: {
+    jornal: { name: 'Jornal', era: 'Era do jornal', icon: 'news', sector: 'jornal' },
+    radio: { name: 'Rádio', era: 'Era do rádio', icon: 'radio', sector: 'radio', tech: 'radio' },
+    tv: { name: 'Televisão', era: 'Era da televisão', icon: 'tv', sector: 'tv', tech: 'televisao' },
+    portal: { name: 'Internet', era: 'Era da internet', icon: 'web', sector: 'portal', tech: 'internet' },
+    social: { name: 'Redes sociais', era: 'Era das redes sociais', icon: 'phone', sector: 'digital', tech: 'smartphone' },
+  },
+  // Sem imprensa local, só a regional dá as notícias importantes da cidade.
+  regional: { jornal: 'Folha da Região', radio: 'Rádio Nacional', tv: 'TV Regional', portal: 'Portal da Região', social: 'Portal da Região' },
+  // Veículos: além do primeiro de cada tipo (minPop em SECTORS), mais um a
+  // cada `peoplePerOutlet` moradores, até `maxOutlets`; chance de um andar
+  // comercial vago virar redação quando a cidade quer mais imprensa.
+  peoplePerOutlet: 3_000,
+  maxOutlets: 12,
+  openChance: 0.35,
+  // Notícias guardadas no save (as mais antigas saem).
+  maxItems: 120,
+  // Notícias "de rotina" (fofoca, crítica, curiosidade, boato) por dia:
+  // base + por veículo local, até o teto.
+  daily: { base: 0.05, perOutlet: 0.12, max: 1.2 },
+  // Peso de cada tipo de notícia de rotina, por veículo: as redes sociais
+  // fofocam e espalham boatos; o jornal critica e informa.
+  mix: {
+    jornal: { fofoca: 3, critica: 2, cidade: 4, boato: 0.4 },
+    radio: { fofoca: 4, critica: 2, cidade: 3, boato: 0.6 },
+    tv: { fofoca: 5, critica: 1.5, cidade: 3, boato: 0.5 },
+    portal: { fofoca: 5, critica: 2, cidade: 2, boato: 1.2 },
+    social: { fofoca: 6, critica: 2, cidade: 1, boato: 3 },
+  },
+  // Dias até a checagem desmentir um boato (se houver imprensa séria) e o
+  // limite de boatos esperando checagem.
+  debunkDays: [3, 12],
+  maxPendingFakes: 4,
+  // Problemas da cidade: limite para virar notícia e dias até poder voltar a
+  // ser notícia (o fim do problema também é notícia).
+  cooldownDays: 30,
+  problems: {
+    energia: 0.05, // parte dos prédios sem energia
+    agua: 0.05, // sem água
+    desemprego: 0.12, // desempregados ÷ quem pode trabalhar
+    crime: 0.35, // índice médio de crime
+    saude: 0.4, // saúde média abaixo disso
+    transito: 0.15, // ruas acima da capacidade no rush das 8h
+    lixo: 0.08, // prédios sem coleta
+    esgoto: 0.35, // esgoto sem tratamento
+    abandono: 0.06, // prédios abandonados
+    creche: 0.05, // pais sem vaga na creche ÷ quem trabalha
+    satisfacao: 0.35, // satisfação média abaixo disso
+  },
+  // Críticas: fator de insatisfação (perda média de satisfação) que vira pauta.
+  complaintMin: 0.03,
+  // População que vira manchete.
+  milestones: [100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000],
+};
+
 export const TOURISM = {
   // Gasto de um turista que vem passar o dia, e a mais de quem dorme num hotel.
   daySpend: 3,
@@ -760,6 +820,35 @@ export const SECTORS = {
   graos: { name: 'Grãos', kind: 'agro', label: 'Fazenda {L}', shifts: { diurno: 0.95, manha: 0.05 } },
   hortifruti: { name: 'Hortifrúti', kind: 'agro', label: 'Sítio {L}', shifts: { diurno: 0.9, madrugada: 0.1 } },
   laticinios: { name: 'Laticínios', kind: 'agro', label: 'Laticínios {L}', shifts: { diurno: 0.7, madrugada: 0.3 } },
+  // Imprensa (ver NEWS): abre no comércio conforme a cidade cresce, do jornal
+  // às redes sociais, cada uma depois da tecnologia dela. Quem trabalha nelas
+  // são os jornalistas que assinam as notícias. {C} é o nome da cidade e {l},
+  // o sobrenome em minúsculas e sem acento.
+  jornal: {
+    name: 'Jornal', kind: 'midia', medium: 'jornal', minPop: 80,
+    labels: ['Diário {L}', 'Gazeta {L}', 'Folha de {C}', 'Correio {L}', 'Jornal de {C}', 'A Tribuna {L}'],
+    shifts: { diurno: 0.55, tarde: 0.2, noturno: 0.15, madrugada: 0.1 },
+  },
+  radio: {
+    name: 'Rádio', kind: 'midia', medium: 'radio', tech: 'radio', minPop: 300,
+    labels: ['Rádio {L} AM', 'Rádio Cidade {L}', 'Rádio {C}', 'Rádio Sociedade {L}'],
+    shifts: { madrugada: 0.2, diurno: 0.5, tarde: 0.2, noturno: 0.1 },
+  },
+  tv: {
+    name: 'Emissora de TV', kind: 'midia', medium: 'tv', tech: 'televisao', minPop: 1_500,
+    labels: ['TV {L}', 'Rede {L} de Televisão', 'TV {C}', 'Canal {L}'],
+    shifts: { diurno: 0.5, tarde: 0.25, noturno: 0.15, madrugada: 0.1 },
+  },
+  portal: {
+    name: 'Portal de notícias', kind: 'midia', medium: 'portal', tech: 'internet', minPop: 600,
+    labels: ['{l}.com.br', 'Portal {L}', 'Notícias de {C}', '{C} Online'],
+    shifts: { diurno: 0.6, tarde: 0.25, noturno: 0.15 },
+  },
+  digital: {
+    name: 'Produtora de conteúdo digital', kind: 'midia', medium: 'social', tech: 'smartphone', minPop: 400,
+    labels: ['@{l}news', '{L} Digital', '@fala{l}', 'Canal {L} Play'],
+    shifts: { diurno: 0.5, tarde: 0.35, noturno: 0.15 },
+  },
 };
 
 // Uma empresa nova tem COMPANY_GRACE_DAYS dias para contratar; depois, se

@@ -34,6 +34,13 @@ export const ICONS = {
   speed2: triangles(2),
   speed3: triangles(3),
 
+  // --- Imprensa (notícias e cada tipo de veículo) ---------------------------
+  news: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h10A1.5 1.5 0 0 1 17 5.5V18a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9h2.5a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2"/><rect class="t" x="7" y="7" width="7" height="4" rx=".5"/><path d="M7 14h7M7 17h5"/>',
+  radio: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8 17 3.5"/><circle class="t" cx="8.5" cy="14" r="3"/><path d="M14.5 12h3.5M14.5 15h3.5"/>',
+  tv: '<rect x="3" y="6" width="18" height="12.5" rx="2"/><path d="M8.5 2.5 12 6l3.5-3.5M8 21.5h8"/><rect class="t" x="5.5" y="8.5" width="13" height="7.5" rx="1"/>',
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3z"/>',
+  phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2"/><path d="M10.5 5h3"/><path class="t" d="M9 9.5h6v5h-3.2L9.5 16.5V14.5H9z"/><circle class="f" cx="12" cy="18.8" r=".9"/>',
+
   // --- Arquivo -------------------------------------------------------------
   save: '<path d="M5 3.5h11l3.5 3.5v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V5A1.5 1.5 0 0 1 5 3.5z"/><path d="M7.5 3.5v5h8v-5"/><rect x="7" y="13" width="10" height="7.5" rx="1"/>',
   'save-as': '<path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z"/><path d="M13.5 7l3 3M13 20h7"/>',

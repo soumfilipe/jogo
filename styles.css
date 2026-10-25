@@ -316,6 +316,8 @@ button.money:hover { border-color: var(--border); background: #323742; }
   border-radius: 6px; padding: 8px 12px; font-size: 13px; z-index: 30; pointer-events: none;
 }
 #toast b { display: block; }
+#toast span { display: block; color: var(--text-secondary); margin-bottom: 4px; }
+#toast span:last-child { margin-bottom: 0; }
 
 #new-dialog form { display: flex; flex-direction: column; gap: 10px; min-width: min(420px, 90vw); }
 #new-dialog h2 { margin: 0; }
@@ -342,7 +344,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
     font-size: 12px;
   }
   #city-name { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar [title="Empregados / desempregados"], #btn-research, #btn-culture { display: none; }
+  .topbar [title="Empregados / desempregados"], #btn-research, #btn-culture, #btn-news { display: none; }
   .topbar .spacer { display: none; }
   .speeds { margin-left: auto; }
   .speeds button { min-width: 40px; padding: 6px 8px; font-size: 12px; }
@@ -354,7 +356,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   /* Barra inferior, como as abas do iOS. */
   .mobile-nav {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     background: var(--panel);
     border-top: 1px solid #23262d;
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
@@ -442,6 +444,34 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+
+/* Painel das notícias */
+#btn-news .count { background: #e03131; color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; margin-left: 2px; }
+.newsroom h3 small { font-size: 12px; font-weight: 400; margin-left: 6px; }
+.news-filters { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 8px; }
+.news-filters button { font-size: 12px; padding: 2px 8px; border-radius: 12px; }
+.news-filters button.active { background: #2f3b55; border-color: #4c6ef5; }
+.news-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.news-list .news { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid #868e96; border-radius: 6px; padding: 8px 10px; }
+.news-list .news.alert { border-left-color: #fcc419; }
+.news-list .news.fake { border-left-color: #e03131; opacity: .8; }
+.news-list .news.fake .headline { text-decoration: line-through; text-decoration-color: #e03131; }
+.news-list p { margin: 0; }
+.news-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.news-list .headline { font-weight: 700; font-size: 14px; margin: 4px 0 3px; line-height: 1.3; }
+.news-list .m-jornal .headline { font-family: Georgia, "Times New Roman", serif; font-size: 15px; }
+.news-list .m-social .headline { font-weight: 600; }
+.news-list .body { font-size: 13px; line-height: 1.45; }
+.news-list .byline { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.news-list .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 8px; background: #343a40; white-space: nowrap; }
+.news-list .t-alerta, .news-list .t-economia { background: #5c4a0a; color: #ffe066; }
+.news-list .t-critica { background: #4a2a5c; color: #e5dbff; }
+.news-list .t-fofoca, .news-list .t-cultura { background: #5c2a45; color: #ffdeeb; }
+.news-list .t-tecnologia, .news-list .t-mundo { background: #1c3d5a; color: #d0ebff; }
+.news-list .t-checagem { background: #1f4d2e; color: #d3f9d8; }
+.news-list .fake .tag { background: #e03131; color: #fff; }
+.newsroom .outlets { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.newsroom .outlets li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
 
 /* Painel da cultura */
 .culture .genres { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
