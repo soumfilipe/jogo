@@ -12,6 +12,8 @@ import { farmOutput } from '../systems/food.js';
 import { isCollected, wasteCapacity } from '../systems/waste.js';
 import { visitorsAt } from '../systems/tourism.js';
 import { nowShowing, showingAppeal } from '../systems/culture.js';
+import { homeStress, overloadedParents } from '../systems/childcare.js';
+import { CHILDCARE } from '../world/catalog.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
@@ -34,7 +36,7 @@ export function renderInspector(el, selection, state, rt, { following }) {
   }
   const c = rt.citizenById.get(selection.id);
   if (!c) return void (el.innerHTML = '<p class="muted">Este cidadão saiu da cidade.</p>');
-  return renderCitizen(el, c, rt, following);
+  return renderCitizen(el, c, state, rt, following);
 }
 
 function renderBuilding(el, b, state, rt) {
@@ -75,6 +77,7 @@ function renderBuilding(el, b, state, rt) {
       ${info.residents ? `<dt>Crianças</dt><dd>${people.filter((c) => c.age < 18).length}</dd>`
         : `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>`}
       ${wellbeingRows(rt, b)}
+      ${info.residents ? parentsRow(state, rt, residents, b) : ''}
       <dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>
       ${info.food ? `<dt>Produção</dt><dd>${Math.round(farmOutput(state, rt, b))} de ${Math.round(farmOutput(state, rt, b, true))} alimentos/mês</dd>` : ''}
       ${info.residents ? `<dt>Alimentos</dt><dd>${foodText(rt.coverage?.alimentos?.[b.tile] ?? 0)}</dd>` : ''}
@@ -115,6 +118,28 @@ const NO_STAFF = '<b style="color:#ff8a80">sem funcionários, não atende</b>';
 const SERVICE_TEXT = { saude: 'saúde', policia: 'policiamento', bombeiros: 'bombeiros', lazer: 'lazer', alimentos: 'alimentos' };
 // Acesso a alimentos da casa (cobertura dos mercados).
 const foodText = (v) => (v === 0 ? '<b style="color:#ff8a80">sem mercado por perto</b>' : `mercado no raio (${pct(v)})`);
+
+// Filho pequeno do cidadão: sem vaga (penalidade cheia) ou na creche antes da Educação infantil.
+function childRow(level) {
+  if (!level) return '';
+  const rende = pct(1 - (1 - CHILDCARE.productivity) * level);
+  return level >= 1
+    ? `<dt>Filho pequeno</dt><dd><b style="color:#ff8a80">sem vaga na creche: rende ${rende} no trabalho</b></dd>`
+    : `<dt>Filho pequeno</dt><dd>na creche (sem Educação infantil): rende ${rende} no trabalho</dd>`;
+}
+
+// Pais sem vaga na creche para o filho pequeno e o estresse da casa.
+function parentsRow(state, rt, residents, b) {
+  const overloaded = overloadedParents(state, rt);
+  const full = residents.filter((c) => overloaded.get(c.id) >= 1).length;
+  const partial = residents.filter((c) => overloaded.get(c.id) > 0 && overloaded.get(c.id) < 1).length;
+  const stress = homeStress(rt, b);
+  if (!full && !partial && stress < 0.005) return '';
+  const parts = [];
+  if (full) parts.push(`<b style="color:#ff8a80">${full} sem vaga na creche</b>`);
+  if (partial) parts.push(`${partial} com filho na creche`);
+  return `<dt>Pais</dt><dd>${parts.join(' · ') || 'ninguém agora'} · estresse ${pct(stress)}</dd>`;
+}
 
 // Saúde, crime e satisfação do prédio (ver systems/wellbeing.js).
 function wellbeingRows(rt, b) {
@@ -189,7 +214,7 @@ function renderUtility(el, b, state, rt) {
     </dl>`;
 }
 
-function renderCitizen(el, c, rt, following) {
+function renderCitizen(el, c, state, rt, following) {
   const home = rt.buildingById.get(c.home);
   const job = c.job !== null ? rt.buildingById.get(c.job) : null;
   const company = c.company != null ? rt.companyById.get(c.company) : null;
@@ -211,6 +236,8 @@ function renderCitizen(el, c, rt, following) {
       ${studying ? `<dt>Estuda</dt><dd>${studying}</dd>` : ''}
       ${job ? `<dt>Turno</dt><dd>${esc(SHIFTS[c.shift ?? 'diurno'].name)}</dd>
       <dt>Rotina</dt><dd>sai ${formatClock(c.departWork)}, volta ${formatClock(c.departHome)}</dd>` : ''}
+      ${childRow(overloadedParents(state, rt).get(c.id))}
+      ${c.stress ? `<dt>Estresse</dt><dd>${pct(c.stress)}</dd>` : ''}
     </dl>
     <button data-follow>${following ? 'Parar de seguir' : 'Seguir com a câmera'}</button>`;
 }
