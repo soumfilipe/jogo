@@ -185,7 +185,7 @@ export class Renderer {
   /**
    * overlay: { hover: {x,y} | null, preview: { tiles, color } | null,
    *            selected: { citizen } | { building } | null,
-   *            mapMode: chave de MAP_MODES | null }
+   *            mapMode: chave de MAP_MODES | null, closed: [tiles] fechados }
    */
   render(state, rt, cam, overlay = {}) {
     const mode = overlay.mapMode ? MAP_MODES[overlay.mapMode] : null;
@@ -299,6 +299,8 @@ export class Renderer {
     }
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
+    // Ruas fechadas pela corrida de rua (ver systems/races.js).
+    if (overlay.closed?.length) this.#drawTiles(ctx, state, cam, overlay.closed, 'rgba(230,126,34,0.4)');
     if (overlay.preview) this.#drawTiles(ctx, state, cam, overlay.preview.tiles, overlay.preview.color);
     const selectedBuilding = overlay.selected?.building;
     if (selectedBuilding) {

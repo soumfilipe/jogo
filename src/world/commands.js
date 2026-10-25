@@ -31,6 +31,8 @@
 //   { type: 'clubAcademy', id }           (abre a próxima categoria da escolinha)
 //   { type: 'promoteYouth', id, player }  (jovem de 16 ou 17 anos sobe ao time adulto)
 //   { type: 'acceptOffer', id } / { type: 'rejectOffer', id }   (propostas pelos craques)
+//   { type: 'race', from, to, day?, name?, marketing?, annual? }  (corrida de rua; ver systems/races.js)
+//   { type: 'cancelRace', id } / { type: 'raceOptions', id, annual?, marketing? }
 
 import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
@@ -48,15 +50,18 @@ import { cancelEvent, confirmEdition, scheduleEvent } from '../systems/agenda.js
 import {
   acceptOffer, closeClub, clubBudget, foundClub, openAcademy, promoteYouth, rejectOffer, upgradeCt,
 } from '../systems/sports.js';
+import { cancelRace, planRace, raceOptions, scheduleRace } from '../systems/races.js';
 
 // Ferramentas que vêm da pesquisa (efeito { tool } em techs.js).
 export const TOOL_TECH = {
   avenida: 'via_expressa', expressa: 'via_expressa', calcadao: 'ciclovia_lazer', parque: 'parque_nacional', revitalizar: 'revitalizacao',
+  corrida: 'educacao_fisica',
 };
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
   if (cmd.type === 'revitalize') return planRevitalize(state, rt, cmd);
+  if (cmd.type === 'race') return planRace(state, rt, cmd);
   const { road, zone, terrain, density } = state.map;
   const park = state.map.park;
   if (cmd.type === 'park' && !rt.techDone?.has(TOOL_TECH.parque)) {
@@ -161,6 +166,10 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'promoteYouth') return promoteYouth(state, rt, cmd);
   if (cmd.type === 'acceptOffer') return acceptOffer(state, rt, cmd);
   if (cmd.type === 'rejectOffer') return rejectOffer(state, rt, cmd);
+  // Corrida de rua (ver systems/races.js).
+  if (cmd.type === 'race') return scheduleRace(state, rt, cmd);
+  if (cmd.type === 'cancelRace') return cancelRace(state, rt, cmd);
+  if (cmd.type === 'raceOptions') return raceOptions(state, rt, cmd);
   if (cmd.type === 'policy') {
     const result = setPolicy(state, rt, cmd.id, cmd.on);
     if (result.ok) computeMods(state, rt);

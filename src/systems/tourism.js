@@ -14,6 +14,7 @@
 //     (null quando o destino é um tile de rua, destTile, como um calçadão),
 //     until: minuto do dia em que vai embora, fan: torcedor da cidade?,
 //     event?: id do evento da agenda (ver agenda.js), match?: id do jogo (ver sports.js),
+//     race?: id da corrida de rua (ver races.js; corre o percurso com o ritmo `pace`),
 //     state: 'indo' | 'visitando' | 'voltando', x, y, path, step }
 
 import { BUILDINGS, CULTURE, SPORTS, TOURISM, ZONE } from '../world/catalog.js';
@@ -26,6 +27,7 @@ import { congestionFactor, roadSpeed } from './traffic.js';
 import { mod } from './mods.js';
 import { eventsToday, venueOf } from './agenda.js';
 import { clubHomes, matchesToday } from './sports.js';
+import { raceWave, runnerPace, runnersToday } from './races.js';
 
 export function createTourism() {
   return { plan: [] }; // { at: minuto do dia, dest, src, until, fan }
@@ -147,6 +149,12 @@ export function planDay(state, rt) {
     outside += c.fromOutside;
     wanted += c.total;
   }
+  // Corrida de rua: os corredores de fora também gastam na cidade.
+  const races = runnersToday(state);
+  for (const r of races) {
+    outside += entries.length ? Math.min(r.runners, SPORTS.race.regional) : 0;
+    wanted += r.runners;
+  }
   state.economy.tourism = (state.economy.tourism ?? 0) + touristSpending(state, rt, outside);
   state.tourism.today = { tourists: outside, fans: visits.reduce((s, v) => s + v.fans, 0) };
 
@@ -180,6 +188,13 @@ export function planDay(state, rt) {
     add(Math.round(fromOutside * scale), () => entries[randomInt(state.rng, 0, entries.length - 1)], false);
     if (homes.length) add(Math.round((total - fromOutside) * scale), () => rt.access.get(homes[randomInt(state.rng, 0, homes.length - 1)].id), true);
   }
+  // Corredores: largam em ondas a partir das 7h e correm o percurso (as ruas estão fechadas).
+  for (const r of races) {
+    const until = SPORTS.race.closed[1] * 60 - 1;
+    for (let i = 0; i < Math.round(r.runners * scale); i++) {
+      plan.push({ at: raceWave(state.rng), dest: null, destTile: r.route[r.route.length - 1], src: r.route[0], until, fan: false, race: r.id, pace: runnerPace(state.rng) });
+    }
+  }
   plan.sort((a, b) => a.at - b.at || (a.dest ?? -1) - (b.dest ?? -1) || (a.destTile ?? -1) - (b.destTile ?? -1) || a.src - b.src);
   state.tourism.plan = plan;
 
@@ -194,7 +209,7 @@ function route(state, rt, from, to) {
   const key = -(from * 100_000 + to) - 1; // chaves negativas: não colidem com as dos cidadãos
   let r = rt.pathCache.get(key);
   if (r === undefined) {
-    r = findRoadPath(state.map, from, to);
+    r = findRoadPath(state.map, from, to, rt.blocked);
     rt.pathCache.set(key, r && Int32Array.from(r));
   }
   return r;
@@ -226,7 +241,9 @@ export function updateVisitors(state, rt) {
     const dest = p.dest !== null ? rt.buildingById.get(p.dest) : null;
     const access = dest ? rt.access.get(dest.id) : p.dest === null && state.map.road[p.destTile] ? p.destTile : -1;
     if (access < 0 || !state.map.road[p.src] || rt.roadComponent[p.src] !== rt.roadComponent[access]) continue;
-    const r = route(state, rt, p.src, access);
+    // Corredor: o caminho é o percurso da corrida (fechado para os carros).
+    const course = p.race ? state.sports.races.find((x) => x.id === p.race)?.route : null;
+    const r = course ? [...course] : route(state, rt, p.src, access);
     if (!r) continue;
     const v = {
       id: 0, src: p.src, dest: p.dest, until: p.until, fan: p.fan, state: 'indo',
@@ -235,12 +252,17 @@ export function updateVisitors(state, rt) {
     if (p.dest === null) v.destTile = p.destTile;
     if (p.event) v.event = p.event;
     if (p.match) v.match = p.match;
+    if (p.race) Object.assign(v, { race: p.race, pace: p.pace });
     addVisitor(state, rt, v);
   }
 
   // Hora de ir embora.
   for (const v of [...state.visitors]) {
     if (v.state !== 'visitando' || minute < v.until) continue;
+    if (v.race) {
+      removeVisitor(state, rt, v); // fim da corrida: os corredores se dispersam
+      continue;
+    }
     const dest = v.dest !== null ? rt.buildingById.get(v.dest) : null;
     const access = dest ? rt.access.get(dest.id) : v.dest === null && state.map.road[v.destTile] ? v.destTile : -1;
     const r = access >= 0 && state.map.road[v.src] ? route(state, rt, access, v.src) : null;
@@ -269,7 +291,10 @@ function moveVisitors(state, rt) {
       removeVisitor(state, rt, v);
       continue;
     }
-    let budget = speed * (type ? roadSpeed(rt, type) * congestionFactor(rt, tile, type) : 1);
+    // Corredor: no ritmo da corrida (as ruas estão fechadas, sem trânsito).
+    let budget = v.race
+      ? speed * (type ? roadSpeed(rt, type) : 1) * SPORTS.race.pace * v.pace
+      : speed * (type ? roadSpeed(rt, type) * congestionFactor(rt, tile, type) : 1);
     while (budget > 0 && v.step < v.path.length - 1) {
       const t = v.path[v.step + 1];
       const nx = (t % width) + 0.5;

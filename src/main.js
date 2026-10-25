@@ -51,6 +51,8 @@ const TOOLS = [
   { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)', swatch: '#d9534f' },
   // Ferramentas que vêm da pesquisa (ficam escondidas até liberar).
   { id: 'parque', name: 'Parque de conservação', label: 'Conservação', shape: 'rect', tech: TOOL_TECH.parque, color: 'rgba(63,138,82,0.55)', swatch: '#3f8a52', group: 'tourism' },
+  // Corrida de rua: arrastar da largada até a chegada (o percurso segue as ruas).
+  { id: 'corrida', name: 'Corrida de rua', label: 'Corrida', shape: 'line', tech: TOOL_TECH.corrida, color: 'rgba(230,126,34,0.6)', swatch: '#e67e22', group: 'leisure' },
   { id: 'revitalizar', name: 'Revitalizar indústria abandonada', label: 'Revitalizar', shape: 'single', tech: TOOL_TECH.revitalizar, color: 'rgba(142,68,173,0.5)', swatch: '#8e44ad', group: 'tourism' },
   // Prédios do jogador: um clique coloca (precisa encostar numa rua). Os que
   // dependem de pesquisa ficam escondidos (no celular, com cadeado) até liberar.
@@ -209,6 +211,7 @@ const loopStats = startLoop({
       preview: currentPreview(),
       selected: selectedObjects(),
       mapMode,
+      closed: rt.blockedTiles,
     });
     minimap.render(state, rt, cam);
     throttledHud();
@@ -807,6 +810,7 @@ function toolCommand() {
   const tiles = tool.shape === 'line'
     ? lineTiles(width, start.x, start.y, hover.x, hover.y)
     : rectTiles(width, start.x, start.y, hover.x, hover.y);
+  if (tool.id === 'corrida') return { type: 'race', from: start.y * width + start.x, to: hover.y * width + hover.x };
   if (tool.road) return { type: 'road', road: tool.road, tiles };
   if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
   if (tool.id === 'parque') return { type: 'park', tiles };
@@ -829,6 +833,11 @@ function currentPreview() {
     tooltip.textContent = plan.reason || `${tool.name} · $${plan.cost.toLocaleString('pt-BR')}`;
     tooltip.style.color = plan.reason ? '#ff8a80' : '';
     return { tiles: plan.tiles, color: plan.reason ? 'rgba(255,80,60,0.5)' : 'rgba(80,220,120,0.5)' };
+  }
+  if (cmd.type === 'race') {
+    tooltip.textContent = plan.reason || `Corrida de rua · ${(plan.tiles.length * 0.1).toLocaleString('pt-BR')} km · $${plan.cost.toLocaleString('pt-BR')}`;
+    tooltip.style.color = plan.reason ? '#ff8a80' : '';
+    return { tiles: plan.tiles, color: tool.color };
   }
   const zoneName = usesDensity(tool) ? `${tool.name} ${DENSITY_INFO[density].name.toLowerCase()} · ` : '';
   tooltip.textContent = `${zoneName}${plan.tiles.length} tiles · $${plan.cost.toLocaleString('pt-BR')}`;
@@ -934,6 +943,11 @@ canvas.addEventListener('pointerup', (e) => {
       if (result.ok) {
         dirty = true;
         renderer.invalidate();
+        // Corrida marcada: abre a aba Corridas do painel Esporte para ajustar.
+        if (cmd.type === 'race') {
+          sports.showTab('corridas');
+          toggleSports(true);
+        }
       }
       else status(result.reason);
     }

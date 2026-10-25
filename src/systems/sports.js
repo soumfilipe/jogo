@@ -58,7 +58,7 @@ const yearOf = (day) => Math.floor(day / DAYS_PER_YEAR) + 1;
 const PRIZE_SHARE = [1, 0.5, 0.3, 0.2];
 
 export function createSports() {
-  return { clubs: [], rivals: [], leagues: [], history: [], offers: [], sales: [], nextId: 1 };
+  return { clubs: [], rivals: [], leagues: [], history: [], offers: [], sales: [], races: [], nextId: 1 };
 }
 
 /** Modalidades que a cidade já pode ter. */

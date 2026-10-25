@@ -333,6 +333,28 @@ Regras em `src/systems/sports.js`; números em `SPORTS` no catálogo.
   corridas e sem empate.
 - O **parque aquático** (3×3) também chama turistas, mais nos fins de semana.
 
+### Corrida de rua
+
+Regras em `src/systems/races.js`; números em `SPORTS.race`.
+
+- Com a *Educação física escolar*, a ferramenta **Corrida de rua** (menu Lazer) marca a
+  largada e a chegada. É só arrastar, como numa rua, e o percurso segue as ruas.
+  - Custa $5 mil mais $100 por trecho de rua, mais a propaganda.
+  - A corrida fica marcada para o próximo domingo daqui a pelo menos 7 dias.
+  - Na aba **Corridas** do painel Esporte dá para aumentar a propaganda, repetir a corrida todo ano ou cancelar (devolve metade).
+- **No dia**, o percurso fica **fechado para os carros das 6h às 12h** (laranja no
+  mapa). As rotas desviam (`findRoadPath` com `rt.blocked`), o trânsito aperta nas
+  ruas em volta e quem já estava no caminho segue.
+  - A largada é às 7h: os corredores (pontos laranja) correm o percurso em ondas, cada um no seu ritmo.
+- **Corredores**: cerca de 3% da população, mais com propaganda, mais gente de fora se há
+  estrada saindo do mapa. Cada um paga $15 de inscrição à prefeitura (receita
+  *Esporte*), e os de fora gastam como turistas.
+- **Resultado** ao meio-dia: o melhor atleta de um clube de atletismo da cidade pode vencer,
+  com chance pela habilidade; senão vence alguém de fora. Sai a notícia, e a corrida
+  anual já fica marcada para o ano seguinte, no mesmo dia da semana.
+- O fechamento é derivado da data e da hora: carregar um save no meio da corrida
+  reabre o jogo com as mesmas ruas fechadas.
+
 ### Base e mercado
 
 - **Escolinha**: cada clube pode abrir até três categorias, pagas pela prefeitura:
@@ -787,6 +809,8 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 19 (antes das corridas de rua) abrem sem corridas marcadas.
 
 Saves do formato 18 (antes da base) abrem com as escolinhas fechadas e sem propostas.
 

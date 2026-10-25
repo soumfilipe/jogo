@@ -805,6 +805,16 @@ export const SPORTS = {
   // recusa só recebe outra proposta pelo atleta depois de cooldown meses.
   market: { star: 0.15, minStar: 0.6, chance: 0.12, base: 300_000, youngAge: 23, young: 1.5, division: 0.5, days: 30, cooldown: 3, sales: 20 },
   buyers: ['Atlético Metropolitano', 'Real Capital', 'Esporte Clube Litoral', 'União Paulistana', 'Sociedade Esportiva Planalto', 'Grêmio Industrial', 'Clube Atlético Cosmopolita', 'Fluminense do Sul', 'Internacional da Serra', 'Sporting Atlântico'],
+  // Corrida de rua (ver systems/races.js): fecha o percurso das closed[0]h às
+  // closed[1]h; largada às start h. Custo = base + perTile × tiles; inscrição
+  // por corredor (vai para a prefeitura). Corredores = pop × share × (1 +
+  // propaganda) + regional (com estrada para fora), até max. pace: fração da
+  // velocidade de um carro. Cada tile vale km quilômetros.
+  race: {
+    tech: 'educacao_fisica', closed: [6, 12], start: 7, base: 5_000, perTile: 100, fee: 15,
+    share: 0.03, regional: 500, max: 3_000, marketing: { k: 0.5, scale: 5_000 },
+    tiles: [10, 300], days: [7, 120], pace: 0.25, km: 0.1,
+  },
   // Meses no vermelho até o clube perder atletas.
   redMonths: 3,
   // Reinvestir: caixa acima de tantos meses de despesas vira treino.

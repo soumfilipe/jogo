@@ -26,12 +26,15 @@ import { indexVisitors, planDay, updateVisitors } from './tourism.js';
 import { closeCultureMonth } from './culture.js';
 import { runEventsOfDay } from './agenda.js';
 import { closeSportsMonth, runSportsOfDay } from './sports.js';
+import { startRacesOfDay, updateClosures, updateRaces } from './races.js';
 import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
 export function tick(state, rt) {
   state.time.tick++;
   const t = state.time.tick;
+  // Corrida de rua: fecha e abre o percurso (antes das rotas do minuto).
+  updateRaces(state, rt);
 
   updateCitizens(state, rt);
   updateVisitors(state, rt);
@@ -76,6 +79,7 @@ export function tick(state, rt) {
       runEventsOfDay(state, rt);
       // Jogos do dia dos clubes da cidade (e começo e fim das temporadas).
       runSportsOfDay(state, rt);
+      startRacesOfDay(state, rt);
       planDay(state, rt);
       // Notícias do dia, com a cidade já atualizada.
       dailyNews(state, rt);
@@ -110,6 +114,7 @@ export function prepare(state) {
   indexVisitors(state, rt);
   grantLegacyResearch(state);
   computeMods(state, rt);
+  updateClosures(state, rt);
   convertLegacyJobs(state, rt);
   computeDemand(state, rt);
   computeUtilities(state, rt);
