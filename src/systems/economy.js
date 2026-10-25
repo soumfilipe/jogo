@@ -66,10 +66,12 @@ export function monthlyBudget(state, rt) {
     // Passagens do transporte público juntadas neste mês (ver transit.js).
     fares: Math.round(state.economy.fares ?? 0),
     // Gasto dos turistas juntado neste mês (ver tourism.js).
+    // Ingressos dos eventos realizados neste mês (ver agenda.js).
+    events: Math.round(state.economy.eventsIncome ?? 0),
     tourism: Math.round(state.economy.tourism ?? 0),
   };
   income.total = income.residential + income.commercial + income.industrial + income.rural
-    + income.statal + income.food + income.fares + income.tourism;
+    + income.statal + income.food + income.fares + income.tourism + income.events;
 
   const expenses = {
     roads: Math.round(roadTiles * mod(rt, 'roadUpkeep', ECONOMY.roadUpkeepPerMonth) * mod(rt, 'maintenance')),
@@ -92,6 +94,7 @@ export function closeMonth(state, rt) {
   economy.money += budget.net;
   economy.fares = 0; // as passagens do mês já entraram na receita
   economy.tourism = 0; // e o gasto dos turistas também
+  economy.eventsIncome = 0; // e os ingressos dos eventos
 
   for (const loan of economy.loans) {
     const interest = Math.round(loan.balance * monthlyRate(loan));

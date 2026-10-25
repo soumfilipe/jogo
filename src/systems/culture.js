@@ -4,23 +4,35 @@
 // Formato no estado (state.culture):
 //   artists: [{ id, name, kind: 'musica'|'teatro', genre, fame (0 a 1),
 //               trend (−1 a 1), born, debut (anos do mundo), shows, low,
-//               local? (nasceu na cidade) }]
+//               local? (nasceu na cidade), citizen? (id do cidadão, quando
+//               é da cidade), since? (tick em que virou artista da cidade),
+//               lastCityShow? (tick do último show na cidade, ver agenda.js),
+//               touring? (sem show na cidade há meses: em turnê) }]
 //   genres:  { gênero: { hype (0,1 a 1) } }
 //   works:   [{ id, kind: 'filme'|'peca', title, genre, quality (0 a 1),
 //               premiere (tick), peak, run (dias) }]
 //   nextId
+//   events, series, history: agenda de eventos (ver systems/agenda.js)
 //
 // Todo mês (closeCultureMonth): a moda dos gêneros anda, a fama de cada
 // artista segue a tendência (veteranos tendem a cair), quem passa muito tempo
 // esquecido se aposenta, estreiam filmes e peças e saem os que acabaram a
-// temporada. Em janeiro surgem novatos (mais numa cidade grande). Tudo com
-// state.rng, no estado: carregar um save continua igual.
+// temporada. Em janeiro surgem novatos (mais numa cidade grande), e cidadãos
+// com vocação para a arte e talento viram artistas da cidade.
+//
+// Turnê: quem passa CULTURE.touringMonths sem show na cidade sai em turnê
+// (a fama anda mais devagar e com mais sorte). O artista da cidade com fama
+// vive da arte (larga o emprego); se passa CULTURE.leaveMonths sem
+// oportunidade aqui, muda de cidade com a família. Tudo com state.rng, no
+// estado: carregar um save continua igual.
 
 import { CULTURE } from '../world/catalog.js';
 import { FIRST_NAMES, LAST_NAMES } from '../agents/names.js';
 import { chance, pick, random, randomInt } from '../core/rng.js';
-import { TICKS_PER_DAY, calendar } from '../core/time.js';
+import { TICKS_PER_DAY, TICKS_PER_MONTH, calendar } from '../core/time.js';
 import { mod } from './mods.js';
+import { removeCitizen, setJob } from '../world/runtime.js';
+import { report } from './news.js';
 
 const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
@@ -33,7 +45,7 @@ export function activeGenres(year, kind) {
 
 /** Cena inicial (jogo novo ou save antigo): artistas de várias gerações e obras em cartaz. */
 export function createCulture(rng, year, tick = 0) {
-  const culture = { artists: [], genres: {}, works: [], nextId: 1 };
+  const culture = { artists: [], genres: {}, works: [], events: [], series: [], history: [], nextId: 1 };
   // Só os gêneros que ainda têm novatos: os que já acabaram não estão na moda.
   for (const id of activeGenres(year)) culture.genres[id] = { hype: 0.3 + random(rng) * 0.6 };
   for (let i = 0; i < CULTURE.startArtists; i++) {
@@ -106,6 +118,61 @@ function addWork(culture, rng, kind, year, premiere) {
   return work;
 }
 
+/**
+ * Um cidadão com vocação para a arte e talento vira artista da cidade (com o
+ * nome dele). Devolve o artista, ou null se ninguém tem o perfil.
+ */
+export function cityTalent(state, rt, year = Math.floor(state.research.world)) {
+  const culture = state.culture;
+  const rng = state.rng;
+  const candidates = state.citizens.filter((c) => c.calling === 'arte' && (c.talent ?? 0) >= CULTURE.artistTalent
+    && c.age >= 18 && c.age <= 40 && c.artist === undefined);
+  if (!candidates.length) return null;
+  const c = pick(rng, candidates);
+  const genres = activeGenres(year, 'musica');
+  if (!genres.length) return null;
+  const artist = addArtist(culture, rng, { kind: 'musica', genre: pick(rng, genres), debut: year, fame: 0.03 + c.talent * 0.1, local: true });
+  artist.name = c.name;
+  artist.citizen = c.id;
+  artist.since = state.time.tick;
+  c.artist = artist.id;
+  return artist;
+}
+
+/**
+ * Artistas da cidade: com fama, vivem da arte (largam o emprego); sem show na
+ * cidade por muito tempo, mudam de cidade com a família e viram artistas de fora.
+ */
+function localArtists(state, rt) {
+  const tick = state.time.tick;
+  for (const a of state.culture.artists) {
+    if (a.citizen === undefined) continue;
+    const c = rt.citizenById.get(a.citizen);
+    if (!c) {
+      // O cidadão morreu ou foi embora por outro motivo.
+      delete a.citizen;
+      delete a.local;
+      continue;
+    }
+    if (a.fame >= CULTURE.fullTimeFame && !c.fullTime) {
+      c.fullTime = true;
+      if (c.job !== null) setJob(rt, c, null);
+    }
+    const since = a.lastCityShow ?? a.since ?? tick;
+    if (a.fame >= CULTURE.leaveFame && tick - since > CULTURE.leaveMonths * TICKS_PER_MONTH) {
+      const surname = c.name.slice(c.name.indexOf(' ') + 1);
+      const family = [...(rt.residents.get(c.home) ?? [])].filter((id) => {
+        const m = rt.citizenById.get(id);
+        return m && m.name.slice(m.name.indexOf(' ') + 1) === surname;
+      });
+      for (const id of family.sort((x, y) => x - y)) removeCitizen(state, rt, id);
+      delete a.citizen;
+      delete a.local;
+      report(state, { kind: 'artista_saiu', name: a.name, genre: a.genre, people: family.length });
+    }
+  }
+}
+
 /** Fama que conta para o público: a do artista pesada pela moda do gênero. */
 export function effectiveFame(culture, artist) {
   const hype = culture.genres[artist.genre]?.hype ?? 0.5;
@@ -167,31 +234,39 @@ export function closeCultureMonth(state, rt) {
     if (until && year >= until && !playing.has(g)) delete culture.genres[g];
   }
 
+  const tick = state.time.tick;
   for (const a of culture.artists) {
     const veteran = year - a.debut > CULTURE.veteranYears ? -0.06 : 0;
     a.trend = clamp(a.trend * 0.85 + (random(rng) - 0.5) * 0.35 + veteran, -1, 1);
-    a.fame = clamp(a.fame + a.trend * 0.04 * speed);
+    // Em turnê (sem show na cidade há meses), a fama anda menos e com mais sorte.
+    const since = a.lastCityShow ?? a.since ?? 0;
+    if (tick - since > CULTURE.touringMonths * TICKS_PER_MONTH) a.touring = true;
+    else delete a.touring;
+    const luck = a.touring ? (random(rng) - 0.5) * 0.03 : 0;
+    a.fame = clamp(a.fame + a.trend * 0.04 * speed * (a.touring ? 0.6 : 1) + luck);
     a.low = a.fame < 0.03 ? a.low + 1 : 0;
   }
+  localArtists(state, rt);
   culture.artists = culture.artists.filter((a) => a.low < CULTURE.retireMonths && year - a.born < 85);
 
   if (calendar(state.time.tick).month === 1) {
     const people = state.citizens.length;
     const count = Math.min(CULTURE.newMax, CULTURE.newBase + Math.floor(people / CULTURE.newPerPeople));
-    const local = Math.round(mod(rt, 'culture.local', 0));
-    for (let i = 0; i < count + local; i++) {
+    for (let i = 0; i < count; i++) {
       const kind = random(rng) < 0.8 ? 'musica' : 'teatro';
       const genres = activeGenres(year, kind);
       if (!genres.length) continue;
-      addArtist(culture, rng, { kind, genre: pick(rng, genres), debut: year, fame: 0.02 + random(rng) * 0.12, local: i >= count });
+      addArtist(culture, rng, { kind, genre: pick(rng, genres), debut: year, fame: 0.02 + random(rng) * 0.12 });
     }
+    // Talentos da cidade: um por ano numa cidade de 500+ moradores, mais com a economia criativa.
+    const local = (people >= 500 ? 1 : 0) + Math.round(mod(rt, 'culture.local', 0));
+    for (let i = 0; i < local; i++) cityTalent(state, rt, year);
     // Lista limitada: saem os menos famosos.
     if (culture.artists.length > CULTURE.maxArtists) {
       culture.artists = ranking(culture).slice(0, CULTURE.maxArtists).sort((x, y) => x.id - y.id);
     }
   }
 
-  const tick = state.time.tick;
   culture.works = culture.works.filter((w) => tick - w.premiere <= w.run * TICKS_PER_DAY);
   for (const kind of ['filme', 'peca']) {
     for (let i = 0; i < CULTURE.premieres[kind]; i++) addWork(culture, rng, kind, year, tick + randomInt(rng, 0, 29) * TICKS_PER_DAY);

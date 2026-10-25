@@ -54,7 +54,7 @@ Salvar, carregar e o resto ficam no menu 💾 Arquivo, no topo.
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
-| `Z` Cultura (ou 🎭 no topo) | artistas em alta, gêneros em moda, novatos do ano e o que está em cartaz |
+| `Z` Cultura (ou 🎭 no topo) | artistas em alta, gêneros em moda e o que está em cartaz; agenda, novo evento, séries e histórico |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
 | Notícias (no topo) | o que a imprensa publicou, com filtros, e os jornais, rádios, TVs e canais da cidade |
 | Calçadão | rua só de pedestres (depois de *Ruas de lazer*): valoriza o comércio em volta; vira rua de novo se você desenhar uma rua por cima |
@@ -243,6 +243,46 @@ Regras em `src/systems/culture.js`; números em `CULTURE` no catálogo.
   só usam o calçadão quando precisam.
 - O painel **Cultura** (`Z` ou 🎭) mostra o ranking, os gêneros em moda, os
   novatos e o que está em cartaz.
+
+### Agenda de eventos
+
+Regras em `src/systems/agenda.js`. O jogador organiza eventos pela aba
+**Novo evento** do painel Cultura (ou pelo botão "Agendar evento aqui" no
+inspetor de uma arena, estádio, praça, cinema ou teatro):
+
+| Tipo | Onde | Atrações |
+|---|---|---|
+| Show | arena, estádio, praça, calçadão | 1 artista |
+| Festival (com a Televisão) | arena, estádio, parque temático, calçadão | 2 a 6 artistas, 1 a 3 dias |
+| Mostra de cinema | cinema | os filmes em cartaz |
+| Temporada de teatro | teatro | uma peça, 3 a 10 dias |
+| Feira cultural | praça, calçadão | até 2 artistas |
+| Torneio de eSports (com eSports) | arena | — |
+
+- **Custo** pago ao agendar: cachês (crescem com a fama; a lei de *Incentivo
+  à cultura* tira 20%), aluguel do estádio ou do parque temático e
+  propaganda. O evento precisa de 7 a 120 dias de antecedência.
+- **Público**: parte da cidade (e gente de fora, se há estrada saindo do
+  mapa), vezes o poder das atrações (fama efetiva; o principal mais 30% dos
+  outros), a propaganda (retorno decrescente; rádio, TV, internet e
+  smartphone a deixam mais forte), o preço do ingresso, o fim de semana e a
+  reputação da série. Eventos no mesmo dia dividem o público. A aba mostra a
+  **previsão** (público, receita, custo, lucro); o resultado tem ±15% de sorte.
+- No dia, o público aparece **andando até o local** (pontos roxos) e os
+  ingressos entram na receita **Eventos** do orçamento. Com 70% de lotação é
+  sucesso (a fama dos artistas sobe); abaixo de 35%, fracasso. O resultado
+  vira notícia.
+- **Séries** (mensal ou anual): cada edição seguinte fica esperando
+  confirmação (aviso 30 dias antes; sem confirmar até 7 dias antes, é
+  pulada). Sucesso com a verba mantida ou maior aumenta a reputação; verba
+  cortada, fracasso ou edição pulada a derrubam.
+- **Turnê**: artista sem show na cidade há 6 meses sai em turnê (a fama anda
+  mais devagar e com mais sorte).
+- **Talentos da cidade**: todo cidadão nasce com talento (0 a 1) e às vezes
+  uma vocação (arte ou esporte). Todo janeiro, um morador com vocação para a
+  arte pode virar artista da cidade (mais com a *Economia criativa*); com
+  fama, larga o emprego para viver da arte. Se passa um ano sem palco aqui,
+  muda de cidade com a família.
 
 ## Notícias e imprensa
 
@@ -676,6 +716,9 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 16 (antes da agenda) abrem sem eventos agendados; o talento
+e a vocação dos cidadãos saem de um hash do id (o sorteio da simulação não muda).
 
 Saves do formato 15 (antes das notícias) abrem sem notícias publicadas e sem
 imprensa local; as redações abrem conforme a cidade cresce.

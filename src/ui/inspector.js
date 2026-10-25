@@ -13,10 +13,11 @@ import { isCollected, wasteCapacity } from '../systems/waste.js';
 import { visitorsAt } from '../systems/tourism.js';
 import { nowShowing, showingAppeal } from '../systems/culture.js';
 import { homeStress, overloadedParents } from '../systems/childcare.js';
-import { CHILDCARE } from '../world/catalog.js';
+import { CHILDCARE, CULTURE } from '../world/catalog.js';
+import { unlockedTypes } from '../systems/agenda.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
-import { formatClock } from '../core/time.js';
+import { TICKS_PER_DAY, formatClock } from '../core/time.js';
 import { upgradeBlockers } from '../systems/growth.js';
 import { jobsOf, mod, utilityOutput, utilityUpkeep } from '../systems/mods.js';
 import { AREAS } from '../world/techs.js';
@@ -177,6 +178,9 @@ function renderUtility(el, b, state, rt) {
   const workers = rt.workers.get(b.id).size;
   const jobs = jobsOf(rt, b.type);
   const fmt = (v) => Math.round(v).toLocaleString('pt-BR');
+  // Palco de eventos (painel Cultura): arena, estádio, praça, cinema, teatro...
+  const stage = unlockedTypes(rt).some((t) => CULTURE.eventTypes[t].venues.includes(b.type));
+  const next = state.culture?.events.filter((e) => e.venue === b.id && e.status === 'agendado').sort((a, c) => a.day - c.day)[0];
   const kind = u.service ? (u.service.kind === 'lazer' ? 'Lazer' : 'Serviço público') : u.school && u.institute ? 'Ensino e pesquisa' : u.school || u.library ? 'Educação'
     : u.institute || u.privateResearch ? 'Pesquisa' : u.income ? 'Estatal' : 'Serviço público';
   el.innerHTML = `
@@ -211,7 +215,9 @@ function renderUtility(el, b, state, rt) {
       <dt>Acesso a estrada</dt><dd>${access >= 0 ? 'Sim' : NO}</dd>
       ${net ? `<dt>Rede (${label})</dt><dd>${net[res].used.toLocaleString('pt-BR')} usados de ${net[res].supply.toLocaleString('pt-BR')}</dd>` : ''}
       ${u.pollution ? `<dt>Poluição</dt><dd>alta em volta</dd>` : ''}
-    </dl>`;
+      ${next ? `<dt>Próximo evento</dt><dd>${esc(next.name)} (em ${next.day - Math.floor(state.time.tick / TICKS_PER_DAY)} dias)</dd>` : ''}
+    </dl>
+    ${stage ? '<button data-plan-event>Agendar evento aqui</button>' : ''}`;
 }
 
 function renderCitizen(el, c, state, rt, following) {

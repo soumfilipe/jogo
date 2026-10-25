@@ -20,6 +20,10 @@
 //   { type: 'policy', id, on }           (liga ou desliga uma lei)
 //   { type: 'park',  tiles }             (mata vira parque de conservação; com a pesquisa)
 //   { type: 'revitalize', tile }         (indústria abandonada vira centro cultural)
+//   { type: 'event', eventType, venue, day, days, artists, work?, ticket,
+//     marketing, recurrence?, name? }    (agenda um evento; ver systems/agenda.js)
+//   { type: 'confirmEvent', id, artists?, marketing?, ticket? }   (próxima edição da série)
+//   { type: 'cancelEvent', id }
 
 import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
@@ -33,6 +37,7 @@ import { setPolicy } from '../systems/policies.js';
 import { computeCoverage } from '../systems/services.js';
 import { computeTransit } from '../systems/transit.js';
 import { computeFreight } from '../systems/logistics.js';
+import { cancelEvent, confirmEdition, scheduleEvent } from '../systems/agenda.js';
 
 // Ferramentas que vêm da pesquisa (efeito { tool } em techs.js).
 export const TOOL_TECH = {
@@ -133,6 +138,10 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'funding') return setFunding(state, cmd.area, cmd.amount);
   if (cmd.type === 'priority') return setPriority(state, rt, cmd.area, cmd.tech);
   if (cmd.type === 'course') return setCourse(state, cmd.area, cmd.weight);
+  // Agenda cultural (ver systems/agenda.js).
+  if (cmd.type === 'event') return scheduleEvent(state, rt, cmd);
+  if (cmd.type === 'confirmEvent') return confirmEdition(state, rt, cmd);
+  if (cmd.type === 'cancelEvent') return cancelEvent(state, rt, cmd);
   if (cmd.type === 'policy') {
     const result = setPolicy(state, rt, cmd.id, cmd.on);
     if (result.ok) computeMods(state, rt);

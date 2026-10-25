@@ -96,8 +96,8 @@ export const POLICIES = {
   },
   lei_cultura: {
     name: 'Incentivo à cultura', tech: 'lei_cultura',
-    desc: 'Mais satisfação; a arrecadação cai 3%.',
-    cost: {}, effects: [{ mod: 'income.all', mul: 0.97 }, { mod: 'satisfactionPolicy', add: 0.04 }],
+    desc: 'Mais satisfação e cachês dos artistas 20% mais baratos; a arrecadação cai 3%.',
+    cost: {}, effects: [{ mod: 'income.all', mul: 0.97 }, { mod: 'satisfactionPolicy', add: 0.04 }, { mod: 'culture.fee', mul: 0.8 }],
   },
   saude_familia: {
     name: 'Saúde da família', tech: 'saude_familia',

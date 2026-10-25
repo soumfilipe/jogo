@@ -656,6 +656,58 @@ export const CULTURE = {
   // Títulos: o artigo vem junto (concorda com o substantivo).
   titleNouns: ['O Segredo', 'O Caminho', 'O Silêncio', 'O Último Verão', 'O Farol', 'O Herdeiro', 'O Baile', 'A Viagem', 'O Sonho', 'O Retrato', 'A Noite', 'O Rio', 'O Jardim', 'A Promessa', 'A Herança'],
   titlePlaces: ['da Serra', 'do Sertão', 'da Cidade', 'de Copacabana', 'do Interior', 'da Praia', 'do Morro', 'de Ninguém', 'do Porto', 'da Estação'],
+
+  // Agenda de eventos (ver systems/agenda.js).
+  //   venues: onde cada tipo pode acontecer; artists: quantos artistas
+  //   [mín, máx] (0 = sem artista); days: duração [mín, máx]; hours: de que
+  //   horas a que horas (o público chega antes); tech: tecnologia que libera
+  //   (ou mod: modificador que libera).
+  eventTypes: {
+    show: { name: 'Show', venues: ['arena_eventos', 'estadio', 'parque', 'calcadao'], artists: [1, 1], days: [1, 1], hours: [20, 23], power: null },
+    festival: { name: 'Festival', venues: ['arena_eventos', 'estadio', 'parque_tematico', 'calcadao'], artists: [2, 6], days: [1, 3], hours: [14, 23], tech: 'televisao' },
+    mostra: { name: 'Mostra de cinema', venues: ['cinema'], artists: [0, 0], days: [1, 7], hours: [18, 23], power: 'filme' },
+    teatro: { name: 'Temporada de teatro', venues: ['teatro'], artists: [0, 1], days: [3, 10], hours: [20, 22], power: 'peca' },
+    feira: { name: 'Feira cultural', venues: ['parque', 'calcadao'], artists: [0, 2], days: [1, 2], hours: [10, 17], power: 0.4 },
+    esports: { name: 'Torneio de eSports', venues: ['arena_eventos'], artists: [0, 0], days: [1, 2], hours: [14, 21], power: 0.6, mod: 'event.esports' },
+  },
+  // Capacidade de cada local (o calçadão: por tile do trecho) e aluguel por dia.
+  venues: {
+    arena_eventos: { capacity: 3_000 },
+    estadio: { capacity: 20_000, rent: 8_000 },
+    parque_tematico: { capacity: 8_000, rent: 4_000 },
+    parque: { capacity: 800 },
+    cinema: { capacity: 300 },
+    teatro: { capacity: 400 },
+    calcadao: { perTile: 150, maxTiles: 60 },
+  },
+  // Cachê por apresentação: base × (0,2 + fama²).
+  fee: 20_000,
+  // Ingresso padrão e quanto o preço pesa no público.
+  ticket: 20,
+  priceElasticity: 0.8,
+  // Propaganda: 1 + k × ln(1 + verba / scale).
+  marketing: { k: 0.6, scale: 5_000 },
+  // Público potencial: parte da população e, com estrada saindo do mapa (ou
+  // aeroporto), gente de fora (parte da população mais uma base regional).
+  audience: { city: 0.35, outside: 0.15, regional: 2_000 },
+  weekend: 1.3,
+  noise: 0.15,
+  // Lotação para contar como sucesso e como fracasso.
+  success: 0.7,
+  flop: 0.35,
+  // Mínimo e máximo de dias de antecedência para agendar.
+  minDays: 7,
+  maxDays: 120,
+  // Turnê: meses sem show na cidade até o artista sair em turnê, e até um
+  // artista da cidade (que já tem alguma fama) se mudar com a família.
+  touringMonths: 6,
+  leaveMonths: 12,
+  leaveFame: 0.2,
+  // Artista da cidade larga o emprego e vive da arte com esta fama.
+  fullTimeFame: 0.25,
+  // Vocação dos cidadãos (arte, esporte) e o talento mínimo para virar artista.
+  calling: { arte: 0.08, esporte: 0.08 },
+  artistTalent: 0.6,
 };
 
 // Turismo (ver systems/tourism.js).

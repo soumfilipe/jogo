@@ -335,6 +335,37 @@ const OUTLET_KIND = {
 };
 
 function publishEvent(ctx, e) {
+  if (e.kind === 'evento_resultado') {
+    const story = e.success ? STORIES.evento_sucesso : e.flop ? STORIES.evento_fracasso : STORIES.evento_morno;
+    publish(ctx, {
+      cat: 'evento',
+      tile: e.tile,
+      story,
+      vars: {
+        evento: e.name,
+        publico: count(e.attendance),
+        lotacao: `${Math.round((e.attendance / Math.max(1, e.capacity)) * 100)}%`,
+        atracoes: lineupText(ctx, e.artists),
+      },
+    });
+    return;
+  }
+  if (e.kind === 'festival_anuncio') {
+    publish(ctx, {
+      cat: 'cultura',
+      story: STORIES.festival_anuncio,
+      vars: { evento: e.name, dias: Math.max(1, e.day - Math.floor(ctx.tick / TICKS_PER_DAY)), atracoes: lineupText(ctx, e.artists) },
+    });
+    return;
+  }
+  if (e.kind === 'artista_saiu') {
+    publish(ctx, { cat: 'cultura', story: STORIES.artista_saiu, vars: { artista: e.name, genero: CULTURE.genres[e.genre]?.name ?? 'música' } });
+    return;
+  }
+  if (e.kind === 'serie_confirmar') {
+    publish(ctx, { cat: 'evento', alert: true, story: STORIES.serie_confirmar, vars: { evento: e.name, dias: e.days } });
+    return;
+  }
   if (e.kind === 'incendio') {
     const alvo = e.count > 1 ? `${NUMBERS[e.count] ?? e.count} prédios` : (FIRE_TARGET[e.type] ?? 'um prédio');
     const covered = e.covered;
@@ -383,6 +414,14 @@ function publishEvent(ctx, e) {
       },
     });
   }
+}
+
+/** "Nas atrações, X, Y e Z." (ou vazio, sem artistas). */
+function lineupText(ctx, ids = []) {
+  const names = ids.map((id) => ctx.state.culture?.artists.find((a) => a.id === id)?.name).filter(Boolean);
+  if (!names.length) return '';
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}` : names[0];
+  return names.length > 1 ? `No palco, ${list}.` : `A atração foi ${list}.`;
 }
 
 function calendarNews(ctx) {
@@ -656,7 +695,7 @@ function cultureNews(ctx) {
   const { state, news, rng } = ctx;
   const culture = state.culture;
   if (!culture || state.citizens.length < 50) return;
-  const top = ranking(culture)[0];
+  const top = ranking(culture).find((a) => a.kind === 'musica');
   if (top && top.id !== news.flags.topArtist) {
     news.flags.topArtist = top.id;
     publish(ctx, {
