@@ -12,6 +12,7 @@ import { BUILDINGS, FIRE } from '../world/catalog.js';
 import { footprint, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
 import { chance } from '../core/rng.js';
 import { mod } from './mods.js';
+import { report } from './news.js';
 
 /** Incêndios do dia. Devolve os ids dos prédios que viraram ruína. */
 export function applyFires(state, rt) {
@@ -24,6 +25,8 @@ export function applyFires(state, rt) {
     if (chance(state.rng, risk * Math.max(1, info.level) * info.size * info.size)) queue.push(b.id);
   }
   const seen = new Set(queue);
+  let people = 0; // quem morava ou trabalhava nos prédios queimados (para as notícias)
+  let covered = false;
   while (queue.length) {
     const b = rt.buildingById.get(queue.shift());
     if (!b || b.abandoned !== undefined) continue;
@@ -31,6 +34,8 @@ export function applyFires(state, rt) {
     if (chance(state.rng, cover)) continue; // os bombeiros apagaram
     // O detector de fumaça faz parte dos incêndios não passarem de um susto.
     if (chance(state.rng, 1 - mod(rt, 'fireDamage'))) continue;
+    people += rt.residents.get(b.id).size + rt.workers.get(b.id).size;
+    covered ||= cover > 0;
     burn(state, rt, b);
     burned.push(b.id);
     for (const n of neighbors(state, rt, b)) {
@@ -40,7 +45,11 @@ export function applyFires(state, rt) {
       queue.push(n.id);
     }
   }
-  if (burned.length) (rt.events ??= []).push({ kind: 'incendio', count: burned.length, tile: rt.buildingById.get(burned[0]).tile });
+  if (burned.length) {
+    const first = rt.buildingById.get(burned[0]);
+    (rt.events ??= []).push({ kind: 'incendio', count: burned.length, tile: first.tile });
+    report(state, { kind: 'incendio', count: burned.length, tile: first.tile, type: first.type, people, covered });
+  }
   return burned;
 }
 

@@ -35,6 +35,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `Z` Cultura (ou 🎭 no topo) | artistas em alta, gêneros em moda, novatos do ano e o que está em cartaz |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
+| 📰 Notícias (no topo) | o que a imprensa publicou, com filtros, e os jornais, rádios, TVs e canais da cidade |
 | Calçadão | rua só de pedestres (depois de *Ruas de lazer*): valoriza o comércio em volta; vira rua de novo se você desenhar uma rua por cima |
 | Avenida / Via expressa | como a estrada, mas mais rápidas e com mais capacidade (depois da pesquisa *Via expressa*); sobre uma rua, melhoram ela pagando só a diferença |
 | `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` / `Q` / `Y` Mapas | valor do terreno, poluição (também nos rios), energia, água, escolas, saúde, crime, satisfação, trânsito, alimentos ou lixo sobre o mapa |
@@ -208,6 +209,44 @@ Regras em `src/systems/culture.js`; números em `CULTURE` no catálogo.
   só usam o calçadão quando precisam.
 - O painel **Cultura** (`Z` ou 🎭) mostra o ranking, os gêneros em moda, os
   novatos e o que está em cartaz.
+
+## Notícias e imprensa
+
+Regras em `src/systems/news.js`, textos em `src/world/stories.js`; números em
+`NEWS` no catálogo e os setores de mídia em `SECTORS`.
+
+- **Os avisos são notícias.** Incêndios, epidemias, falta de energia ou de
+  água, tecnologias concluídas, festas: tudo aparece na tela como manchete de
+  um veículo, com três ou quatro frases em tom de jornal no painel 📰.
+- **A imprensa evolui com a tecnologia** que a cidade tem: jornal desde o
+  começo, depois rádio, televisão, portais de notícias (internet) e redes
+  sociais (smartphone). Cada veículo tem seu estilo (plantão da TV, "no ar" do
+  rádio, curtidas nas redes) e o painel mostra a era da imprensa.
+- **Jornalistas e empresas de comunicação**: as redações são empresas que
+  abrem num andar comercial vago conforme a cidade cresce (o primeiro jornal
+  com 80 moradores; rádio, portal, canal digital e TV com mais gente e depois
+  da tecnologia; mais um veículo a cada 3 mil moradores). Quem trabalha nelas
+  são os jornalistas, que assinam as matérias. Sem imprensa local, a imprensa
+  regional dá só as notícias importantes.
+- **O que vira notícia**:
+  - *problemas da cidade* (energia, água, desemprego, crime, saúde, trânsito
+    no rush das 8h, lixo, esgoto, prédios abandonados, falta de creche,
+    satisfação), quando passam do limite; e de novo quando acabam;
+  - *acontecimentos*: incêndios, empresas que fecham, veículos que abrem,
+    carnaval, megaevento, o jogo de domingo (com placar), marcos de população,
+    contas do mês, artistas em alta e estreias;
+  - *tecnologias* que a cidade conclui e as que o **mundo descobre** (com a
+    nota histórica), e a virada de cada marco;
+  - *críticas ao governo*, pela origem da insatisfação dos moradores (saúde,
+    lazer, escola, comida, lixo, poluição, desemprego, imposto, creche, crime)
+    e pelos problemas que continuam;
+  - *fofocas* e notícias inúteis (artistas da cena cultural, gato no poste,
+    abóbora gigante, vídeos virais na era das redes);
+  - *boatos* (fake news), inventados ou exagerando um problema real, mais
+    comuns nas redes sociais. Alguns dias depois, a **checagem** desmente e o
+    boato aparece riscado como falso no painel.
+- As notícias usam um gerador próprio, salvo junto com a cidade: não mudam a
+  simulação, e carregar um save continua com as mesmas notícias.
 
 ## Lixo e esgoto
 
@@ -604,6 +643,9 @@ estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
 
+Saves do formato 15 (antes das notícias) abrem sem notícias publicadas e sem
+imprensa local; as redações abrem conforme a cidade cresce.
+
 Saves do formato 14 (antes da cena cultural) abrem com artistas e obras
 gerados pela semente da cidade; arenas de eSports viram arenas de eventos.
 
@@ -645,7 +687,8 @@ index.html, styles.css  interface
 src/main.js             liga simulação, renderização, controles e salvamento
 src/core/               relógio/laço, tempo do jogo, RNG com semente
 src/world/              estado (world.js), catálogo de prédios, terreno,
-                        índices derivados (runtime.js), ações do jogador
+                        índices derivados (runtime.js), ações do jogador,
+                        textos das notícias (stories.js)
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes
 src/systems/            demanda, valor do terreno, energia e água, crescimento e níveis, empresas,
                         economia, ordem dos sistemas

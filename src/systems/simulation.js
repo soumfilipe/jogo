@@ -25,6 +25,7 @@ import { collectWaste } from './waste.js';
 import { indexVisitors, planDay, updateVisitors } from './tourism.js';
 import { closeCultureMonth } from './culture.js';
 import { updateStress } from './childcare.js';
+import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -38,6 +39,8 @@ export function tick(state, rt) {
     computeMods(state, rt);
     computeTransit(state, rt);
     updateTrafficMap(state, rt);
+    // Rush das 8h: quanto das ruas está parado (para as notícias).
+    if (t % TICKS_PER_DAY === 8 * 60) noteRushHour(state, rt);
     computeDemand(state, rt);
     // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
     // assim o resultado não depende de quando o save foi carregado.
@@ -67,6 +70,8 @@ export function tick(state, rt) {
       computeDemand(state, rt);
       // Turistas de hoje (meia-noite): plano de chegadas e gasto do dia.
       planDay(state, rt);
+      // Notícias do dia, com a cidade já atualizada.
+      dailyNews(state, rt);
     }
     // Andares vagos são alugados antes de surgirem prédios novos.
     openCompanies(state, rt);
@@ -82,6 +87,7 @@ export function tick(state, rt) {
     closeHealthMonth(state, rt);
     closeResearchMonth(state, rt);
     closeCultureMonth(state, rt);
+    monthlyNews(state, rt);
   }
 }
 

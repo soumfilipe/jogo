@@ -10,13 +10,15 @@
 //     nova quando a zona tem demanda.
 //   - Empresa que passa muito tempo sem conseguir metade dos funcionários
 //     fecha: quem trabalhava lá fica desempregado.
+//   - Conforme a cidade cresce, alguns andares comerciais viram redações de
+//     jornal, rádio, TV, portal ou canal digital (ver wantedMedia em news.js).
 //
 // Formato de uma empresa no estado (e no save):
 //   { id, name, sector, building, floor (0 = térreo), floors, foundedAt,
 //     understaffedDays? }
 
 import {
-  BUILDINGS, COMPANY_CLOSE_DAYS, COMPANY_GRACE_DAYS, COMPANY_OPEN_CHANCE, SECTORS, ZONE, buildingFloors,
+  BUILDINGS, COMPANY_CLOSE_DAYS, COMPANY_GRACE_DAYS, COMPANY_OPEN_CHANCE, NEWS, SECTORS, ZONE, buildingFloors,
 } from '../world/catalog.js';
 import {
   addCompany, companyJobs, removeCompany, setJob, singleOwner, touchMap, usesCompanies,
@@ -26,6 +28,7 @@ import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { LAST_NAMES } from '../agents/names.js';
 import { isServed } from './utilities.js';
+import { report, wantedMedia } from './news.js';
 
 const SECTORS_BY_KIND = {};
 for (const [id, sector] of Object.entries(SECTORS)) (SECTORS_BY_KIND[sector.kind] ??= []).push(id);
@@ -61,6 +64,15 @@ function openCompanyIn(state, rt, b) {
 
   let kind;
   let floors;
+  // A cidade quer mais imprensa: o andar vira redação.
+  const media = info.zone === ZONE.COMMERCIAL && !singleOwner(info) ? wantedMedia(state, rt) : null;
+  if (media && chance(state.rng, NEWS.openChance)) {
+    const co = addCompany(state, rt, {
+      id: 0, name: companyName(state, media), sector: media, building: b.id, floor, floors: 1, foundedAt: state.time.tick,
+    });
+    report(state, { kind: 'veiculo', company: co.id });
+    return info.perFloor;
+  }
   if (singleOwner(info)) {
     // A indústria (e a fazenda) cresce junto com o prédio: a empresa que já
     // está lá ocupa o andar novo.
@@ -92,10 +104,14 @@ function openCompanyIn(state, rt, b) {
 }
 
 function companyName(state, sector) {
+  const info = SECTORS[sector];
+  // Veículos de imprensa sorteiam entre vários formatos de nome.
+  const label = info.labels ? pick(state.rng, info.labels) : info.label;
   const first = pick(state.rng, LAST_NAMES);
   let second = pick(state.rng, LAST_NAMES);
   if (second === first) second = LAST_NAMES[(LAST_NAMES.indexOf(first) + 1) % LAST_NAMES.length];
-  return SECTORS[sector].label.replace('{L}', first).replace('{M}', second);
+  const plain = first.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return label.replace('{L}', first).replace('{M}', second).replace('{l}', plain).replace('{C}', state.city.name);
 }
 
 /**
@@ -147,6 +163,7 @@ export function reviewCompanies(state, rt) {
     co.understaffedDays = (co.understaffedDays || 0) + 1;
     if (co.understaffedDays >= COMPANY_CLOSE_DAYS) {
       const b = rt.buildingById.get(co.building);
+      report(state, { kind: 'fechou', name: co.name, sector: co.sector, jobs: companyJobs(rt, co) });
       removeCompany(state, rt, co.id);
       // As luzes do prédio dependem das empresas.
       touchMap(rt, b.tile, BUILDINGS[b.type].size);

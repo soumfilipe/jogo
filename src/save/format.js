@@ -21,9 +21,10 @@ import { EDUCATION } from '../world/catalog.js';
 import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { createRng, hash2 } from '../core/rng.js';
 import { createCulture } from '../systems/culture.js';
+import { createNews } from '../systems/news.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -210,6 +211,14 @@ const MIGRATIONS = {
     for (const b of buildings) if (b.type === 'arena_esports') b.type = 'arena_eventos';
     data.buildings = encodeTable(buildings);
     save.version = 15;
+    return save;
+  },
+  // v15 -> v16: notícias. A cidade começa sem nada publicado e sem imprensa
+  // local; as redações abrem conforme ela cresce.
+  15: (save) => {
+    const data = save.data;
+    data.news ??= createNews(data.seed, data.research);
+    save.version = 16;
     return save;
   },
 };

@@ -55,6 +55,9 @@ export function computeWellbeing(state, rt) {
 
   let people = 0;
   const sum = { health: 0, crime: 0, satisfaction: 0 };
+  // Quanto cada fator tira da satisfação, somado por morador (para as
+  // críticas da imprensa, ver news.js).
+  const complaints = { health: 0, leisure: 0, school: 0, food: 0, garbage: 0, pollution: 0, unemployment: 0, tax: 0, stress: 0, crime: 0 };
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
     if (!info.zone || b.abandoned !== undefined) continue;
@@ -104,6 +107,16 @@ export function computeWellbeing(state, rt) {
       satisfaction = clamp(content + S.safety * (0.5 - crime) * 2);
       const n = rt.residents.get(b.id).size;
       people += n;
+      complaints.health += Math.max(0, -S.health * (health - 0.5) * 2) * n;
+      complaints.leisure += S.leisure * (1 - Math.min(1, (cov?.lazer[t] ?? 0) * leisureMul)) * n;
+      complaints.school += S.school * (1 - schoolOk) * n;
+      complaints.food += Math.max(0, -S.food * food) * n;
+      complaints.garbage += S.garbage * dirty * n;
+      complaints.pollution += S.pollution * pollution * n;
+      complaints.unemployment += S.unemployment * unemployment * n;
+      complaints.tax += Math.max(0, tax) * n;
+      complaints.stress += CHILDCARE.satisfaction * stress * n;
+      complaints.crime += Math.max(0, -S.safety * (0.5 - crime) * 2) * n;
       sum.health += health * n;
       sum.crime += crime * n;
       sum.satisfaction += satisfaction * n;
@@ -112,6 +125,8 @@ export function computeWellbeing(state, rt) {
   }
 
   rt.wellbeing = wellbeing;
+  for (const k of Object.keys(complaints)) complaints[k] = people ? complaints[k] / people : 0;
+  rt.complaints = complaints;
   rt.waste = waste;
   rt.sanitation = sanitation;
   fillWasteMap(state, rt, waste);

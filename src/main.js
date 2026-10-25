@@ -22,6 +22,7 @@ import { renderInspector } from './ui/inspector.js';
 import { BudgetPanel } from './ui/budget.js';
 import { ResearchPanel } from './ui/research.js';
 import { CulturePanel } from './ui/culture.js';
+import { NewsPanel, mediumIcon } from './ui/news.js';
 import { Sheets } from './ui/sheets.js';
 import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
@@ -110,6 +111,7 @@ let density = DENSITY.MEDIUM;
 const DENSITY_KEY = 'x';
 const usesDensity = (t) => t.zone === ZONE.RESIDENTIAL || t.zone === ZONE.COMMERCIAL;
 let dirty = false; // mudanças desde o último save manual
+let newsReset = true; // cidade nova ou carregada: as notícias que já existem contam como lidas
 let hover = null;
 let drag = null; //   { kind: 'tool' | 'pan', start, last, moved }
 let selection = null; // { type: 'building' | 'citizen', id }
@@ -138,6 +140,7 @@ if (saves.backend.migrated) {
 function setWorld(next) {
   state = next;
   rt = prepare(state);
+  newsReset = true;
   renderer.invalidate();
   cam = createCamera(state.map.width, state.map.height);
   renderer.resize(cam);
@@ -211,8 +214,17 @@ function throttledHud() {
   budget.render(state, rt);
   research.render(state, rt);
   culture.render(state, rt);
+  if (newsReset) {
+    newsReset = false;
+    newsPanel.markSeen(state);
+    rt.newsFresh = [];
+  }
+  newsPanel.render(state, rt);
+  const unread = newsPanel.unread(state);
+  $('news-count').textContent = unread > 99 ? '99+' : String(unread);
+  $('news-count').hidden = unread === 0;
   refreshTools();
-  announceResearch();
+  announceNews();
 }
 
 function renderHud() {
@@ -421,71 +433,42 @@ $('btn-research').onclick = () => toggleResearch();
 // Cultura: artistas, gêneros e o que está em cartaz (botão 🎭 ou tecla Z).
 const culture = new CulturePanel($('culture'));
 $('btn-culture').onclick = () => toggleCulture();
+// Notícias: o que a imprensa publicou e os veículos da cidade (botão 📰).
+const newsPanel = new NewsPanel($('news'));
+$('btn-news').onclick = () => toggleNews();
 
-// Orçamento, pesquisa e cultura ocupam o mesmo canto: abrir um fecha os outros.
-function toggleBudget(force) {
-  budget.toggle(force);
-  if (budget.open) {
-    research.toggle(false);
-    culture.toggle(false);
-  }
-  budget.render(state, rt);
+// Orçamento, pesquisa, cultura e notícias ocupam o mesmo canto: abrir um fecha os outros.
+const cornerPanels = () => [budget, research, culture, newsPanel];
+function openOnly(panel, force) {
+  panel.toggle(force);
+  if (panel.open) for (const other of cornerPanels()) if (other !== panel) other.toggle(false);
+  panel.render(state, rt);
 }
-function toggleResearch(force) {
-  research.toggle(force);
-  if (research.open) {
-    budget.toggle(false);
-    culture.toggle(false);
-  }
-  research.render(state, rt);
-}
-function toggleCulture(force) {
-  culture.toggle(force);
-  if (culture.open) {
-    budget.toggle(false);
-    research.toggle(false);
-  }
-  culture.render(state, rt);
-}
+const toggleBudget = (force) => openOnly(budget, force);
+const toggleResearch = (force) => openOnly(research, force);
+const toggleCulture = (force) => openOnly(culture, force);
+const toggleNews = (force) => openOnly(newsPanel, force);
 
-// Aviso de tecnologia concluída (a simulação deixa os ids em rt.researchEvents).
+// Avisos na tela: as notícias de alerta que a imprensa acabou de publicar
+// (problemas, incêndios, epidemias, festas, tecnologias). A simulação deixa
+// as notícias novas em rt.newsFresh.
 let toastTimer = null;
-function announceResearch() {
-  announceEvents();
-  const events = rt.researchEvents;
-  if (!events?.length) return;
-  rt.researchEvents = [];
-  const names = events.map((id) => TECH_BY_ID.get(id));
-  const toast = $('toast');
-  toast.innerHTML = names.map((t) => `<b>🔬 ${escapeHtml(t.name)}</b><span>${escapeHtml(t.mechanic)}</span>`).join('');
-  toast.hidden = false;
-  status(`Nova tecnologia: ${names.map((t) => t.name).join(', ')}`);
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
-}
-// Incêndios e epidemias (a simulação deixa em rt.events).
-function announceEvents() {
-  const events = rt.events;
-  if (!events?.length) return;
+function announceNews() {
+  // Os avisos antigos (rt.events, rt.researchEvents) agora chegam pelas notícias.
   rt.events = [];
-  const burned = events.filter((e) => e.kind === 'incendio').reduce((n, e) => n + e.count, 0);
-  const lines = [];
-  if (burned) {
-    lines.push(`<b>🔥 Incêndio</b><span>${burned} ${burned === 1 ? 'prédio virou' : 'prédios viraram'} ruína. Quartéis de bombeiros apagam o fogo no raio deles.</span>`);
-  }
-  if (events.some((e) => e.kind === 'epidemia')) {
-    lines.push('<b>🦠 Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>');
-  }
-  for (const e of events.filter((x) => x.kind === 'festa')) {
-    lines.push(`<b>🎉 ${escapeHtml(e.name)}</b><span>${escapeHtml(e.text)}</span>`);
-  }
+  rt.researchEvents = [];
+  const fresh = rt.newsFresh;
+  if (!fresh?.length) return;
+  rt.newsFresh = [];
+  const alerts = fresh.filter((i) => i.alert).slice(-3);
+  if (!alerts.length) return;
   const toast = $('toast');
-  toast.innerHTML = lines.join('');
+  toast.innerHTML = alerts.map((i) => `<b>${mediumIcon(i.medium)} ${escapeHtml(i.headline)}</b>
+    <span>${escapeHtml(i.outlet)} · ${escapeHtml(i.body.split(/(?<=[.!?])\s/)[0])}</span>`).join('');
   toast.hidden = false;
-  status([burned ? 'Incêndio' : null, events.some((e) => e.kind === 'epidemia') ? 'Epidemia' : null,
-    ...events.filter((e) => e.kind === 'festa').map((e) => e.name)].filter(Boolean).join(', '));
+  status(alerts.map((i) => i.headline).join(' · '));
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 7000);
 }
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
@@ -565,6 +548,9 @@ for (const button of $('mobile-nav').children) {
     } else if (button.dataset.mobile === 'culture') {
       sheets.close();
       toggleCulture();
+    } else if (button.dataset.mobile === 'news') {
+      sheets.close();
+      toggleNews();
     }
   };
 }
@@ -830,9 +816,7 @@ window.addEventListener('keydown', (e) => {
   } else if (key === 'escape') {
     drag = null;
     select(null);
-    budget.toggle(false);
-    research.toggle(false);
-    culture.toggle(false);
+    for (const panel of cornerPanels()) panel.toggle(false);
   } else if (key === DENSITY_KEY) {
     setDensity((density + 1) % Object.keys(DENSITY_INFO).length);
   } else if (key === 'o') {

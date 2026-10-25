@@ -9,6 +9,7 @@ import { createEducation } from '../systems/education.js';
 import { createPolicies } from '../systems/policies.js';
 import { createTourism } from '../systems/tourism.js';
 import { createCulture } from '../systems/culture.js';
+import { createNews } from '../systems/news.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -66,6 +67,8 @@ export function createWorld({
     research,
     // Artistas, gêneros, filmes e peças (ver systems/culture.js).
     culture: createCulture(createRng((seed ^ 0x5eed5) >>> 0), research.world, 7 * 60),
+    // Notícias e imprensa (ver systems/news.js).
+    news: createNews(seed, research),
     // Cursos da universidade (ver systems/education.js).
     education: createEducation(),
     // Leis ativas (systems/policies.js), epidemia e médias do dia (wellbeing.js).
