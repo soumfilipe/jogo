@@ -137,12 +137,14 @@ test('críticas ao governo seguem a maior fonte de insatisfação', () => {
   assert.equal(topComplaint(rt), null, 'abaixo do mínimo não vira pauta');
 
   // Com o imposto residencial alto, a imprensa local critica no fechamento do mês.
+  // (Só metade dos textos cita a alíquota; a manchete diz que é sobre o imposto.)
   state.economy.taxes.residential = 18;
-  for (let i = 0; i < 6 && !state.news.items.some((x) => x.cat === 'critica' && x.body.includes('18%')); i++) {
+  const isTax = (x) => x.cat === 'critica' && STORIES.critica.tax.h.includes(x.headline);
+  for (let i = 0; i < 6 && !state.news.items.some(isTax); i++) {
     monthlyNews(state, rt);
     state.news.next.imposto = 0;
   }
-  assert.ok(state.news.items.some((x) => x.cat === 'critica' && x.body.includes('18%')), 'crítica ao imposto');
+  assert.ok(state.news.items.some(isTax), 'crítica ao imposto');
 });
 
 test('boatos: saem na imprensa local e a checagem desmente depois', () => {

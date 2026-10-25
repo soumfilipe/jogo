@@ -340,13 +340,13 @@ export const BUILDINGS = {
   //   utility.gated: { recurso: modificador } — só produz depois da pesquisa
   lixao: {
     name: 'Lixão', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 4,
-    utility: { power: 0, water: 0, cost: 2_000, upkeep: 60, pollution: 6, area: 'ambiental', waste: { radius: 20, capacity: 60_000 } },
+    utility: { power: 0, water: 0, cost: 2_000, upkeep: 60, pollution: 6, area: 'ambiental', waste: { radius: 30, capacity: 60_000 } },
   },
   aterro: {
     name: 'Aterro sanitário', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 8,
     utility: {
       power: 800, water: 0, cost: 10_000, upkeep: 250, pollution: 2, area: 'ambiental',
-      waste: { radius: 22, capacity: 250_000 }, gated: { power: 'biogas' },
+      waste: { radius: 40, capacity: 250_000 }, gated: { power: 'biogas' },
     },
   },
   centro_reciclagem: {
@@ -527,7 +527,7 @@ export const TRAFFIC = {
     metro: { name: 'Metrô', speed: 2, ignoresTraffic: true, fare: 0.06 },
   },
   // Poluição de um carro parado num tile (somada à da indústria no mapa).
-  carPollution: 0.1,
+  carPollution: 0.033,
 };
 
 export const COSTS = {
@@ -599,28 +599,49 @@ export const CULTURE = {
   retireMonths: 18,
   // Gêneros: a partir de que ano do mundo surgem novatos (e até quando).
   genres: {
+    modinha: { name: 'Modinha', kind: 'musica', from: 1900, until: 1930 },
+    maxixe: { name: 'Maxixe', kind: 'musica', from: 1900, until: 1935 },
     samba: { name: 'Samba', kind: 'musica', from: 1910 },
     choro: { name: 'Choro', kind: 'musica', from: 1910, until: 1960 },
     marchinha: { name: 'Marchinha', kind: 'musica', from: 1920, until: 1970 },
-    sertanejo: { name: 'Sertanejo', kind: 'musica', from: 1930 },
+    sertanejo: { name: 'Sertanejo', kind: 'musica', from: 1930, until: 2005 },
+    samba_cancao: { name: 'Samba-canção', kind: 'musica', from: 1945, until: 1965 },
+    bolero: { name: 'Bolero', kind: 'musica', from: 1945, until: 1975 },
     forro: { name: 'Forró', kind: 'musica', from: 1945 },
+    baiao: { name: 'Baião', kind: 'musica', from: 1946, until: 1975 },
     rock: { name: 'Rock', kind: 'musica', from: 1955 },
     bossa: { name: 'Bossa nova', kind: 'musica', from: 1958, until: 1990 },
+    jovem_guarda: { name: 'Jovem Guarda', kind: 'musica', from: 1964, until: 1975 },
     mpb: { name: 'MPB', kind: 'musica', from: 1965 },
     pop: { name: 'Pop', kind: 'musica', from: 1965 },
+    tropicalia: { name: 'Tropicália', kind: 'musica', from: 1967, until: 1975 },
+    brega: { name: 'Brega', kind: 'musica', from: 1970 },
+    soul: { name: 'Soul', kind: 'musica', from: 1970, until: 1990 },
+    disco: { name: 'Disco', kind: 'musica', from: 1975, until: 1985 },
     pagode: { name: 'Pagode', kind: 'musica', from: 1980 },
+    rock_nacional: { name: 'Rock nacional', kind: 'musica', from: 1982, until: 2000 },
     axe: { name: 'Axé', kind: 'musica', from: 1985 },
+    lambada: { name: 'Lambada', kind: 'musica', from: 1987, until: 1995 },
     rap: { name: 'Rap', kind: 'musica', from: 1988 },
     funk: { name: 'Funk', kind: 'musica', from: 1990 },
-    eletronica: { name: 'Eletrônica', kind: 'musica', from: 1990 },
+    eletronica: { name: 'Eletrônica', kind: 'musica', from: 1995 },
+    tecnobrega: { name: 'Tecnobrega', kind: 'musica', from: 2002 },
+    sertanejo_universitario: { name: 'Sertanejo universitário', kind: 'musica', from: 2005 },
+    arrocha: { name: 'Arrocha', kind: 'musica', from: 2005 },
+    trap: { name: 'Trap', kind: 'musica', from: 2015 },
+    piseiro: { name: 'Piseiro', kind: 'musica', from: 2018 },
     comedia: { name: 'Comédia', kind: 'teatro', from: 1910 },
     drama: { name: 'Drama', kind: 'teatro', from: 1910 },
+    revista: { name: 'Teatro de revista', kind: 'teatro', from: 1910, until: 1960 },
     musical: { name: 'Musical', kind: 'teatro', from: 1930 },
+    infantil: { name: 'Teatro infantil', kind: 'teatro', from: 1950 },
+    standup: { name: 'Stand-up', kind: 'teatro', from: 2005 },
   },
-  // Filmes e peças: gêneros, quantos estreiam por mês e duração em cartaz (dias).
+  // Filmes e peças: gêneros (com o ano do mundo em que aparecem), quantos
+  // estreiam por mês e duração em cartaz (dias).
   workGenres: {
-    filme: ['comédia', 'drama', 'ação', 'romance', 'terror', 'aventura', 'animação'],
-    peca: ['comédia', 'drama', 'musical', 'infantil'],
+    filme: { 'comédia': 1900, drama: 1900, romance: 1900, 'animação': 1940, 'ação': 1950, terror: 1950, aventura: 1950 },
+    peca: { 'comédia': 1900, drama: 1900, musical: 1930, infantil: 1950 },
   },
   premieres: { filme: 3, peca: 2 },
   run: { filme: [28, 70], peca: [42, 112] },
@@ -628,7 +649,7 @@ export const CULTURE = {
   // Turistas por dia de cada cinema/teatro com uma obra no auge.
   appeal: { filme: 15, peca: 10 },
   // Palavras para os nomes inventados.
-  stagePrefix: { rap: 'MC', funk: 'MC', eletronica: 'DJ' },
+  stagePrefix: { rap: 'MC', funk: 'MC', trap: 'MC', eletronica: 'DJ', tecnobrega: 'DJ' },
   // Bandas: substantivo no plural + complemento que concorda com qualquer gênero.
   bandNouns: ['Luas', 'Estrelas', 'Tambores', 'Ventos', 'Cometas', 'Raízes', 'Ondas', 'Faróis', 'Corsários', 'Girassóis', 'Trovões', 'Andorinhas', 'Cactos', 'Vagalumes', 'Pandeiros'],
   bandAdjectives: ['Azuis', 'do Norte', 'Selvagens', 'de Prata', 'do Cais', 'Livres', 'do Morro', 'Errantes', 'de Neon', 'Gigantes', 'do Asfalto', 'Imortais'],

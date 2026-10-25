@@ -224,7 +224,10 @@ function renderChart(el, history) {
     <line class="grid" x1="${PAD.left}" x2="${W - PAD.right}" y1="${y(max * f)}" y2="${y(max * f)}"/>
     <text class="axis" x="${PAD.left - 6}" y="${y(max * f) + 3}" text-anchor="end">${compact(max * f)}</text>`).join('');
   const every = Math.max(1, Math.ceil(n / 6));
-  const xLabels = history.map((h, i) => (i % every === 0 || i === n - 1)
+  // O último mês sempre tem rótulo; o periódico colado nele sai (senão "set"
+  // e "out" ficam um em cima do outro).
+  const labeled = (i) => i === n - 1 || (i % every === 0 && n - 1 - i >= Math.max(2, every / 2));
+  const xLabels = history.map((h, i) => labeled(i)
     ? `<text class="axis" x="${x(i)}" y="${H - 6}" text-anchor="middle">${monthLabel(h.tick).short}</text>` : '').join('');
 
   // Rótulos no fim das linhas, afastados se ficarem colados.
@@ -244,7 +247,7 @@ function renderChart(el, history) {
   const labels = ends.map(({ s, y: ly }) => `<text class="end-label" x="${x(n - 1) + 8}" y="${ly + 4}">${s.name}</text>`).join('');
 
   el.innerHTML = `
-    <div class="legend">${series.map((s) => `<span><i style="background:${s.css}"></i>${s.name}</span>`).join('')}</div>
+    <div class="chart-legend">${series.map((s) => `<span><i style="background:${s.css}"></i>${s.name}</span>`).join('')}</div>
     <div class="chart-box">
       <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
            aria-label="Receita e despesa nos últimos ${n} meses">
@@ -285,8 +288,10 @@ function renderChart(el, history) {
     tip.innerHTML = `<b>${monthLabel(h.tick).long}</b>
       ${series.map((s) => `<span><i style="background:${s.css}"></i>${s.name} ${money(s.values[i])}</span>`).join('')}
       <span class="muted">Saldo ${money(h.income.total - h.expenses.total)}</span>`;
+    // Ao lado da cruz (do lado com mais espaço), para não cobrir o mês apontado.
     const left = (x(i) / W) * rect.width;
-    tip.style.left = `${Math.min(rect.width - 150, Math.max(0, left - 75))}px`;
+    const width = tip.offsetWidth;
+    tip.style.left = `${left > rect.width / 2 ? Math.max(0, left - width - 10) : Math.min(rect.width - width, left + 10)}px`;
   });
   svg.addEventListener('pointerleave', () => {
     cross.setAttribute('visibility', 'hidden');
