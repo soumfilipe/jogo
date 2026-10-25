@@ -12,7 +12,7 @@ import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems
 import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
-import { MAP_MODES, Renderer } from './render/renderer.js';
+import { MAP_MODES, Renderer, mapColor } from './render/renderer.js';
 import { moverPose } from './render/movers.js';
 import { Minimap } from './render/minimap.js';
 import {
@@ -23,6 +23,7 @@ import { BudgetPanel } from './ui/budget.js';
 import { ResearchPanel } from './ui/research.js';
 import { CulturePanel } from './ui/culture.js';
 import { Sheets } from './ui/sheets.js';
+import { hydrateIcons, icon, inkFor } from './ui/icons.js';
 import { computeDemand } from './systems/demand.js';
 import { SaveManager } from './save/SaveManager.js';
 import { detectBackend } from './save/backends.js';
@@ -36,16 +37,16 @@ const canvas = $('map');
 // Ferramentas: `shape` define como o arraste seleciona tiles.
 const TOOLS = [
   { id: 'inspect', name: 'Inspecionar', key: 'v' },
-  { id: 'road', name: 'Estrada', key: 'e', shape: 'line', road: 1, color: 'rgba(255,255,255,0.35)' },
+  { id: 'road', name: 'Estrada', key: 'e', shape: 'line', road: 1, color: 'rgba(255,255,255,0.35)', swatch: '#5a5d65', group: 'road' },
   // Avenida e via expressa: sobre uma rua, melhoram ela (paga só a diferença).
-  { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57' },
-  { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047' },
-  { id: 'calcadao', name: 'Calçadão', shape: 'line', road: 4, color: 'rgba(216,207,189,0.7)', swatch: '#d8cfbd' },
+  { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57', group: 'road' },
+  { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047', group: 'road' },
+  { id: 'calcadao', name: 'Calçadão', shape: 'line', road: 4, color: 'rgba(216,207,189,0.7)', swatch: '#d8cfbd', group: 'road' },
   ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL].map((zone) => ({
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
-    shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
+    shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color, group: 'zone',
   })),
-  { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)' },
+  { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)', swatch: '#d9534f' },
   // Ferramentas que vêm da pesquisa (ficam escondidas até liberar).
   { id: 'parque', name: 'Parque de conservação', label: 'Conservação', shape: 'rect', tech: TOOL_TECH.parque, color: 'rgba(63,138,82,0.55)', swatch: '#3f8a52', group: 'tourism' },
   { id: 'revitalizar', name: 'Revitalizar indústria abandonada', label: 'Revitalizar', shape: 'single', tech: TOOL_TECH.revitalizar, color: 'rgba(142,68,173,0.5)', swatch: '#8e44ad', group: 'tourism' },
@@ -83,11 +84,43 @@ const TOOLS = [
     ['estacao_vlt', 'VLT', '#16a085', 'transit'], ['estacao_metro', 'Metrô', '#9fc3e0', 'transit'],
     ['patio_ferroviario', 'Pátio', '#8a826f', 'freight'], ['porto', 'Porto', '#3f6fc0', 'freight'],
     ['centro_distribuicao', 'Distribuição', '#cfc9b8', 'freight'],
-  ].map(([building, label, swatch, group], i) => ({
+  ].map(([building, label, swatch, group]) => ({
     id: `place-${building}`, name: BUILDINGS[building].name, label, shape: 'single', building, swatch, group,
-    separatorBefore: i === 0,
   })),
 ];
+
+// Grupos de ferramentas e os menus da barra, por área. Inspecionar e Demolir
+// ficam fora dos menus, como botões diretos.
+const GROUPS = {
+  road: 'Ruas', zone: 'Zonas', utility: 'Energia e água', waste: 'Lixo e esgoto',
+  education: 'Educação', services: 'Saúde e segurança', food: 'Alimentos',
+  leisure: 'Lazer', tourism: 'Turismo e cultura', transit: 'Transporte público', freight: 'Carga',
+  research: 'Pesquisa e estatais',
+};
+const MENUS = [
+  { id: 'ruas', name: 'Ruas', icon: 'roads', groups: ['road'] },
+  { id: 'zonas', name: 'Zonas', icon: 'zones', groups: ['zone'] },
+  { id: 'infra', name: 'Infraestrutura', icon: 'infra', groups: ['utility', 'waste'] },
+  { id: 'servicos', name: 'Serviços', icon: 'services', groups: ['education', 'services', 'food'] },
+  { id: 'lazer', name: 'Lazer e cultura', icon: 'leisure', groups: ['leisure', 'tourism'] },
+  { id: 'transporte', name: 'Transporte', icon: 'transport', groups: ['transit', 'freight'] },
+  { id: 'economia', name: 'Estatais', icon: 'estatais', groups: ['research'] },
+];
+// Mapas, também por área.
+const MAP_MENU = [
+  ['Infraestrutura', ['energia', 'agua', 'lixo', 'transito']],
+  ['Serviços', ['escolas', 'saude', 'crime', 'alimentos']],
+  ['Cidade', ['valor', 'poluicao', 'satisfacao']],
+];
+// Ícone de cada ferramenta (src/ui/icons.js): o do prédio, da zona ou o id.
+const ZONE_ICON = { [ZONE.RESIDENTIAL]: 'residencial', [ZONE.COMMERCIAL]: 'comercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
+const toolIcon = (t) => (t.building === 'parque' ? 'praca' : t.building ?? ZONE_ICON[t.zone] ?? t.id);
+/** Ícone sobre a cor da ferramenta (a mesma do prédio ou da zona no mapa). */
+const glyph = (t) => `<span class="glyph" style="--c:${t.swatch};color:${inkFor(t.swatch)}">${icon(toolIcon(t))}</span>`;
+const DEMAND_KEY = {
+  [ZONE.RESIDENTIAL]: 'residential', [ZONE.COMMERCIAL]: 'commercial',
+  [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural',
+};
 
 /** Preço mostrado nos botões do painel "Construir" (celular). */
 function toolCost(t) {
@@ -117,6 +150,7 @@ let mapMode = null; //   chave de MAP_MODES (valor do terreno, poluição) ou nu
 let following = false;
 const keysDown = new Set();
 
+hydrateIcons();
 const renderer = new Renderer(canvas);
 const sheets = new Sheets(); // painéis do celular (ver mais abaixo)
 const minimap = new Minimap($('minimap'));
@@ -224,7 +258,12 @@ function renderHud() {
   if (city) {
     const sat = Math.round(city.satisfaction * 100);
     const happy = $('happiness');
-    happy.firstChild.textContent = `${sat >= 60 ? '😀' : sat >= 40 ? '🙂' : '😟'} `;
+    const face = happy.firstElementChild;
+    const mood = sat >= 60 ? 'face-happy' : sat >= 40 ? 'face-neutral' : 'face-sad';
+    if (face.dataset.icon !== mood) {
+      face.dataset.icon = mood;
+      face.innerHTML = icon(mood);
+    }
     happy.lastElementChild.textContent = `${sat}%`;
     happy.title = `Satisfação média ${sat}% · saúde ${Math.round(city.health * 100)}% · crime ${Math.round(city.crime * 100)}%`
       + (state.health?.epidemicUntil > state.time.tick ? ' · EPIDEMIA' : '');
@@ -243,6 +282,17 @@ function renderHud() {
     bar.style.height = `${pct}%`;
     bar.style.bottom = value >= 0 ? '50%' : `${50 - pct}%`;
     bar.style.opacity = value >= 0 ? '1' : '0.45';
+  }
+  // A mesma demanda nos botões das zonas, em barras deitadas: para a direita
+  // falta, para a esquerda sobra.
+  for (const el of document.querySelectorAll('[data-demand]')) {
+    const value = rt.demand[DEMAND_KEY[el.dataset.demand]] ?? 0;
+    const pct = Math.min(50, Math.abs(value) * 2);
+    const bar = el.firstElementChild;
+    bar.style.width = `${pct}%`;
+    bar.style.left = value >= 0 ? '50%' : `${50 - pct}%`;
+    bar.style.opacity = value >= 0 ? '1' : '0.45';
+    el.title = `Demanda ${value > 0 ? '+' : ''}${Math.round(value)}: ${value > 2 ? 'a cidade quer mais desta zona' : value < -2 ? 'sobra desta zona' : 'equilibrada'}`;
   }
   for (const b of $('speeds').children) b.classList.toggle('active', Number(b.dataset.speed) === speed);
   renderUtilities();
@@ -288,22 +338,105 @@ for (const b of $('speeds').children) b.onclick = () => setSpeed(Number(b.datase
 // Ferramentas e mouse
 // ---------------------------------------------------------------------------
 
-for (const t of TOOLS) {
-  if (t.separatorBefore) {
-    const sep = document.createElement('span');
-    sep.className = 'separator';
-    $('tools').append(sep);
-  }
+// Botão de uma ferramenta, igual nos menus da barra e no painel "Construir"
+// do celular: cor, nome, tecla e preço (ou o cadeado, enquanto falta pesquisa).
+// As zonas mostram também a demanda.
+function toolButton(t) {
   const button = document.createElement('button');
-  const swatch = t.swatch ? `<span class="swatch" style="background:${t.swatch}"></span>` : '';
-  const key = t.key ? `<kbd>${t.key.toUpperCase()}</kbd>` : '';
-  button.innerHTML = `${swatch}${t.label || t.name}${key}`;
-  if (t.building) button.title = `${t.name}: ${utilityTitle(t.building)}`;
+  button.className = 'tool';
   button.dataset.tool = t.id;
-  button.onclick = () => selectTool(t);
-  $('tools').append(button);
-  if (t.zone === ZONE.RURAL) $('tools').append(densityButtons('density'));
+  const key = t.key ? `<kbd>${t.key.toUpperCase()}</kbd>` : '';
+  button.innerHTML = `${glyph(t)}
+    <span class="name">${t.label || t.name}${key}</span><small>${toolCost(t)}</small>
+    ${t.zone ? `<span class="demand" data-demand="${t.zone}" style="--zone:${t.swatch}"><i></i></span>` : ''}`;
+  button.onclick = () => {
+    selectTool(t);
+    closeMenus();
+    sheets.close();
+  };
+  return button;
 }
+
+/** Seções (título + grade de botões) de um menu; as zonas ganham a densidade. */
+function menuSections(menu, extra = []) {
+  const nodes = [];
+  for (const group of menu.groups) {
+    const title = document.createElement('h4');
+    title.textContent = GROUPS[group];
+    const grid = document.createElement('div');
+    grid.className = 'tool-grid';
+    grid.dataset.buildGroup = group;
+    grid.append(...TOOLS.filter((t) => t.group === group).map(toolButton), ...(group === 'road' ? extra : []));
+    nodes.push(title, grid);
+    if (group === 'zone') {
+      const dens = document.createElement('h4');
+      dens.innerHTML = `Densidade <small>residencial e comercial · tecla ${DENSITY_KEY.toUpperCase()}</small>`;
+      nodes.push(dens, densityButtons('density'));
+    }
+  }
+  return nodes;
+}
+
+// Menu suspenso da barra: um botão que abre um painel logo abaixo dele.
+function addMenu(id, label, nodes, className = '', parent = $('tools')) {
+  const wrap = document.createElement('div');
+  wrap.className = 'menu';
+  wrap.dataset.menu = id;
+  const button = document.createElement('button');
+  button.className = 'menu-button';
+  button.innerHTML = `${label}<span class="caret">▾</span>`;
+  button.onclick = () => toggleMenu(id);
+  const panel = document.createElement('div');
+  panel.className = `menu-panel ${className}`;
+  panel.hidden = true;
+  panel.append(...nodes);
+  wrap.append(button, panel);
+  parent.append(wrap);
+  return wrap;
+}
+let openMenu = null;
+function toggleMenu(id) {
+  const next = openMenu === id ? null : id;
+  closeMenus();
+  if (!next) return;
+  openMenu = next;
+  const wrap = document.querySelector(`.menu[data-menu="${id}"]`);
+  wrap.classList.add('open');
+  const panel = wrap.querySelector('.menu-panel');
+  panel.hidden = false;
+  // Não deixa o painel sair pela direita da janela.
+  panel.style.left = '';
+  const overflow = panel.getBoundingClientRect().right - (window.innerWidth - 8);
+  if (overflow > 0) panel.style.left = `${-overflow}px`;
+}
+function closeMenus() {
+  openMenu = null;
+  for (const wrap of document.querySelectorAll('.menu.open')) {
+    wrap.classList.remove('open');
+    wrap.querySelector('.menu-panel').hidden = true;
+  }
+}
+// Clicar fora de um menu aberto fecha ele.
+document.addEventListener('pointerdown', (e) => {
+  if (openMenu && !e.target.closest('.menu, #btn-zones')) closeMenus();
+});
+
+const directButton = (t) => {
+  const button = document.createElement('button');
+  button.dataset.tool = t.id;
+  button.className = 'direct';
+  button.innerHTML = `${icon(toolIcon(t))}${t.id === 'inspect' ? '' : `<span>${t.name}</span>`}<kbd>${t.key.toUpperCase()}</kbd>`;
+  button.title = `${t.name} (tecla ${t.key.toUpperCase()})`;
+  button.onclick = () => {
+    selectTool(t);
+    closeMenus();
+  };
+  return button;
+};
+const bulldozeTool = TOOLS.find((t) => t.id === 'bulldoze');
+$('tools').append(directButton(TOOLS[0]));
+for (const menu of MENUS) addMenu(menu.id, `${icon(menu.icon)}<span data-menu-label>${menu.name}</span>`, menuSections(menu));
+$('tools').append(directButton(bulldozeTool));
 
 // Escolha da densidade: Baixa / Média / Alta. Na barra fica depois das zonas;
 // no celular, num grupo do painel "Construir".
@@ -368,17 +501,14 @@ function refreshTools() {
   if (key === toolsKey) return;
   toolsKey = key;
   for (const t of TOOLS) {
-    const buttons = document.querySelectorAll(`[data-tool="${t.id}"]`);
     const locked = toolLocked(t);
-    for (const button of buttons) {
-      const mobile = button.closest('.sheet');
-      if (!mobile) {
-        button.hidden = Boolean(locked);
-        if (t.building) button.title = `${t.name}: ${utilityTitle(t.building)}`;
-        continue;
-      }
+    for (const button of document.querySelectorAll(`[data-tool="${t.id}"]`)) {
+      const small = button.querySelector('small');
+      if (!small) continue; // Inspecionar e Demolir: sempre liberados
       button.disabled = Boolean(locked);
-      button.querySelector('small').textContent = locked ? `🔒 ${lockText(t)}` : toolCost(t);
+      small.innerHTML = locked ? `${icon('lock')} ${escapeHtml(lockText(t))}` : toolCost(t);
+      button.title = locked ? `${t.name}: precisa de ${lockText(t)}`
+        : t.building ? `${t.name}: ${utilityTitle(t.building)}` : t.name;
     }
   }
   if (toolLocked(tool)) selectTool(TOOLS[0]);
@@ -388,11 +518,16 @@ function selectTool(t) {
   tool = t;
   drag = null;
   for (const b of document.querySelectorAll('[data-tool]')) b.classList.toggle('active', b.dataset.tool === t.id);
+  // O botão do menu mostra a ferramenta escolhida dentro dele.
+  for (const menu of MENUS) {
+    const wrap = document.querySelector(`.menu[data-menu="${menu.id}"]`);
+    const inside = menu.groups.includes(t.group);
+    wrap.classList.toggle('active', inside);
+    wrap.querySelector('[data-menu-label]').textContent = inside ? t.label || t.name : menu.name;
+  }
   updateMobileNav();
 }
-selectTool(tool);
-document.querySelector('[data-build-group="density"]')?.append(...densityButtons('').children);
-showDensity();
+
 
 // Orçamento: painel aberto pelo dinheiro no topo ou pela tecla O.
 const budget = new BudgetPanel($('budget'), {
@@ -408,7 +543,7 @@ const budget = new BudgetPanel($('budget'), {
 });
 $('btn-budget').onclick = () => toggleBudget();
 
-// Pesquisa: painel aberto pelo botão 🔬 no topo ou pela tecla T. Ocupa o
+// Pesquisa: painel aberto pelo botão de pesquisa no topo ou pela tecla T. Ocupa o
 // mesmo canto do orçamento, então abrir um fecha o outro.
 const research = new ResearchPanel($('research'), {
   act: (cmd) => {
@@ -418,7 +553,7 @@ const research = new ResearchPanel($('research'), {
   },
 });
 $('btn-research').onclick = () => toggleResearch();
-// Cultura: artistas, gêneros e o que está em cartaz (botão 🎭 ou tecla Z).
+// Cultura: artistas, gêneros e o que está em cartaz (botão no topo ou tecla Z).
 const culture = new CulturePanel($('culture'));
 $('btn-culture').onclick = () => toggleCulture();
 
@@ -457,7 +592,7 @@ function announceResearch() {
   rt.researchEvents = [];
   const names = events.map((id) => TECH_BY_ID.get(id));
   const toast = $('toast');
-  toast.innerHTML = names.map((t) => `<b>🔬 ${escapeHtml(t.name)}</b><span>${escapeHtml(t.mechanic)}</span>`).join('');
+  toast.innerHTML = names.map((t) => `<b>${icon('research')} ${escapeHtml(t.name)}</b><span>${escapeHtml(t.mechanic)}</span>`).join('');
   toast.hidden = false;
   status(`Nova tecnologia: ${names.map((t) => t.name).join(', ')}`);
   clearTimeout(toastTimer);
@@ -471,13 +606,13 @@ function announceEvents() {
   const burned = events.filter((e) => e.kind === 'incendio').reduce((n, e) => n + e.count, 0);
   const lines = [];
   if (burned) {
-    lines.push(`<b>🔥 Incêndio</b><span>${burned} ${burned === 1 ? 'prédio virou' : 'prédios viraram'} ruína. Quartéis de bombeiros apagam o fogo no raio deles.</span>`);
+    lines.push(`<b>${icon('fire')} Incêndio</b><span>${burned} ${burned === 1 ? 'prédio virou' : 'prédios viraram'} ruína. Quartéis de bombeiros apagam o fogo no raio deles.</span>`);
   }
   if (events.some((e) => e.kind === 'epidemia')) {
-    lines.push('<b>🦠 Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>');
+    lines.push(`<b>${icon('epidemic')} Epidemia</b><span>A saúde da cidade está baixa: mais mortes nos próximos meses. Hospitais e clínicas ajudam.</span>`);
   }
   for (const e of events.filter((x) => x.kind === 'festa')) {
-    lines.push(`<b>🎉 ${escapeHtml(e.name)}</b><span>${escapeHtml(e.text)}</span>`);
+    lines.push(`<b>${icon('party')} ${escapeHtml(e.name)}</b><span>${escapeHtml(e.text)}</span>`);
   }
   const toast = $('toast');
   toast.innerHTML = lines.join('');
@@ -489,56 +624,97 @@ function announceEvents() {
 }
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
-// Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
+// Mapas: sobreposições (valor do terreno, poluição, serviços...), num menu
+// por área. Com um mapa ligado, a legenda das cores aparece embaixo do mapa.
 const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j', transito: 'm', alimentos: 'q', lixo: 'y' };
+function mapButtons(onPick) {
+  const nodes = [];
+  for (const [area, ids] of [[null, [null]], ...MAP_MENU]) {
+    if (area) {
+      const title = document.createElement('h4');
+      title.textContent = area;
+      nodes.push(title);
+    }
+    const grid = document.createElement('div');
+    grid.className = 'tool-grid maps';
+    for (const id of ids) {
+      const mode = id ? MAP_MODES[id] : { name: 'Nenhum (mapa normal)' };
+      const button = document.createElement('button');
+      button.className = 'tool';
+      button.dataset.map = id ?? '';
+      if (!id) button.classList.add('wide');
+      // Ícone na cor "boa" do mapa, com a faixa de cores embaixo.
+      const ramp = id ? `linear-gradient(90deg, ${mode.from}, ${mode.mid}, ${mode.to})` : 'var(--border)';
+      button.innerHTML = `<span class="glyph map-glyph" style="--c:#20232a;--ramp:${ramp};color:${id ? mode.to : 'var(--muted)'}">${icon(id ?? 'map-off')}</span>
+        <span class="name">${mode.name}${MAP_KEYS[id] ? `<kbd>${MAP_KEYS[id].toUpperCase()}</kbd>` : ''}</span>`;
+      button.title = id ? `Mapa: ${mode.name}` : 'Desliga a sobreposição';
+      button.onclick = () => {
+        setMap(id);
+        onPick();
+      };
+      grid.append(button);
+    }
+    nodes.push(grid);
+  }
+  return nodes;
+}
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);
-for (const [id, mode] of Object.entries(MAP_MODES)) {
-  const button = document.createElement('button');
-  button.innerHTML = `${mode.label || mode.name}${MAP_KEYS[id] ? `<kbd>${MAP_KEYS[id].toUpperCase()}</kbd>` : ''}`;
-  button.title = `Mapa: ${mode.name}`;
-  button.dataset.map = id;
-  button.onclick = () => toggleMap(id);
-  $('tools').append(button);
-}
+addMenu('mapas', `${icon('map')}<span data-menu-label>Mapas</span>`, mapButtons(closeMenus), 'narrow');
+
+// O status (salvo, erros) fica num balão no canto de baixo do mapa.
+$('viewport').append($('status'));
+// Arquivo: os botões de salvar/carregar ficam num menu no topo, antes das velocidades.
+const fileMenu = addMenu('arquivo', `${icon('save')}<span>Arquivo</span>`, [...$('file-actions').children], 'narrow file-menu', $('speeds').parentElement);
+$('speeds').before(fileMenu);
+$('file-actions').remove();
+fileMenu.querySelector('.menu-panel').addEventListener('click', (e) => {
+  if (e.target.closest('button')) closeMenus();
+});
+
 function toggleMap(id) {
   setMap(mapMode === id ? null : id);
 }
 function setMap(id) {
   mapMode = id;
   for (const b of document.querySelectorAll('[data-map]')) b.classList.toggle('active', (b.dataset.map || null) === mapMode);
+  const wrap = document.querySelector('.menu[data-menu="mapas"]');
+  wrap.classList.toggle('active', Boolean(id));
+  wrap.querySelector('[data-menu-label]').textContent = id ? MAP_MODES[id].label || MAP_MODES[id].name : 'Mapas';
+  renderLegend();
   updateMobileNav();
 }
 
+// Legenda das cores do mapa ligado: faixa contínua (de ruim a bom) ou
+// categorias com a cor de cada uma.
+function renderLegend() {
+  const el = $('legend');
+  const mode = mapMode && MAP_MODES[mapMode];
+  el.hidden = !mode;
+  if (!mode) return;
+  const { legend } = mode;
+  const body = legend.items
+    ? `<ul>${legend.items.map(([v, text]) => `<li><i style="background:${mapColor(mode, v)}"></i>${text}</li>`).join('')}</ul>`
+    : `<div class="ramp" style="background:linear-gradient(90deg, ${mode.colors.join(', ')})"></div>
+       <div class="ends"><span>${legend.low}</span><span>${legend.high}</span></div>`;
+  el.innerHTML = `<button class="close" data-legend-close title="Desligar o mapa">×</button>
+    <b>${icon(mapMode)} ${mode.name}</b>${body}${legend.note ? `<small>${legend.note}</small>` : ''}`;
+}
+$('legend').addEventListener('click', (e) => {
+  if (e.target.closest('[data-legend-close]')) setMap(null);
+});
+
 // --- Celular: barra inferior e painéis que sobem de baixo -------------------
 
-for (const t of TOOLS) {
-  if (t.id === 'inspect') continue;
-  const button = document.createElement('button');
-  button.dataset.tool = t.id;
-  button.innerHTML = `<span class="swatch" style="background:${t.swatch || t.color}"></span>
-    <span>${t.label || t.name}</span><small>${toolCost(t)}</small>`;
-  button.onclick = () => {
-    selectTool(t);
-    sheets.close();
-  };
-  document.querySelector(`[data-build-group="${t.group ?? 'ground'}"]`).append(button);
-}
-
-for (const [id, mode] of [[null, { name: 'Nenhum' }], ...Object.entries(MAP_MODES)]) {
-  const button = document.createElement('button');
-  button.dataset.map = id ?? '';
-  button.textContent = mode.name;
-  button.onclick = () => {
-    setMap(id);
-    sheets.close();
-  };
-  document.querySelector('[data-maps]').append(button);
-}
+// "Construir": as mesmas seções dos menus da barra, uma embaixo da outra.
+const buildSections = document.querySelector('[data-build-sections]');
+const mobileBulldoze = toolButton(bulldozeTool);
+for (const menu of MENUS) buildSections.append(...menuSections(menu, [mobileBulldoze]));
+document.querySelector('[data-maps]').append(...mapButtons(() => sheets.close()));
 
 for (const button of document.querySelectorAll('[data-click]')) {
-  // Os botões do painel "Arquivo" fazem o mesmo que os da barra de baixo do computador.
+  // Os botões do painel "Arquivo" fazem o mesmo que os do menu Arquivo do computador.
   button.onclick = () => {
     sheets.close();
     $(button.dataset.click).click();
@@ -570,6 +746,12 @@ for (const button of $('mobile-nav').children) {
 }
 sheets.onChange = () => updateMobileNav();
 
+function setIcon(el, name) {
+  if (el.dataset.icon === name) return;
+  el.dataset.icon = name;
+  el.innerHTML = icon(name);
+}
+
 // Destaca o botão ativo e mostra a ferramenta/mapa escolhidos nos rótulos.
 function updateMobileNav() {
   const nav = $('mobile-nav');
@@ -578,11 +760,26 @@ function updateMobileNav() {
   nav.querySelector('[data-mobile="inspect"]').classList.toggle('active', !building);
   nav.querySelector('[data-sheet="sheet-build"]').classList.toggle('active', building);
   nav.querySelector('[data-build-label]').textContent = building ? (tool.label || tool.name) : 'Construir';
+  // O ícone dos botões vira o da ferramenta e o do mapa escolhidos.
+  setIcon(nav.querySelector('[data-sheet="sheet-build"] .ico'), building ? toolIcon(tool) : 'build');
+  setIcon(nav.querySelector('[data-sheet="sheet-maps"] .ico'), mapMode ?? 'map');
   nav.querySelector('[data-maps-label]').textContent = mapMode ? MAP_MODES[mapMode].label || MAP_MODES[mapMode].name : 'Mapas';
   nav.querySelector('[data-sheet="sheet-maps"]').classList.toggle('active', Boolean(mapMode));
   for (const b of nav.querySelectorAll('[data-sheet]')) b.classList.toggle('open', sheets.openId === b.dataset.sheet);
 }
-updateMobileNav();
+selectTool(tool);
+showDensity();
+
+// Demanda (RCI) no topo: abre as zonas, onde estão a demanda de cada uma e a
+// densidade. No celular, abre o painel "Construir" já nas zonas.
+$('btn-zones').onclick = () => {
+  if ($('tools').offsetParent) {
+    toggleMenu('zonas');
+    return;
+  }
+  sheets.open('sheet-build');
+  document.querySelector('#sheet-build [data-build-group="zone"]').previousElementSibling.scrollIntoView({ block: 'start' });
+};
 
 function toolCommand() {
   if (!tool.shape || !hover) return null;
@@ -829,6 +1026,7 @@ window.addEventListener('keydown', (e) => {
     setSpeed(Number(key));
   } else if (key === 'escape') {
     drag = null;
+    closeMenus();
     select(null);
     budget.toggle(false);
     research.toggle(false);

@@ -11,31 +11,32 @@
   <header class="topbar">
     <strong id="city-name">—</strong>
     <span id="date" class="mono"></span>
-    <span title="População">👥 <span id="population">0</span></span>
-    <span title="Empregados / desempregados">💼 <span id="employment">0</span></span>
-    <span id="happiness" title="Satisfação média dos moradores">🙂 <span>50%</span></span>
-    <button id="btn-budget" class="money" title="Orçamento (O)">💰 <span id="money">0</span></button>
-    <button id="btn-research" class="money" title="Pesquisa (T)">🔬 <span id="research-hud">Pesquisa</span></button>
-    <button id="btn-culture" class="money" title="Cultura (Z)">🎭 <span>Cultura</span></button>
-    <span id="power" title="Energia: consumo / produção">⚡ <span>0</span></span>
-    <span id="water" title="Água: consumo / produção">💧 <span>0</span></span>
+    <span title="População"><span class="ico" data-icon="people"></span><span id="population">0</span></span>
+    <span title="Empregados / desempregados"><span class="ico" data-icon="jobs"></span><span id="employment">0</span></span>
+    <span id="happiness" title="Satisfação média dos moradores"><span class="ico" data-icon="face-neutral"></span><span>50%</span></span>
+    <button id="btn-budget" class="money" title="Orçamento (O)"><span class="ico" data-icon="money"></span><span id="money">0</span></button>
+    <button id="btn-research" class="money" title="Pesquisa (T)"><span class="ico" data-icon="research"></span><span id="research-hud">Pesquisa</span></button>
+    <button id="btn-culture" class="money" title="Cultura (Z)"><span class="ico" data-icon="culture"></span><span>Cultura</span></button>
+    <span id="power" title="Energia: consumo / produção"><span class="ico" data-icon="power"></span><span>0</span></span>
+    <span id="water" title="Água: consumo / produção"><span class="ico" data-icon="water"></span><span>0</span></span>
     <span id="utility-hint" class="hint" hidden></span>
-    <span class="rci" title="Demanda: residencial, comercial, industrial e rural">
-      <span class="bar" id="demand-r"><i></i></span>
-      <span class="bar" id="demand-c"><i></i></span>
-      <span class="bar" id="demand-i"><i></i></span>
-      <span class="bar" id="demand-f"><i></i></span>
-    </span>
+    <button id="btn-zones" class="money rci" title="Demanda por zona (R, C, I e rural): para cima falta, para baixo sobra. Clique para zonear e escolher a densidade.">
+      <span class="col"><span class="bar" id="demand-r"><i></i></span><b>R</b></span>
+      <span class="col"><span class="bar" id="demand-c"><i></i></span><b>C</b></span>
+      <span class="col"><span class="bar" id="demand-i"><i></i></span><b>I</b></span>
+      <span class="col"><span class="bar" id="demand-f"><i></i></span><b>F</b></span>
+    </button>
     <span class="spacer"></span>
     <span class="speeds" id="speeds">
-      <button data-speed="0" title="Pausar (espaço)">⏸</button>
-      <button data-speed="1" title="Velocidade 1 (tecla 1)">▶</button>
-      <button data-speed="2" title="Velocidade 2 (tecla 2)">▶▶</button>
-      <button data-speed="3" title="Velocidade 3 (tecla 3)">▶▶▶</button>
+      <button data-speed="0" title="Pausar (espaço)"><span class="ico" data-icon="pause"></span></button>
+      <button data-speed="1" title="Velocidade 1 (tecla 1)"><span class="ico" data-icon="speed1"></span></button>
+      <button data-speed="2" title="Velocidade 2 (tecla 2)"><span class="ico" data-icon="speed2"></span></button>
+      <button data-speed="3" title="Velocidade 3 (tecla 3)"><span class="ico" data-icon="speed3"></span></button>
     </span>
   </header>
 
-  <nav class="toolbar" id="tools"></nav>
+  <!-- Ferramentas em menus por área, montados em main.js. -->
+  <nav class="toolbar" id="tools"><span id="status" class="muted status"></span></nav>
 
   <main id="viewport">
     <canvas id="map"></canvas>
@@ -44,6 +45,7 @@
     <aside id="research" class="budget research" hidden></aside>
     <aside id="culture" class="budget culture" hidden></aside>
     <div id="toast" hidden></div>
+    <div id="legend" class="legend" hidden></div>
     <aside id="inspector" hidden>
       <button id="inspector-close" class="close" title="Fechar">×</button>
       <div id="inspector-body"></div>
@@ -51,29 +53,28 @@
     <canvas id="minimap" width="220" height="120"></canvas>
   </main>
 
-  <footer class="savebar">
-    <button id="btn-new">Nova cidade</button>
-    <button id="btn-save" title="Ctrl+S">Salvar</button>
-    <button id="btn-save-as">Salvar como…</button>
-    <button id="btn-load">Carregar…</button>
-    <button id="btn-export">Exportar arquivo</button>
-    <button id="btn-import">Importar arquivo</button>
-    <button id="btn-code">Código de save</button>
-    <input type="file" id="file-input" accept=".json,application/json" hidden>
-    <span class="spacer"></span>
-    <span id="storage-mode" class="muted"></span>
-    <span id="status" class="muted"></span>
-  </footer>
+  <!-- Vão para o menu "Arquivo" da barra (ver main.js). -->
+  <div id="file-actions" hidden>
+    <button id="btn-save" title="Ctrl+S"><span class="ico" data-icon="save"></span>Salvar</button>
+    <button id="btn-save-as"><span class="ico" data-icon="save-as"></span>Salvar como…</button>
+    <button id="btn-load"><span class="ico" data-icon="load"></span>Carregar…</button>
+    <button id="btn-export"><span class="ico" data-icon="export"></span>Exportar arquivo</button>
+    <button id="btn-import"><span class="ico" data-icon="import"></span>Importar arquivo</button>
+    <button id="btn-code"><span class="ico" data-icon="code"></span>Código de save</button>
+    <button id="btn-new"><span class="ico" data-icon="new"></span>Nova cidade</button>
+    <small id="storage-mode" class="muted"></small>
+  </div>
+  <input type="file" id="file-input" accept=".json,application/json" hidden>
 
   <!-- Celular: barra inferior e painéis que sobem de baixo (no computador ficam escondidos). -->
   <nav class="mobile-nav" id="mobile-nav">
-    <button data-mobile="inspect"><span class="ico">✋</span><span>Mover</span></button>
-    <button data-sheet="sheet-build"><span class="ico">🏗️</span><span data-build-label>Construir</span></button>
-    <button data-sheet="sheet-maps"><span class="ico">🗺️</span><span data-maps-label>Mapas</span></button>
-    <button data-mobile="budget"><span class="ico">💰</span><span>Orçamento</span></button>
-    <button data-mobile="research"><span class="ico">🔬</span><span>Pesquisa</span></button>
-    <button data-mobile="culture"><span class="ico">🎭</span><span>Cultura</span></button>
-    <button data-sheet="sheet-file"><span class="ico">💾</span><span>Arquivo</span></button>
+    <button data-mobile="inspect"><span class="ico" data-icon="inspect"></span><span>Mover</span></button>
+    <button data-sheet="sheet-build"><span class="ico" data-icon="build"></span><span data-build-label>Construir</span></button>
+    <button data-sheet="sheet-maps"><span class="ico" data-icon="map"></span><span data-maps-label>Mapas</span></button>
+    <button data-mobile="budget"><span class="ico" data-icon="money"></span><span>Orçamento</span></button>
+    <button data-mobile="research"><span class="ico" data-icon="research"></span><span>Pesquisa</span></button>
+    <button data-mobile="culture"><span class="ico" data-icon="culture"></span><span>Cultura</span></button>
+    <button data-sheet="sheet-file"><span class="ico" data-icon="save"></span><span>Arquivo</span></button>
   </nav>
 
   <div class="sheet" id="sheet-build" hidden>
@@ -81,30 +82,7 @@
     <section class="sheet-panel" role="dialog" aria-label="Construir">
       <div class="grabber"></div>
       <h3>Construir</h3>
-      <h4>Ruas e zonas</h4>
-      <div class="sheet-grid" data-build-group="ground"></div>
-      <h4>Densidade (residencial e comercial)</h4>
-      <div class="sheet-grid" data-build-group="density"></div>
-      <h4>Energia e água</h4>
-      <div class="sheet-grid" data-build-group="utility"></div>
-      <h4>Pesquisa e estatais</h4>
-      <div class="sheet-grid" data-build-group="research"></div>
-      <h4>Educação</h4>
-      <div class="sheet-grid" data-build-group="education"></div>
-      <h4>Saúde e segurança</h4>
-      <div class="sheet-grid" data-build-group="services"></div>
-      <h4>Lazer</h4>
-      <div class="sheet-grid" data-build-group="leisure"></div>
-      <h4>Alimentos</h4>
-      <div class="sheet-grid" data-build-group="food"></div>
-      <h4>Turismo e cultura</h4>
-      <div class="sheet-grid" data-build-group="tourism"></div>
-      <h4>Lixo e esgoto</h4>
-      <div class="sheet-grid" data-build-group="waste"></div>
-      <h4>Transporte público</h4>
-      <div class="sheet-grid" data-build-group="transit"></div>
-      <h4>Carga</h4>
-      <div class="sheet-grid" data-build-group="freight"></div>
+      <div data-build-sections></div>
     </section>
   </div>
 
@@ -113,7 +91,7 @@
     <section class="sheet-panel" role="dialog" aria-label="Mapas">
       <div class="grabber"></div>
       <h3>Mapas</h3>
-      <div class="sheet-grid" data-maps></div>
+      <div data-maps></div>
     </section>
   </div>
 
@@ -123,13 +101,13 @@
       <div class="grabber"></div>
       <h3>Arquivo</h3>
       <div class="sheet-list">
-        <button data-click="btn-save"><span class="ico">💾</span>Salvar</button>
-        <button data-click="btn-save-as"><span class="ico">📝</span>Salvar como…</button>
-        <button data-click="btn-load"><span class="ico">📂</span>Carregar…</button>
-        <button data-click="btn-export"><span class="ico">⬇️</span>Exportar arquivo</button>
-        <button data-click="btn-import"><span class="ico">⬆️</span>Importar arquivo</button>
-        <button data-click="btn-code"><span class="ico">🔑</span>Código de save</button>
-        <button data-click="btn-new"><span class="ico">✨</span>Nova cidade</button>
+        <button data-click="btn-save"><span class="ico" data-icon="save"></span>Salvar</button>
+        <button data-click="btn-save-as"><span class="ico" data-icon="save-as"></span>Salvar como…</button>
+        <button data-click="btn-load"><span class="ico" data-icon="load"></span>Carregar…</button>
+        <button data-click="btn-export"><span class="ico" data-icon="export"></span>Exportar arquivo</button>
+        <button data-click="btn-import"><span class="ico" data-icon="import"></span>Importar arquivo</button>
+        <button data-click="btn-code"><span class="ico" data-icon="code"></span>Código de save</button>
+        <button data-click="btn-new"><span class="ico" data-icon="new"></span>Nova cidade</button>
       </div>
       <p class="muted small" data-file-status></p>
     </section>
