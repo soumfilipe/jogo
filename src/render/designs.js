@@ -375,6 +375,52 @@ const GENERATORS = {
   },
 };
 
+// Fazendas: lavoura em faixas, celeiro, silos e (nas maiores) galpão de máquinas.
+const CROPS = ['#c9b456', '#9cbf5a', '#6f9a3f', '#d9c27a', '#8fae4a', '#b58a4a', '#7fa55a', '#c4a24a'];
+const BARNS = [wall('#a5402d', '#86321f'), wall('#c9b79c', '#ab9a80'), wall('#e6e2da', '#c9c4ba'), wall('#8a5a3a', '#6f472e')];
+
+GENERATORS[ZONE.RURAL] = (info, r) => {
+  const S = info.size;
+  const parts = [{ kind: 'slab', box: [0.03, 0.03, S - 0.03, S - 0.03], color: r.pick(['#8a7a4a', '#7c6f45', '#93834f']), lift: 0 }];
+  // Faixas de lavoura, cada uma com uma cultura.
+  const strips = S === 1 ? r.pick([2, 3]) : r.pick([3, 4, 5]);
+  const alongX = r.chance(0.5);
+  const field = S === 1 ? [0.06, 0.06, 0.94, 0.55] : [0.06, 0.06, 1.94, 1.2];
+  const len = (alongX ? field[3] - field[1] : field[2] - field[0]) / strips;
+  for (let k = 0; k < strips; k++) {
+    const a = (alongX ? field[1] : field[0]) + k * len;
+    const box = alongX ? [field[0], a + 0.01, field[2], a + len - 0.01] : [a + 0.01, field[1], a + len - 0.01, field[3]];
+    parts.push({ kind: 'slab', box, color: r.pick(CROPS), lines: true, lift: 0.01 });
+  }
+  // Celeiro com telhado de duas águas.
+  const barn = r.pick(BARNS);
+  const bx = r.range(0.06, S === 1 ? 0.18 : 0.3);
+  const bw = S === 1 ? r.range(0.38, 0.5) : r.range(0.6, 0.8);
+  const by = S === 1 ? 0.6 : 1.3;
+  parts.push(block([bx, by, bx + bw, S - 0.08], 0, r.range(0.3, 0.45) * (1 + (info.level - 1) * 0.2), barn, {
+    roof: { kind: r.pick(['gable-x', 'gable-y']), color: r.pick(['#6f5b4b', '#5b5f66', '#8a3b2c']), rise: r.range(0.2, 0.35) },
+    doors: { count: 1, color: '#4a3a2a' },
+  }));
+  // Silos: um no sítio, mais nas fazendas maiores.
+  const silos = info.level === 1 ? r.pick([0, 1]) : info.level === 2 ? r.pick([1, 2]) : r.pick([2, 3]);
+  for (let k = 0; k < silos; k++) {
+    parts.push({
+      kind: 'cylinder', cx: S - 0.18 - k * 0.2, cy: S === 1 ? 0.78 : 1.6, r: 0.08 + (S - 1) * 0.04,
+      lift: 0, h: r.range(0.5, 0.8) * (1 + (S - 1) * 0.5), color: r.pick(['#d6d8dc', '#c9b79c', '#a7b4c2']), top: '#eceef0',
+    });
+  }
+  if (S > 1) {
+    // Agroindústria: galpão de beneficiamento.
+    const w = r.pick(IND_WALLS);
+    parts.push(block([1.0, 1.3, 1.45, 1.9], 0, r.range(0.55, 0.75), w, { doors: { count: 2, color: '#3e4145' }, bands: [{ at: 0.4, thick: 0.06, color: r.pick(STRIPES) }] }));
+  } else if (info.level >= 3) {
+    // Trator no pátio.
+    const tx = r.range(0.55, 0.62);
+    parts.push(block([tx, 0.62, tx + 0.16, 0.72], 0, 0.1, wall(r.pick(['#3d8f5a', '#c23b3b', '#e8b931']), '#2c3e50'), { top: '#4a4d52' }));
+  }
+  return parts;
+};
+
 // Serviços públicos: um desenho por tipo, com pequenas variações.
 const UTILITY_GENERATORS = {
   usina_carvao(r) {
@@ -869,6 +915,41 @@ const UTILITY_GENERATORS = {
     parts.push(block([1.55, 1.1, 1.65, 1.2], 0, 2.0, wall('#e8b931', '#c9a020')));
     parts.push(block([1.5, 0.15, 1.7, 1.25], 2.0, 0.12, wall('#e8b931', '#c9a020')));
     parts.push(block([0.15, 1.35, 1.2, 1.85], 0, 0.6, r.pick(IND_WALLS), { doors: { count: 2, color: '#5c5f68' } }));
+    return parts;
+  },
+
+  mercado_municipal(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 0.96, 0.96], color: '#b5b0a6', lift: 0 }];
+    // Galpão com telhado alto e bancas coloridas na frente.
+    parts.push(block([0.1, 0.1, 0.9, 0.62], 0, 0.7, r.pick([wall('#e9d48a', '#cdb86e'), wall('#e6e2da', '#c9c4ba')]), {
+      roof: { kind: 'gable-x', color: '#9c4a3a', rise: 0.3 }, doors: { count: 3, color: '#6f4e37' }, windows: { cols: 3, style: 'grid' },
+    }));
+    for (const [x, c] of [[0.12, '#c23b3b'], [0.4, '#3d8f5a'], [0.68, '#e8b931']]) {
+      parts.push(block([x, 0.72, x + 0.2, 0.9], 0.22, 0.03, wall(c, mixHex(c, '#000000', 0.2)), { top: c }));
+    }
+    return parts;
+  },
+
+  restaurante_popular() {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.88, 0.75], 0, 0.75, wall('#f2d7b4', '#d8bc97'), {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 2, color: '#d9822b' }, bands: [{ at: 0.6, thick: 0.08, color: '#d9822b' }],
+    }));
+    return parts;
+  },
+
+  ceasa(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7a7d84', lines: true, lift: 0 }];
+    // Pavilhões compridos com cobertura em arco e caminhões de hortifrúti.
+    for (const y of [0.12, 0.72]) {
+      parts.push(block([0.12, y, 1.88, y + 0.45], 0, 0.55, r.pick([wall('#e6e2da', '#c9c4ba'), wall('#cfc9b8', '#b0aa99')]), {
+        roof: { kind: 'gable-x', color: '#5b5f66', rise: 0.25 }, doors: { count: 5, color: '#3e4145' },
+      }));
+    }
+    for (const x of [0.25, 0.75, 1.25]) {
+      parts.push(block([x, 1.4, x + 0.25, 1.85], 0, 0.28, wall('#f4f5f6', '#d6d9dd')));
+      parts.push(block([x, 1.32, x + 0.25, 1.42], 0, 0.2, wall('#3d8f5a', '#2f7148')));
+    }
     return parts;
   },
 

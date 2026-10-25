@@ -22,7 +22,7 @@ import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { hash2 } from '../core/rng.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -181,6 +181,12 @@ const MIGRATIONS = {
   11: (save) => {
     save.data.economy.fares ??= 0;
     save.version = 12;
+    return save;
+  },
+  // v12 -> v13: zona rural, com imposto próprio.
+  12: (save) => {
+    save.data.economy.taxes.rural ??= 9;
+    save.version = 13;
     return save;
   },
 };

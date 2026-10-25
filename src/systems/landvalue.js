@@ -38,6 +38,7 @@ export function computeLandValue(state, rt) {
     else if (terrain[i] === TERRAIN.SAND) nature[i] = 0.5;
   }
   const industryPollution = mod(rt, 'pollution.industry');
+  const farmPollution = mod(rt, 'pollution.farm', 0);
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
     // Prédios grandes contam no tile de origem com o peso da área inteira.
@@ -45,6 +46,8 @@ export function computeLandValue(state, rt) {
     activity[b.tile] += info.size * info.size;
     if (info.zone === ZONE.COMMERCIAL) commerce[b.tile] += weight;
     if (info.zone === ZONE.INDUSTRIAL) industry[b.tile] += weight * industryPollution;
+    // Fazendas só poluem com adubo e agrotóxicos.
+    if (info.zone === ZONE.RURAL) industry[b.tile] += weight * farmPollution;
     if (info.utility) industry[b.tile] += utilityPollution(rt, b.type);
   }
   // Carros na rua agora (contados das posições em viagem, que estão no estado).

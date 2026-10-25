@@ -8,6 +8,7 @@ import { minEduFor, radiusOf, seatsOf } from '../systems/education.js';
 import { serviceRadius } from '../systems/services.js';
 import { transitRadius } from '../systems/transit.js';
 import { EXPORT, freightFactor } from '../systems/logistics.js';
+import { farmOutput } from '../systems/food.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
 import { formatClock } from '../core/time.js';
@@ -72,7 +73,9 @@ function renderBuilding(el, b, state, rt) {
         : `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>`}
       ${wellbeingRows(rt, b)}
       <dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>
-      ${info.zone !== ZONE.INDUSTRIAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
+      ${info.food ? `<dt>Produção</dt><dd>${Math.round(farmOutput(state, rt, b))} de ${Math.round(farmOutput(state, rt, b, true))} alimentos/mês</dd>` : ''}
+      ${info.residents ? `<dt>Alimentos</dt><dd>${foodText(rt.coverage?.alimentos?.[b.tile] ?? 0)}</dd>` : ''}
+      ${info.zone !== ZONE.INDUSTRIAL && info.zone !== ZONE.RURAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
       <dt>Poluição</dt><dd>${pct(rt.pollution[b.tile])}</dd>
       <dt>Acesso a estrada</dt><dd>${access ? 'Sim' : NO}</dd>
@@ -105,7 +108,9 @@ function freightRow(rt, b) {
   return '';
 }
 const NO_STAFF = '<b style="color:#ff8a80">sem funcionários, não atende</b>';
-const SERVICE_TEXT = { saude: 'saúde', policia: 'policiamento', bombeiros: 'bombeiros', lazer: 'lazer' };
+const SERVICE_TEXT = { saude: 'saúde', policia: 'policiamento', bombeiros: 'bombeiros', lazer: 'lazer', alimentos: 'alimentos' };
+// Acesso a alimentos da casa (cobertura dos mercados).
+const foodText = (v) => (v === 0 ? '<b style="color:#ff8a80">sem mercado por perto</b>' : `mercado no raio (${pct(v)})`);
 
 // Saúde, crime e satisfação do prédio (ver systems/wellbeing.js).
 function wellbeingRows(rt, b) {

@@ -7,21 +7,17 @@ import {
   BUILDINGS, DAYS_BETWEEN_UPGRADES, DENSITY, DENSITY_INFO, LAND_VALUE_FOR_LEVEL, LARGE_BUILDINGS, LEVELS,
   MAX_LEVEL, ZONE, buildingFloors, capacityOf, landValueForFloor, maxFloorsFor,
 } from '../world/catalog.js';
-import { addBuilding, findAccessRoad, touchMap, usesCompanies, vacancies } from '../world/runtime.js';
+import { addBuilding, findAccessRoad, leasedJobs, touchMap, usesCompanies, vacancies } from '../world/runtime.js';
 import { fitCompanies, foundCompanies, vacantFloors } from './companies.js';
 import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { moveInFamily } from './demography.js';
 import { isBuildable } from '../world/world.js';
-import { levelUnlocked, mod } from './mods.js';
+import { levelUnlocked, mod, ZONE_KEY } from './mods.js';
 import { LEVEL_TECH, TECH_BY_ID } from '../world/techs.js';
 
-const DEMAND_KEY = {
-  [ZONE.RESIDENTIAL]: 'residential',
-  [ZONE.COMMERCIAL]: 'commercial',
-  [ZONE.INDUSTRIAL]: 'industrial',
-};
+const DEMAND_KEY = ZONE_KEY;
 const GROW_CHANCE = 0.08;
 const LARGE_CHANCE = 0.3;
 // Prédios grandes só aparecem depois que a cidade tem este tamanho.
@@ -104,7 +100,7 @@ export function upgradeBuildings(state, rt) {
     if (rt.demand[DEMAND_KEY[info.zone]] < 0) continue;
 
     if (b.abandoned !== undefined || !isServed(rt, b)) continue;
-    if (occupied(rt, b) < capacityOf(b)) continue;
+    if (!isFull(rt, b)) continue;
     if (rt.landValue[b.tile] < step.landValue) continue;
     // O passo seguinte consome mais: precisa caber na rede.
     const access = rt.access.get(b.id);
@@ -182,7 +178,7 @@ export function upgradeBlockers(state, rt, b) {
   if (service && !service.power) blockers.push('energia');
   if (service && !service.water) blockers.push('água');
   if (usesCompanies(info) && vacantFloors(rt, b).length) blockers.push('alugar os andares vagos');
-  else if (occupied(rt, b) < capacityOf(b)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
+  else if (!isFull(rt, b)) blockers.push(info.residents ? 'ficar lotado de moradores' : 'ficar com todas as vagas preenchidas');
   if (rt.landValue[b.tile] < step.landValue) {
     blockers.push(`valor do terreno ${pct(step.landValue)} (agora ${pct(rt.landValue[b.tile])})`);
   }
@@ -192,9 +188,20 @@ export function upgradeBlockers(state, rt, b) {
 
 const occupied = (rt, b) => (BUILDINGS[b.type].residents ? rt.residents.get(b.id) : rt.workers.get(b.id)).size;
 
-/** Densidade que vale para um prédio no tile: a indústria não tem limite. */
+/**
+ * Lotado: casa sem vaga, ou todas as vagas preenchidas. Com empresas, conta o
+ * que elas oferecem quando a pesquisa diminui as vagas (o trator nas fazendas).
+ */
+function isFull(rt, b) {
+  const info = BUILDINGS[b.type];
+  let capacity = capacityOf(b);
+  if (usesCompanies(info) && vacantFloors(rt, b).length === 0) capacity = Math.min(capacity, leasedJobs(rt, b));
+  return occupied(rt, b) >= capacity;
+}
+
+/** Densidade que vale para um prédio no tile: a indústria e as fazendas não têm limite. */
 function densityOf(state, info, tile) {
-  return info.zone === ZONE.INDUSTRIAL ? DENSITY.HIGH : state.map.density[tile];
+  return info.zone === ZONE.INDUSTRIAL || info.zone === ZONE.RURAL ? DENSITY.HIGH : state.map.density[tile];
 }
 
 /** Prédios grandes só nascem onde todo o terreno permite o nível máximo. */

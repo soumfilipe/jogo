@@ -64,11 +64,11 @@ const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
 // Cor dos lotes vazios por zona e densidade: quanto mais densa, mais forte.
 const DENSITY_TINT = { [DENSITY.LOW]: 0.28, [DENSITY.MEDIUM]: 0.45, [DENSITY.HIGH]: 0.65 };
 const ZONE_TINT = {};
-for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL]) {
+for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL]) {
   ZONE_TINT[zone] = {};
   for (const [density, amount] of Object.entries(DENSITY_TINT)) {
-    // A indústria não tem densidade: sempre a cor média.
-    const t = zone === ZONE.INDUSTRIAL ? DENSITY_TINT[DENSITY.MEDIUM] : amount;
+    // A indústria e a zona rural não têm densidade: sempre a cor média.
+    const t = zone === ZONE.INDUSTRIAL || zone === ZONE.RURAL ? DENSITY_TINT[DENSITY.MEDIUM] : amount;
     ZONE_TINT[zone][density] = mix(GRASS[0], ZONE_INFO[zone].color, t);
   }
 }
@@ -88,6 +88,8 @@ export const MAP_MODES = {
   saude: { name: 'Saúde', layer: 'healthMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
   crime: { name: 'Segurança', label: 'Crime', layer: 'crimeMap', from: '#8e1b1b', mid: '#f1c40f', to: '#2ecc71' },
   satisfacao: { name: 'Satisfação', layer: 'satisfactionMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  // Alimentos: casas com mercado no raio (verde) ou sem (vermelho).
+  alimentos: { name: 'Alimentos', layer: 'foodMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
   // Trânsito: só as ruas mudam de cor (verde livre, vermelho parado).
   transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
 };

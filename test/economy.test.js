@@ -94,7 +94,7 @@ test('save v3 vira impostos por zona a partir da taxa única', () => {
   v3.version = 3;
   v3.checksum = checksum(v3.data);
   const { state: migrated } = readSave(JSON.stringify(v3));
-  assert.deepEqual(migrated.economy.taxes, { residential: 12, commercial: 12, industrial: 12 });
+  assert.deepEqual(migrated.economy.taxes, { residential: 12, commercial: 12, industrial: 12, rural: 9 });
   assert.deepEqual(migrated.economy.loans, []);
   assert.equal(migrated.economy.money, 777);
   const rt = prepare(migrated);

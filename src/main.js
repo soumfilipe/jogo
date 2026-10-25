@@ -37,7 +37,7 @@ const TOOLS = [
   // Avenida e via expressa: sobre uma rua, melhoram ela (paga só a diferença).
   { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57' },
   { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047' },
-  ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL].map((zone) => ({
+  ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL].map((zone) => ({
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color,
   })),
@@ -62,6 +62,8 @@ const TOOLS = [
     ['delegacia', 'Delegacia', '#2c3e50', 'services'], ['guarda_municipal', 'Guarda', '#16a085', 'services'],
     ['central_cameras', 'Câmeras', '#5b7fa8', 'services'], ['quartel_bombeiros', 'Bombeiros', '#c0392b', 'services'],
     ['base_samu', 'SAMU', '#e05a47', 'services'],
+    ['mercado_municipal', 'Mercado', '#e9d48a', 'food'], ['restaurante_popular', 'Restaurante', '#d9822b', 'food'],
+    ['ceasa', 'Ceasa', '#3d8f5a', 'food'],
     ['parque', 'Praça', '#7fb069', 'leisure'], ['cinema', 'Cinema', '#8e44ad', 'leisure'], ['ginasio', 'Ginásio', '#3f6fc0', 'leisure'],
     ['ponto_onibus', 'Ônibus', '#e8b931', 'transit'], ['estacao_brt', 'BRT', '#c0392b', 'transit'],
     ['estacao_vlt', 'VLT', '#16a085', 'transit'], ['estacao_metro', 'Metrô', '#9fc3e0', 'transit'],
@@ -218,7 +220,9 @@ function renderHud() {
   $('population').parentElement.title = `População: ${(s.population - kids).toLocaleString('pt-BR')} adultos e ${kids.toLocaleString('pt-BR')} crianças e jovens`;
   $('employment').textContent = `${s.employed.toLocaleString('pt-BR')} / ${s.unemployed.toLocaleString('pt-BR')}`;
   $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
-  for (const [id, value] of [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial], ['demand-i', rt.demand.industrial]]) {
+  const demands = [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial],
+    ['demand-i', rt.demand.industrial], ['demand-f', rt.demand.rural]];
+  for (const [id, value] of demands) {
     const bar = $(id).firstElementChild;
     const pct = Math.min(50, Math.abs(value) * 2);
     bar.style.height = `${pct}%`;
@@ -283,7 +287,7 @@ for (const t of TOOLS) {
   button.dataset.tool = t.id;
   button.onclick = () => selectTool(t);
   $('tools').append(button);
-  if (t.zone === ZONE.INDUSTRIAL) $('tools').append(densityButtons('density'));
+  if (t.zone === ZONE.RURAL) $('tools').append(densityButtons('density'));
 }
 
 // Escolha da densidade: Baixa / Média / Alta. Na barra fica depois das zonas;
@@ -445,7 +449,7 @@ function announceEvents() {
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
-const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j', transito: 'm' };
+const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j', transito: 'm', alimentos: 'q' };
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);

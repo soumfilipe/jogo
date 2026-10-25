@@ -2,10 +2,11 @@
 //
 // Receitas (impostos, por zona):
 //   residencial: cada morador empregado paga incomePerWorker por ponto de imposto
-//   comercial / industrial: cada vaga ocupada paga incomePerJob por ponto
+//   comercial / industrial / rural: cada vaga ocupada paga incomePerJob por ponto
 //   estatais (refinaria, fábrica de cimento...): receita proporcional à lotação
+//   exportação de alimentos que sobram (ver food.js)
 // Despesas: manutenção das ruas e dos serviços públicos, verba de pesquisa,
-// leis e políticas ativas, parcelas de empréstimos. Tecnologias mudam vários desses valores (mod()).
+// leis e políticas ativas, alimentos importados, parcelas de empréstimos. Tecnologias mudam vários desses valores (mod()).
 //
 // monthlyBudget() calcula o mês "como está agora" (para o painel e a
 // previsão); closeMonth() aplica no fim de cada mês, paga as parcelas e guarda
@@ -16,8 +17,9 @@ import { jobsOf, mod, utilityOutput, utilityUpkeep } from './mods.js';
 import { researchOutput } from './research.js';
 import { policiesCost } from './policies.js';
 import { freightFactor } from './logistics.js';
+import { foodBalance } from './food.js';
 
-const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial' };
+const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
 
 export function monthlyBudget(state, rt) {
   const taxes = state.economy.taxes;
@@ -25,7 +27,7 @@ export function monthlyBudget(state, rt) {
   for (const c of state.citizens) if (c.job !== null) employed++;
 
   // Vagas ocupadas, já pesadas pelo modificador de imposto do nível do prédio.
-  const jobsFilled = { commercial: 0, industrial: 0 };
+  const jobsFilled = { commercial: 0, industrial: 0, rural: 0 };
   let utilities = 0;
   let statal = 0;
   for (const b of state.buildings) {
@@ -48,24 +50,30 @@ export function monthlyBudget(state, rt) {
   for (const r of state.map.road) roadTiles += r;
 
   const all = mod(rt, 'income.all');
+  const food = foodBalance(state, rt);
   const income = {
     residential: Math.round(employed * ECONOMY.incomePerWorker * taxes.residential * all),
     commercial: Math.round(jobsFilled.commercial * ECONOMY.incomePerJob * taxes.commercial * all),
     industrial: Math.round(jobsFilled.industrial * ECONOMY.incomePerJob * taxes.industrial * all),
+    rural: Math.round(jobsFilled.rural * ECONOMY.incomePerJob * (taxes.rural ?? ECONOMY.taxDefault) * all),
     statal: Math.round(statal),
+    food: food.exportIncome,
     // Passagens do transporte público juntadas neste mês (ver transit.js).
     fares: Math.round(state.economy.fares ?? 0),
   };
-  income.total = income.residential + income.commercial + income.industrial + income.statal + income.fares;
+  income.total = income.residential + income.commercial + income.industrial + income.rural
+    + income.statal + income.food + income.fares;
 
   const expenses = {
     roads: Math.round(roadTiles * mod(rt, 'roadUpkeep', ECONOMY.roadUpkeepPerMonth) * mod(rt, 'maintenance')),
     utilities,
     research: researchOutput(state, rt).fundingCost,
     policies: policiesCost(state, rt, income.total),
+    food: food.importCost,
     loans: state.economy.loans.reduce((sum, loan) => sum + loanInstallment(loan), 0),
   };
-  expenses.total = expenses.roads + expenses.utilities + expenses.research + expenses.policies + expenses.loans;
+  expenses.total = expenses.roads + expenses.utilities + expenses.research + expenses.policies + expenses.food
+    + expenses.loans;
 
   return { income, expenses, net: income.total - expenses.total };
 }

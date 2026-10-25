@@ -18,7 +18,8 @@
 //   landValue.<zona>, upgradeChance.<zona>, pollution.industry,
 //   pollution.<tipo>, output.power, output.<tipo>, cost.<tipo>, upkeep.<tipo>,
 //   roadCapacity, congestion, speed.<via>, radius.<modo>, freightRange,
-//   pollution.traffic, noise
+//   pollution.traffic, noise, food.output, food.waste, food.price, food.sand,
+//   food.consumption, pollution.farm, demand.rural
 
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { BUILDING_TECH, TECH_BY_ID } from '../world/techs.js';
@@ -28,6 +29,7 @@ export const ZONE_KEY = {
   [ZONE.RESIDENTIAL]: 'residential',
   [ZONE.COMMERCIAL]: 'commercial',
   [ZONE.INDUSTRIAL]: 'industrial',
+  [ZONE.RURAL]: 'rural',
 };
 
 export function computeMods(state, rt) {
@@ -77,7 +79,8 @@ export function isUnlocked(rt, type) {
 
 /**
  * Nível de prédio liberado na zona. O nível 1 e a indústria não dependem de
- * tecnologia; os outros vêm de techs como o concreto armado e o zoneamento.
+ * tecnologia; os outros vêm de techs como o concreto armado, o zoneamento e,
+ * nas fazendas, o trator e a revolução verde.
  */
 export function levelUnlocked(rt, zone, level) {
   const key = ZONE_KEY[zone];

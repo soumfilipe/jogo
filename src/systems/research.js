@@ -56,7 +56,7 @@ export function createResearch(startMarco = 1) {
 export function grantLegacyResearch(state) {
   if (!state.legacyResearch) return;
   delete state.legacyResearch;
-  const keys = { [ZONE.RESIDENTIAL]: 'residential', [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial' };
+  const keys = { [ZONE.RESIDENTIAL]: 'residential', [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
   const needed = new Set();
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];

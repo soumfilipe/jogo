@@ -10,7 +10,7 @@
 // o estado e por isso só rodam em horários fixos da simulação.
 
 import {
-  ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE, capacityOf,
+  ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE, ZONE, capacityOf,
 } from '../world/catalog.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { footprint, removeBuilding, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
@@ -62,7 +62,7 @@ export function computeUtilities(state, rt) {
         entry(net)[res].supply += utilityOutput(rt, b.type, res);
         sources[res].push(rt.access.get(b.id));
       }
-    } else if (b.abandoned === undefined) {
+    } else if (b.abandoned === undefined && info.zone !== ZONE.RURAL) {
       consumers.push({ b, net, need: consumption(info, capacityOf(b), rt) });
       if (net) entry(net);
     }
@@ -126,9 +126,10 @@ export function reserve(state, rt, access, need) {
   for (const res of RESOURCES) if (!state.utilities?.imported?.[res]) e[res].used += need[res];
 }
 
-/** Prédio com energia e água (serviços públicos funcionam sempre). */
+/** Prédio com energia e água (serviços públicos e fazendas funcionam sempre). */
 export function isServed(rt, b) {
-  if (BUILDINGS[b.type].utility) return true;
+  const info = BUILDINGS[b.type];
+  if (info.utility || info.zone === ZONE.RURAL) return true;
   const s = rt.service?.get(b.id);
   return Boolean(s && s.power && s.water);
 }
