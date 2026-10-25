@@ -276,6 +276,35 @@ export const BUILDINGS = {
     name: 'Central de abastecimento (Ceasa)', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
     utility: { power: 0, water: 0, cost: 25_000, upkeep: 400, pollution: 3, area: 'abastecimento', mods: [{ mod: 'food.price', mul: 0.8 }] },
   },
+
+  // --- Lixo e esgoto (ver systems/waste.js e sanitation.js) -------------------
+  //   utility.waste: { radius, capacity } — recolhe o lixo dos prédios no raio
+  //     até encher (b.fill guarda quanto já recebeu)
+  //   utility.recycle: { radius, share } — o lixo dos prédios no raio vira share
+  //   utility.sewage: esgoto tratado por hora (mesma unidade da água)
+  //   utility.gated: { recurso: modificador } — só produz depois da pesquisa
+  lixao: {
+    name: 'Lixão', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 4,
+    utility: { power: 0, water: 0, cost: 2_000, upkeep: 60, pollution: 6, area: 'ambiental', waste: { radius: 20, capacity: 60_000 } },
+  },
+  aterro: {
+    name: 'Aterro sanitário', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 8,
+    utility: {
+      power: 800, water: 0, cost: 10_000, upkeep: 250, pollution: 2, area: 'ambiental',
+      waste: { radius: 22, capacity: 250_000 }, gated: { power: 'biogas' },
+    },
+  },
+  centro_reciclagem: {
+    name: 'Centro de reciclagem', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 15,
+    utility: { power: 0, water: 0, cost: 8_000, upkeep: 250, pollution: 1, income: 200, area: 'quimica', recycle: { radius: 14, share: 0.7 } },
+  },
+  estacao_esgoto: {
+    name: 'Estação de tratamento de esgoto', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 12,
+    utility: {
+      power: 0, water: 1_200, cost: 15_000, upkeep: 400, pollution: 1, needsWater: true, area: 'saude',
+      sewage: 3_000, gated: { water: 'reuso' },
+    },
+  },
   base_samu: {
     name: 'Base do SAMU', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
     utility: { power: 0, water: 0, cost: 8_000, upkeep: 350, pollution: 0, area: 'saude', service: { kind: 'saude', radius: 22, strength: 0.5 } },
@@ -478,6 +507,23 @@ export const ECONOMY = {
 export const TAX_ZONES = ['residential', 'commercial', 'industrial', 'rural'];
 
 // Alimentos (ver systems/food.js), em unidades por mês.
+// Lixo (ver systems/waste.js), em unidades por dia.
+export const WASTE = {
+  perResident: 0.05,
+  perJob: { commercial: 0.03, industrial: 0.06, rural: 0.01 },
+  // Peso, na poluição em volta, de cada unidade de lixo por dia sem coleta
+  // (um quarteirão denso sem coleta chega a uns 30% de poluição).
+  pollution: 0.03,
+};
+
+// Esgoto (ver systems/sanitation.js): o esgoto de cada prédio é o consumo de
+// água dele. O que não é tratado polui os rios; casas que bebem água de bomba
+// em rio poluído adoecem.
+export const SANITATION = {
+  // Saúde perdida com o rio todo poluído e toda a água vindo de bombas.
+  health: 0.08,
+};
+
 export const FOOD = {
   // Consumo de cada morador, e a fração a mais que se perde no caminho
   // (a cadeia do frio reduz).
@@ -651,13 +697,14 @@ export const WELLBEING = {
   // poluição. A saúde multiplica a chance de morrer (de healthDeath[0] com
   // saúde 1 até healthDeath[1] com saúde 0).
   // `food`: acesso a alimentos (mercados no raio) soma até food/2 e a falta tira food/2.
-  health: { base: 0.6, coverage: 0.35, pollution: 0.3, food: 0.1 },
+  // `garbage`: casa sem coleta de lixo.
+  health: { base: 0.6, coverage: 0.35, pollution: 0.3, food: 0.1, garbage: 0.03 },
   healthDeath: [0.6, 1.8],
   // Crime: base mais desemprego, insatisfação e densidade, menos a polícia.
   crime: { base: 0.15, unemployment: 0.5, unhappiness: 0.35, density: 0.15, police: 0.7 },
   // Satisfação: base e o peso de cada fator.
   satisfaction: {
-    base: 0.6, health: 0.15, safety: 0.2, leisure: 0.15, school: 0.05, food: 0.08,
+    base: 0.6, health: 0.15, safety: 0.2, leisure: 0.15, school: 0.05, food: 0.08, garbage: 0.06,
     pollution: 0.2, unemployment: 0.3, taxPerPoint: 0.015,
   },
   // Casas com satisfação abaixo de `leaveBelow` perdem uma família por dia

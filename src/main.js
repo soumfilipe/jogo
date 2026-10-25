@@ -64,6 +64,8 @@ const TOOLS = [
     ['base_samu', 'SAMU', '#e05a47', 'services'],
     ['mercado_municipal', 'Mercado', '#e9d48a', 'food'], ['restaurante_popular', 'Restaurante', '#d9822b', 'food'],
     ['ceasa', 'Ceasa', '#3d8f5a', 'food'],
+    ['lixao', 'Lixão', '#7a6a4f', 'waste'], ['aterro', 'Aterro', '#6f8a4f', 'waste'],
+    ['centro_reciclagem', 'Reciclagem', '#3d8f5a', 'waste'], ['estacao_esgoto', 'Esgoto', '#5f8a7a', 'waste'],
     ['parque', 'Praça', '#7fb069', 'leisure'], ['cinema', 'Cinema', '#8e44ad', 'leisure'], ['ginasio', 'Ginásio', '#3f6fc0', 'leisure'],
     ['ponto_onibus', 'Ônibus', '#e8b931', 'transit'], ['estacao_brt', 'BRT', '#c0392b', 'transit'],
     ['estacao_vlt', 'VLT', '#16a085', 'transit'], ['estacao_metro', 'Metrô', '#9fc3e0', 'transit'],
@@ -449,7 +451,7 @@ function announceEvents() {
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 // Mapas: botões que ligam/desligam a sobreposição de valor do terreno e poluição.
-const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j', transito: 'm', alimentos: 'q' };
+const MAP_KEYS = { valor: 'l', poluicao: 'p', energia: 'n', agua: 'h', escolas: 'u', saude: 'g', crime: 'k', satisfacao: 'j', transito: 'm', alimentos: 'q', lixo: 'y' };
 const separator = document.createElement('span');
 separator.className = 'separator';
 $('tools').append(separator);

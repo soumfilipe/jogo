@@ -953,6 +953,53 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  lixao(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#7a6a4f', lift: 0 }];
+    // Montes de lixo de várias cores e uma cerca baixa.
+    const piles = ['#8d7b5a', '#6f6a5c', '#9a8f6f', '#5f6b5a', '#a08060'];
+    for (let k = 0; k < 7; k++) {
+      const x = r.range(0.15, 1.4);
+      const y = r.range(0.15, 1.4);
+      const c = r.pick(piles);
+      parts.push(block([x, y, x + r.range(0.25, 0.45), y + r.range(0.25, 0.45)], 0, r.range(0.12, 0.35), wall(c, mixHex(c, '#000000', 0.2))));
+    }
+    parts.push(block([1.5, 1.6, 1.85, 1.85], 0, 0.3, wall('#e6e2da', '#c9c4ba'), { doors: { count: 1, color: '#4a4d52' } }));
+    return parts;
+  },
+
+  aterro(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#6f8a4f', lift: 0 }];
+    // Células cobertas de terra e grama, em degraus, e a guarita.
+    parts.push(block([0.15, 0.15, 1.5, 1.5], 0, 0.25, wall('#7f9a5a', '#667d48'), { top: '#8fae64' }));
+    parts.push(block([0.35, 0.35, 1.3, 1.3], 0.25, 0.2, wall('#8a7a4a', '#6f6239'), { top: r.pick(['#9fbf6a', '#a08060']) }));
+    parts.push(block([1.55, 1.55, 1.9, 1.9], 0, 0.35, wall('#e6e2da', '#c9c4ba'), { doors: { count: 1, color: '#3d8f5a' } }));
+    // Queimador de biogás.
+    parts.push({ kind: 'cylinder', cx: 1.75, cy: 0.3, r: 0.05, lift: 0, h: 0.9, color: '#b9bcc2', top: '#e05a47' });
+    return parts;
+  },
+
+  centro_reciclagem(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 0.96, 0.96], color: '#7a7d84', lift: 0 }];
+    parts.push(block([0.1, 0.1, 0.9, 0.6], 0, 0.6, r.pick([wall('#3d8f5a', '#2f7148'), wall('#5b7fa8', '#486889')]), {
+      roof: { kind: 'gable-x', color: '#5b5f66', rise: 0.25 }, doors: { count: 2, color: '#e6e2da' },
+    }));
+    // Fardos coloridos de material separado.
+    for (const [x, c] of [[0.12, '#3f6fc0'], [0.35, '#e8b931'], [0.58, '#c23b3b'], [0.78, '#3d8f5a']]) {
+      parts.push(block([x, 0.7, x + 0.16, 0.88], 0, 0.14, wall(c, mixHex(c, '#000000', 0.2))));
+    }
+    return parts;
+  },
+
+  estacao_esgoto() {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#9a9a8a', lift: 0 }];
+    // Tanques redondos de decantação e o prédio de controle.
+    for (const [x, y] of [[0.5, 0.5], [1.4, 0.5], [0.5, 1.4]]) {
+      parts.push({ kind: 'cylinder', cx: x, cy: y, r: 0.36, lift: 0, h: 0.2, color: '#b5b0a6', top: '#5f8a7a' });
+    }
+    parts.push(block([1.15, 1.15, 1.85, 1.75], 0, 0.6, wall('#e6e2da', '#c9c4ba'), { windows: { cols: 3, style: 'grid' }, doors: { count: 1, color: '#3f6fc0' } }));
+    return parts;
+  },
+
   centro_distribuicao(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#5b5f66', lines: true, lift: 0 }];
     parts.push(block([0.12, 0.12, 1.88, 1.25], 0, 1.0, r.pick([wall('#e9edf2', '#c8ced6'), wall('#cfc9b8', '#b0aa99')]), {

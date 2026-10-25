@@ -19,7 +19,8 @@
 //   pollution.<tipo>, output.power, output.<tipo>, cost.<tipo>, upkeep.<tipo>,
 //   roadCapacity, congestion, speed.<via>, radius.<modo>, freightRange,
 //   pollution.traffic, noise, food.output, food.waste, food.price, food.sand,
-//   food.consumption, pollution.farm, demand.rural
+//   food.consumption, pollution.farm, demand.rural, waste, pollution.river,
+//   output.sewage, biogas, reuso (os dois últimos ligam a produção `gated`)
 
 import { BUILDINGS, ZONE } from '../world/catalog.js';
 import { BUILDING_TECH, TECH_BY_ID } from '../world/techs.js';
@@ -101,6 +102,9 @@ export function jobsOf(rt, type) {
 export function utilityOutput(rt, type, res) {
   const base = BUILDINGS[type].utility?.[res] ?? 0;
   if (!base) return 0;
+  // Produção que só existe depois da pesquisa (biogás do aterro, reúso do esgoto).
+  const gate = BUILDINGS[type].utility.gated?.[res];
+  if (gate && mod(rt, gate, 0) <= 0) return 0;
   const general = res === 'power' ? mod(rt, 'output.power') : 1;
   return Math.round(base * general * mod(rt, `output.${type}`));
 }

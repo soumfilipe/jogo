@@ -21,6 +21,7 @@ import { applyFires } from './fire.js';
 import { computeTransit } from './transit.js';
 import { computeFreight } from './logistics.js';
 import { updateTrafficMap } from './traffic.js';
+import { collectWaste } from './waste.js';
 
 export function tick(state, rt) {
   state.time.tick++;
@@ -51,6 +52,8 @@ export function tick(state, rt) {
       computeFreight(state, rt);
       computeWellbeing(state, rt);
       state.wellbeing = { ...rt.cityWellbeing };
+      // O lixo do dia vai para os lixões e aterros (com a situação usada acima).
+      collectWaste(state, rt, rt.waste);
       applyEmigration(state, rt);
       applyFires(state, rt);
       computeUtilities(state, rt);
