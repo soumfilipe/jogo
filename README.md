@@ -88,6 +88,13 @@ tem nome, idade, casa e emprego, sai de casa de manhã, vai pelas estradas até 
 trabalho e volta no fim da tarde. Com "Inspecionar" dá para clicar em alguém
 andando e seguir com a câmera.
 
+O topo mostra a **taxa de desemprego** (a dica traz empregados, desempregados e
+vagas abertas). Há sempre um desemprego natural de cerca de 5% (gente
+procurando o primeiro emprego ou trocando de vaga): comércio e indústria abrem
+vagas para o resto da força de trabalho, descontadas as de serviços públicos e
+fazendas, e a cidade atrai gente enquanto o desemprego fica nessa faixa. Imposto
+alto ou poucas zonas comerciais e industriais fazem a taxa subir.
+
 ## Orçamento
 
 Painel aberto pela tecla `O` ou clicando no dinheiro no topo
@@ -220,8 +227,13 @@ Regras em `src/systems/culture.js`; números em `CULTURE` no catálogo.
 - **Artistas inventados** (nenhuma pessoa real), com gênero, fama e
   tendência: a fama sobe e cai mês a mês, veteranos tendem a cair e quem fica
   esquecido se aposenta. Todo janeiro surgem novatos, mais numa cidade grande.
-- **Gêneros** aparecem com o tempo do mundo (samba e choro desde 1910, rock
-  nos anos 50, MPB nos 60, funk e eletrônica nos 90…) e entram e saem de moda.
+- **Gêneros** aparecem com o tempo do mundo (samba e choro desde 1910, baião
+  e bolero nos anos 40, rock nos 50, Jovem Guarda e MPB nos 60, disco nos 70,
+  rock nacional e axé nos 80, funk nos 90, sertanejo universitário nos 2000,
+  trap e piseiro nos 2010…) e entram e saem de moda. Os que acabam (choro,
+  marchinha, lambada…) não têm mais novatos e somem da cena quando o último
+  artista se aposenta. Filmes e peças também têm época (animação só depois de
+  1940, ação e terror depois de 1950).
 - **Filmes e peças** estreiam todo mês e têm temporada: o público sobe até o
   auge e cai até saírem de cartaz. Cinemas e teatros atraem turistas pelo que
   está em cartaz.

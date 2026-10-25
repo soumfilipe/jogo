@@ -9,7 +9,7 @@ import { completeTech } from '../src/systems/research.js';
 import { createRng } from '../src/core/rng.js';
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '../src/core/time.js';
 import {
-  activeGenres, closeCultureMonth, createCulture, nowShowing, ranking, showingAppeal, workCurve,
+  activeGenres, closeCultureMonth, createCulture, nowShowing, ranking, showingAppeal, workCurve, workGenres,
 } from '../src/systems/culture.js';
 import { attractionAppeal } from '../src/systems/events.js';
 import { countOccupancy } from '../src/systems/traffic.js';
@@ -43,6 +43,19 @@ test('cena inicial: mesma semente, mesmos artistas; gêneros dependem do ano do 
   assert.ok(!activeGenres(1995).includes('choro'), 'o choro não tem mais novatos');
   const late = createCulture(createRng(1), 2000);
   assert.ok('funk' in late.genres && 'rock' in late.genres);
+  // Sem anacronismos: gênero que já acabou não está na moda, e ninguém
+  // estreou antes de o próprio gênero surgir.
+  assert.ok(!('choro' in late.genres) && !('marchinha' in late.genres), 'sem choro nem marchinha em 2000');
+  assert.ok(!('trap' in late.genres), 'sem trap em 2000');
+  for (const year of [1910, 1950, 1980, 2000, 2020]) {
+    const c = createCulture(createRng(year), year);
+    assert.ok(c.artists.every((x) => x.debut >= CULTURE.genres[x.genre].from && x.debut <= year));
+    assert.ok(Object.keys(c.genres).every((g) => activeGenres(year).includes(g)));
+  }
+  // Filmes e peças também têm época: nada de animação em 1910.
+  assert.ok(!workGenres(1910, 'filme').includes('animação'));
+  assert.ok(workGenres(1960, 'filme').includes('animação'));
+  assert.ok(createCulture(createRng(3), 1910).works.every((w) => workGenres(1910, w.kind).includes(w.genre)));
   // Nomes inventados: bandas no plural, companhias de teatro.
   assert.ok(a.artists.some((x) => x.kind === 'teatro' && x.name.startsWith('Cia. ')));
 });
