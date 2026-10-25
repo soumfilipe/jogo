@@ -24,6 +24,22 @@ npm test   # testes da simulação, do formato de save e do servidor
 
 ## Como jogar
 
+A barra de ferramentas agrupa tudo em **menus por área**: ✋ Inspecionar,
+Ruas, Zonas, Infraestrutura (energia, água, lixo e esgoto), Serviços (educação,
+saúde e segurança, alimentos), Lazer e cultura, Transporte (público e carga),
+Estatais (pesquisa e estatais), Demolir e Mapas. Cada menu abre um painel com
+seções, preço de cada item e, nos que ainda dependem de pesquisa, o cadeado com
+a tecnologia que falta. O botão do menu mostra a ferramenta escolhida nele.
+Salvar, carregar e o resto ficam no menu 💾 Arquivo, no topo.
+
+- **Zonas e demanda juntas**: o menu Zonas mostra a demanda de cada zona (barra
+  para a direita: a cidade quer mais; para a esquerda: sobra) e a escolha da
+  densidade. As barrinhas R, C, I e F no topo são a mesma demanda; clicar nelas
+  abre o menu Zonas.
+- **Legenda dos mapas**: com um mapa ligado, uma legenda embaixo mostra o que
+  cada cor quer dizer (faixa de ruim a bom, ou as categorias, como "prédio sem
+  energia" ou "escola perto, mas lotada"). O × da legenda desliga o mapa.
+
 | Controle | Ação |
 | --- | --- |
 | `E` Estrada | arraste para traçar uma estrada em "L" ($10 por tile) |
@@ -50,8 +66,9 @@ Em telas estreitas (ou celular deitado) a interface muda:
 - **Barra inferior**: Mover (arrastar a câmera e tocar para inspecionar),
   Construir, Mapas, Orçamento, Pesquisa e Arquivo. O rótulo mostra a ferramenta ou o mapa
   escolhido.
-- **Painéis que sobem de baixo**, como o teclado do iOS: Construir (ruas, zonas e
-  serviços públicos, com preço), Mapas e Arquivo (salvar, carregar, exportar,
+- **Painéis que sobem de baixo**, como o teclado do iOS: Construir (as mesmas
+  seções dos menus do computador, com preço, demanda das zonas e densidade;
+  tocar nas barrinhas de demanda do topo abre direto nas zonas), Mapas e Arquivo (salvar, carregar, exportar,
   importar, código de save, nova cidade). Fecham ao tocar fora ou ao deslizar
   para baixo. Orçamento, inspetor e a lista de saves também abrem de baixo (com o
   celular deitado, orçamento e inspetor abrem ao lado).
