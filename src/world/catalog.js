@@ -760,6 +760,28 @@ export const SPORTS = {
   ages: [18, 34],
   // Centro de treinamento: custo de cada nível e ganho de habilidade por nível.
   ct: { cost: [30_000, 80_000, 200_000], bonus: 0.15, strength: 0.02 },
+  // Escolinha de base: cada nível abre uma categoria (da mais velha para a
+  // mais nova; começar cedo dá mais anos de evolução). Custo dos níveis
+  // (prefeitura), vagas por categoria, custo por aluno por mês (clube) e a
+  // evolução por mês: growth × (0,3 + ln(1 + verba / scale)) × (1 + CT).
+  academy: {
+    categories: [
+      { id: 'sub17', name: 'Sub-17', ages: [15, 17] },
+      { id: 'sub15', name: 'Sub-15', ages: [11, 14] },
+      { id: 'sub11', name: 'Sub-11', ages: [8, 10] },
+    ],
+    cost: [20_000, 50_000, 120_000],
+    seats: 15,
+    perKid: 60,
+    growth: 0.012,
+    scale: 3_000,
+  },
+  // Mercado: craque é quem tem habilidade ≥ força da divisão + star (ou ≥
+  // minStar). Chance de proposta por mês; valor = base × hab³ × (jovem: ×young)
+  // × (1 + divisão × division) × sorteio de 0,8 a 1,2. Validade em dias; quem
+  // recusa só recebe outra proposta pelo atleta depois de cooldown meses.
+  market: { star: 0.15, minStar: 0.6, chance: 0.12, base: 300_000, youngAge: 23, young: 1.5, division: 0.5, days: 30, cooldown: 3, sales: 20 },
+  buyers: ['Atlético Metropolitano', 'Real Capital', 'Esporte Clube Litoral', 'União Paulistana', 'Sociedade Esportiva Planalto', 'Grêmio Industrial', 'Clube Atlético Cosmopolita', 'Fluminense do Sul', 'Internacional da Serra', 'Sporting Atlântico'],
   // Meses no vermelho até o clube perder atletas.
   redMonths: 3,
   // Reinvestir: caixa acima de tantos meses de despesas vira treino.

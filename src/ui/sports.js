@@ -4,13 +4,16 @@
 //   Tabela     a classificação das ligas da temporada
 //   Jogos      próximos jogos e resultados dos clubes da cidade
 //   Elenco     os atletas (cidadãos) de cada clube
+//   Base       os jovens da escolinha, por categoria
+//   Mercado    propostas de clubes de fora pelos craques e as vendas feitas
 //   Histórico  temporadas passadas
 // (ver systems/sports.js). As ações passam por applyCommand, como no orçamento.
 
 import { BUILDINGS, SPORTS } from '../world/catalog.js';
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '../core/time.js';
 import {
-  activeClubs, clubCosts, clubIncome, clubStrength, seasonStart, squad, standings, teamName, today, unlockedSports,
+  academyKids, activeClubs, clubCosts, clubIncome, clubStrength, seasonStart, squad, standings, starSkill, teamName,
+  today, unlockedSports, youthCategory,
 } from '../systems/sports.js';
 import { dayLabel } from './culture.js';
 
@@ -18,7 +21,7 @@ const pct = (v) => `${Math.round(v * 100)}%`;
 const money = (v) => `${v < 0 ? '−' : ''}$${Math.abs(Math.round(v)).toLocaleString('pt-BR')}`;
 const num = (v) => Math.round(v).toLocaleString('pt-BR');
 const esc = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-const TABS = [['clubes', 'Clubes'], ['tabela', 'Tabela'], ['jogos', 'Jogos'], ['elenco', 'Elenco'], ['historico', 'Histórico']];
+const TABS = [['clubes', 'Clubes'], ['tabela', 'Tabela'], ['jogos', 'Jogos'], ['elenco', 'Elenco'], ['base', 'Base'], ['mercado', 'Mercado'], ['historico', 'Histórico']];
 const sportName = (id) => SPORTS.kinds[id].name;
 const divName = (d) => SPORTS.divisions[d].name;
 const score = (sport, [a, b]) => (sport === 'volei' ? `${a} × ${b} sets` : `${a} × ${b}`);
@@ -68,7 +71,7 @@ export class SportsPanel {
     const s = state.sports;
     // Na aba Clubes (com campos de verba), redesenha só a cada mês ou quando algo muda.
     const when = this.tab === 'clubes' ? Math.floor(state.time.tick / TICKS_PER_MONTH) : Math.floor(state.time.tick / TICKS_PER_DAY);
-    const key = `${this.tab}:${when}:${s.nextId}:${s.clubs.map((c) => `${c.training}/${c.subsidy}/${c.ct}/${c.reinvest}/${c.closed}`).join()}`;
+    const key = `${this.tab}:${when}:${s.nextId}:${s.offers.length}:${s.clubs.map((c) => `${c.training}/${c.subsidy}/${c.ct}/${c.reinvest}/${c.closed}/${c.academy}/${c.youthBudget}/${c.players.length}/${c.youth.length}`).join()}`;
     if (key === this.key) return;
     this.key = key;
     const body = this.el.querySelector('[data-body]');
@@ -76,6 +79,8 @@ export class SportsPanel {
     else if (this.tab === 'tabela') body.innerHTML = this.#tables(state);
     else if (this.tab === 'jogos') body.innerHTML = this.#games(state);
     else if (this.tab === 'elenco') body.innerHTML = this.#squads(state, rt);
+    else if (this.tab === 'base') body.innerHTML = this.#academy(state, rt);
+    else if (this.tab === 'mercado') body.innerHTML = this.#market(state, rt);
     else body.innerHTML = this.#history(state);
   }
 
@@ -96,20 +101,24 @@ export class SportsPanel {
       const kind = SPORTS.kinds[c.sport];
       const players = squad(state, rt, c).length;
       const venue = rt.buildingById.get(c.home);
+      const next = SPORTS.academy.categories[c.academy];
+      const academy = next ? `<button data-academy="${c.id}">Abrir ${next.name} (${money(SPORTS.academy.cost[c.academy])})</button>` : '';
       const ct = c.ct < SPORTS.ct.cost.length ? `<button data-ct="${c.id}">Centro de treinamento: nível ${c.ct + 1} (${money(SPORTS.ct.cost[c.ct])})</button>` : '<small class="muted">Centro de treinamento no nível máximo.</small>';
       return `<li>
         <div><b>${esc(c.name)}</b> <small class="muted">${sportName(c.sport)} · ${esc(venue ? `${BUILDINGS[venue.type].name} #${venue.id}` : 'sem casa')}</small></div>
         <div class="small">Campeonato ${divName(c.division).toLowerCase()}${pos ? ` · ${pos}º lugar` : league ? '' : ' · estreia na próxima temporada'}
           · ${c.trophies ? `${c.trophies} ${c.trophies === 1 ? 'título' : 'títulos'} · ` : ''}força ${pct(clubStrength(state, rt, c))} · torcida ${pct(c.fans)}</div>
         <div class="small">Caixa <b class="${c.cash < 0 ? 'down' : ''}">${money(c.cash)}</b> · por mês: ${money(income.total)} de receita (patrocínio ${money(income.sponsor)}${income.broadcast ? `, TV ${money(income.broadcast)}` : ''}${c.subsidy ? `, prefeitura ${money(c.subsidy)}` : ''}),
-          ${money(costs.salaries)} de salários e ${money(costs.training)} de treino, mais os ingressos dos jogos em casa.</div>
+          ${money(costs.salaries)} de salários, ${money(costs.training)} de treino${costs.youth ? ` e ${money(costs.youth)} da base` : ''}, mais os ingressos dos jogos em casa.</div>
         ${players < kind.squad ? `<div class="small down">Elenco incompleto: ${players} de ${kind.squad} atletas (faltam cidadãos de ${SPORTS.ages[0]} a ${SPORTS.ages[1]} anos sem emprego fixo).</div>` : ''}
         <div class="form">
           <label>Treino <input type="number" min="0" max="1000000" step="500" value="${c.training}" data-training="${c.id}"> /mês</label>
           <label>Repasse da prefeitura <input type="number" min="0" max="1000000" step="500" value="${c.subsidy}" data-subsidy="${c.id}"> /mês</label>
           <label><input type="checkbox" data-reinvest="${c.id}" ${c.reinvest ? 'checked' : ''}> Reinvestir prêmios no treino</label>
+          ${c.academy ? `<label>Verba da base <input type="number" min="0" max="1000000" step="500" value="${c.youthBudget}" data-youth-budget="${c.id}"> /mês</label>` : ''}
         </div>
-        <div class="row">${ct}<button data-close-club="${c.id}">Fechar clube</button></div>
+        <div class="small">Escolinha: ${c.academy ? `${SPORTS.academy.categories.slice(0, c.academy).map((x) => x.name).join(', ')} · ${academyKids(state, rt, c).length} alunos` : 'fechada'}</div>
+        <div class="row">${ct}${academy}<button data-close-club="${c.id}">Fechar clube</button></div>
       </li>`;
     }).join('');
     return `
@@ -199,6 +208,49 @@ export class SportsPanel {
     }).join('');
   }
 
+  #academy(state, rt) {
+    const clubs = activeClubs(state);
+    if (!clubs.length) return '<p class="muted">A cidade ainda não tem clubes.</p>';
+    const intro = `<p class="muted small">A escolinha treina crianças e adolescentes da cidade no contraturno da escola (eles continuam estudando).
+      Cada nível abre uma categoria: ${SPORTS.academy.categories.map((x) => `${x.name} (${x.ages[0]} a ${x.ages[1]} anos)`).join(', ')}.
+      Aos 18 anos, quem é melhor que o pior do elenco sobe ao time principal.</p>`;
+    return intro + clubs.map((c) => {
+      if (!c.academy) return `<h4>${esc(c.name)}</h4><p class="small muted">Escolinha fechada: abra a Sub-17 na aba Clubes (${money(SPORTS.academy.cost[0])}).</p>`;
+      const kids = academyKids(state, rt, c);
+      const soon = kids.filter((k) => k.age >= 17).length;
+      const cats = SPORTS.academy.categories.slice(0, c.academy).map((cat) => {
+        const list = kids.filter((k) => youthCategory(k.age, c.academy) === cat).sort((a, b) => b.skill - a.skill || a.id - b.id);
+        return `<h4>${cat.name} <small class="muted">${list.length} de ${SPORTS.academy.seats}</small></h4>
+          <ul class="works">${list.map((k) => `<li><span><button class="link" data-citizen="${k.id}">${esc(k.name)}</button> <small class="muted">${k.age} anos${k.calling === 'esporte' ? ' · vocação' : ''}</small></span>
+            <span class="fame">${pct(k.skill)} <span class="meter inline"><i style="width:${pct(k.skill)}"></i></span>${k.age >= 16 ? ` <button data-promote="${c.id}:${k.id}">Subir</button>` : ''}</span></li>`).join('') || '<li class="muted">Ninguém na faixa de idade.</li>'}</ul>`;
+      }).join('');
+      return `<h4>${esc(c.name)} <small class="muted">${kids.length} alunos${soon ? ` · ${soon} sobem em janeiro` : ''}</small></h4>${cats}`;
+    }).join('') + '<p class="small" data-error></p>';
+  }
+
+  #market(state, rt) {
+    const s = state.sports;
+    const clubs = activeClubs(state);
+    if (!clubs.length) return '<p class="muted">A cidade ainda não tem clubes.</p>';
+    const open = s.offers.filter((o) => o.status === 'aberta');
+    const club = (id) => s.clubs.find((c) => c.id === id);
+    const offers = open.map((o) => {
+      const p = rt.citizenById.get(o.player);
+      return `<li>
+        <div><b>${esc(o.buyer)}</b> quer <button class="link" data-citizen="${o.player}">${esc(o.name)}</button> <small class="muted">${esc(club(o.club)?.name ?? '')}</small></div>
+        <div class="small">${money(o.value)} · ${p ? `${p.age} anos, habilidade ${pct(p.skill)}` : ''} · vale até ${dayLabel(Math.floor(o.until / TICKS_PER_DAY))}</div>
+        <div class="small muted">Vendendo, o clube fica com ${money(o.value * (1 - SPORTS.cityShare))} (${pct(SPORTS.cityShare)} vão para a prefeitura) e o atleta se muda com a família.</div>
+        <div class="row"><button class="primary" data-accept="${o.id}">Vender</button><button data-reject="${o.id}">Recusar</button></div>
+      </li>`;
+    }).join('');
+    const stars = clubs.map((c) => `${esc(c.name)}: craque a partir de ${pct(starSkill(c))} de habilidade`).join(' · ');
+    const sales = [...s.sales].reverse().map((v) => `<tr><td>${esc(v.name)}<br><small class="muted">${esc(v.clubName)} → ${esc(v.buyer)}</small></td><td>${money(v.value)}<br><small class="muted">${dayLabel(v.day)}</small></td></tr>`).join('');
+    return `<p class="muted small">Clubes grandes de fora fazem propostas pelos craques. ${stars}.</p>
+      <h4>Propostas</h4>${open.length ? `<ul class="events">${offers}</ul>` : '<p class="small muted">Nenhuma proposta no momento.</p>'}
+      <p class="small" data-error></p>
+      <h4>Vendas</h4>${sales ? `<table class="history"><tbody>${sales}</tbody></table>` : '<p class="small muted">Nenhuma venda ainda.</p>'}`;
+  }
+
   #history(state) {
     const list = [...state.sports.history].reverse();
     if (!list.length) return '<p class="muted">Nenhuma temporada encerrada ainda.</p>';
@@ -234,6 +286,7 @@ export class SportsPanel {
     if (t.dataset.training) cmd = { type: 'clubBudget', id: Number(t.dataset.training), training: Number(t.value) };
     else if (t.dataset.subsidy) cmd = { type: 'clubBudget', id: Number(t.dataset.subsidy), subsidy: Number(t.value) };
     else if (t.dataset.reinvest) cmd = { type: 'clubBudget', id: Number(t.dataset.reinvest), reinvest: t.checked };
+    else if (t.dataset.youthBudget) cmd = { type: 'clubBudget', id: Number(t.dataset.youthBudget), youthBudget: Number(t.value) };
     if (!cmd) return;
     const result = this.act(cmd);
     this.#redraw();
@@ -254,6 +307,16 @@ export class SportsPanel {
       const f = this.form;
       result = this.act({ type: 'club', sport: f.sport, home: Number(f.home), name: f.name });
       if (result.ok) f.name = '';
+    } else if (t.dataset.academy) {
+      result = this.act({ type: 'clubAcademy', id: Number(t.dataset.academy) });
+    } else if (t.dataset.promote) {
+      const [id, player] = t.dataset.promote.split(':').map(Number);
+      result = this.act({ type: 'promoteYouth', id, player });
+    } else if (t.dataset.accept) {
+      if (!confirm('Vender o atleta? Ele se muda da cidade com a família.')) return;
+      result = this.act({ type: 'acceptOffer', id: Number(t.dataset.accept) });
+    } else if (t.dataset.reject) {
+      result = this.act({ type: 'rejectOffer', id: Number(t.dataset.reject) });
     } else if (t.dataset.ct) {
       result = this.act({ type: 'clubCt', id: Number(t.dataset.ct) });
     } else if (t.dataset.closeClub) {

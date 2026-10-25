@@ -31,7 +31,7 @@ import { FIRST_NAMES, LAST_NAMES } from '../agents/names.js';
 import { chance, pick, random, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, calendar } from '../core/time.js';
 import { mod } from './mods.js';
-import { removeCitizen, setJob } from '../world/runtime.js';
+import { familyOf, removeCitizen, setJob } from '../world/runtime.js';
 import { report } from './news.js';
 
 const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
@@ -160,12 +160,8 @@ function localArtists(state, rt) {
     }
     const since = a.lastCityShow ?? a.since ?? tick;
     if (a.fame >= CULTURE.leaveFame && tick - since > CULTURE.leaveMonths * TICKS_PER_MONTH) {
-      const surname = c.name.slice(c.name.indexOf(' ') + 1);
-      const family = [...(rt.residents.get(c.home) ?? [])].filter((id) => {
-        const m = rt.citizenById.get(id);
-        return m && m.name.slice(m.name.indexOf(' ') + 1) === surname;
-      });
-      for (const id of family.sort((x, y) => x - y)) removeCitizen(state, rt, id);
+      const family = familyOf(rt, c);
+      for (const id of family) removeCitizen(state, rt, id);
       delete a.citizen;
       delete a.local;
       report(state, { kind: 'artista_saiu', name: a.name, genre: a.genre, people: family.length });

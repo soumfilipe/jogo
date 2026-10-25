@@ -9,8 +9,9 @@ import { createRng } from '../src/core/rng.js';
 import { removeCitizen } from '../src/world/runtime.js';
 import { canWork } from '../src/agents/citizens.js';
 import {
-  closeSportsMonth, drawScore, matchPoints, newSeason, squad, standings, teamName, today,
+  academyKids, closeSportsMonth, drawScore, matchPoints, newSeason, squad, standings, teamName, today, youthCategory,
 } from '../src/systems/sports.js';
+import { createCitizen } from '../src/agents/citizens.js';
 import { todaysVisits } from '../src/systems/tourism.js';
 import { monthlyBudget } from '../src/systems/economy.js';
 import { createSave, readSave, checksum } from '../src/save/format.js';
@@ -229,4 +230,151 @@ test('save: v17 abre sem clubes; salvar no dia do jogo e carregar dá o mesmo re
   const { state: old } = readSave(JSON.stringify(v17));
   assert.deepEqual(old.sports.clubs, []);
   assert.equal(old.economy.sportsIncome, 0);
+});
+
+/** Clube de futebol fundado numa cidade com moradores (e crianças). */
+function club(seed = 5) {
+  const { state, rt, field } = fieldCity(seed, 20);
+  assert.ok(applyCommand(state, rt, { type: 'club', sport: 'futebol', home: field.id }).ok);
+  return { state, rt, field, club: state.sports.clubs[0] };
+}
+
+test('escolinha: cada nível abre uma categoria; vocação primeiro; as crianças seguem na escola', () => {
+  const { state, rt, club: c } = club();
+  assert.match(applyCommand(state, rt, { type: 'clubAcademy', id: 999 }).reason, /não encontrado/);
+  const money = state.economy.money;
+  state.economy.money = 10;
+  assert.match(applyCommand(state, rt, { type: 'clubAcademy', id: c.id }).reason, /Dinheiro/);
+  state.economy.money = money;
+  const schools = new Map(state.citizens.map((x) => [x.id, x.school]));
+  assert.ok(applyCommand(state, rt, { type: 'clubAcademy', id: c.id }).ok);
+  assert.equal(state.economy.money, money - SPORTS.academy.cost[0]);
+  let kids = academyKids(state, rt, c);
+  assert.ok(kids.length > 0 && kids.length <= SPORTS.academy.seats);
+  assert.ok(kids.every((k) => k.age >= 15 && k.age <= 17 && k.skill > 0), 'só a sub-17');
+  assert.ok(kids.every((k) => k.school === schools.get(k.id)), 'continuam na escola');
+  const left = state.citizens.filter((x) => x.age >= 15 && x.age <= 17 && x.youth === undefined);
+  if (left.some((x) => x.calling === 'esporte')) assert.ok(kids.every((k) => k.calling === 'esporte'), 'vocação primeiro');
+  assert.ok(applyCommand(state, rt, { type: 'clubAcademy', id: c.id }).ok);
+  kids = academyKids(state, rt, c);
+  assert.ok(kids.some((k) => youthCategory(k.age, 2)?.id === 'sub15'));
+  assert.ok(kids.every((k) => k.age >= 11 && k.age <= 17));
+  // Custo do mês: alunos e verba da base.
+  assert.ok(applyCommand(state, rt, { type: 'clubBudget', id: c.id, youthBudget: 2000 }).ok);
+  assert.equal(c.youthBudget, 2000);
+});
+
+test('base: evolui mais rápido que o adulto; quem morre sai; aos 18 sobe ao time principal', () => {
+  const { state, rt, club: c } = club();
+  applyCommand(state, rt, { type: 'clubAcademy', id: c.id });
+  c.cash = 1_000_000;
+  c.training = 3000;
+  c.youthBudget = 3000;
+  const kid = academyKids(state, rt, c)[0];
+  const adult = squad(state, rt, c).find((x) => x.age < 25);
+  const [k0, a0] = [kid.skill, adult.skill];
+  for (let i = 0; i < 6; i++) closeSportsMonth(state, rt);
+  assert.ok(kid.skill - k0 > adult.skill - a0, `base ${kid.skill - k0} x adulto ${adult.skill - a0}`);
+
+  const [dead] = academyKids(state, rt, c).filter((x) => x !== kid);
+  if (dead) {
+    removeCitizen(state, rt, dead.id);
+    closeSportsMonth(state, rt);
+    assert.ok(!c.youth.includes(dead.id));
+  }
+  // Fez 18 anos e é bom: sobe no lugar do pior do elenco cheio.
+  kid.age = 18;
+  kid.skill = 0.9;
+  const worst = squad(state, rt, c).sort((a, b) => a.skill - b.skill)[0];
+  closeSportsMonth(state, rt);
+  assert.equal(kid.athlete, c.id);
+  assert.equal(kid.youth, undefined);
+  assert.ok(kid.skill > 0.85);
+  assert.equal(worst.athlete, undefined, 'o pior do elenco saiu');
+  assert.equal(squad(state, rt, c).length, SPORTS.kinds.futebol.squad);
+
+  // Subir antes da hora: só com 16 anos ou mais.
+  const young = academyKids(state, rt, c).find((x) => x.age < 16) ?? academyKids(state, rt, c)[0];
+  young.age = 15;
+  assert.match(applyCommand(state, rt, { type: 'promoteYouth', id: c.id, player: young.id }).reason, /16 anos/);
+  young.age = 16;
+  assert.ok(applyCommand(state, rt, { type: 'promoteYouth', id: c.id, player: young.id }).ok);
+  assert.equal(young.athlete, c.id);
+});
+
+/** Faz um craque e fecha meses até chegar uma proposta por ele. */
+function offerFor(state, rt, c) {
+  const star = squad(state, rt, c).sort((a, b) => a.id - b.id)[0];
+  c.cash = 1_000_000;
+  for (let i = 0; i < 80 && !state.sports.offers.some((o) => o.player === star.id); i++) {
+    star.skill = 0.9;
+    star.age = 22;
+    closeSportsMonth(state, rt);
+  }
+  const offer = state.sports.offers.find((o) => o.player === star.id);
+  assert.ok(offer, 'chegou proposta');
+  return { star, offer };
+}
+
+test('mercado: proposta pelo craque, vence em 30 dias; recusar segura o atleta', () => {
+  const { state, rt, club: c } = club();
+  const { star, offer } = offerFor(state, rt, c);
+  assert.equal(offer.status, 'aberta');
+  assert.ok(offer.value >= 0.8 * SPORTS.market.base * 0.9 ** 3 * SPORTS.market.young - 1000);
+  assert.ok(state.news.pending.some((n) => n.kind === 'proposta'));
+  // Passou o prazo: some.
+  state.time.tick += 31 * TICKS_PER_DAY;
+  star.skill = 0.1;
+  closeSportsMonth(state, rt);
+  assert.ok(!state.sports.offers.some((o) => o.id === offer.id));
+
+  const { offer: again } = offerFor(state, rt, c);
+  assert.ok(applyCommand(state, rt, { type: 'rejectOffer', id: again.id }).ok);
+  assert.equal(again.status, 'recusada');
+  for (let i = 0; i < 2; i++) closeSportsMonth(state, rt);
+  assert.ok(!state.sports.offers.some((o) => o.player === again.player && o.status === 'aberta'), 'ninguém volta logo');
+  assert.match(applyCommand(state, rt, { type: 'acceptOffer', id: again.id }).reason, /não está mais/);
+});
+
+test('vender: dinheiro no caixa (10% para a prefeitura), o atleta e a família se mudam, o elenco é reposto', () => {
+  const { state, rt, club: c } = club();
+  const { star, offer } = offerFor(state, rt, c);
+  const surname = star.name.slice(star.name.indexOf(' ') + 1);
+  const relative = createCitizen(state, rt, rt.buildingById.get(star.home), { age: 50, lastName: surname });
+  const [cash, fee, pop] = [c.cash, state.economy.sportsIncome ?? 0, state.citizens.length];
+  assert.ok(applyCommand(state, rt, { type: 'acceptOffer', id: offer.id }).ok);
+  assert.equal(c.cash, cash + offer.value - Math.round(offer.value * SPORTS.cityShare));
+  assert.equal(state.economy.sportsIncome, fee + Math.round(offer.value * SPORTS.cityShare));
+  assert.ok(!rt.citizenById.has(star.id) && !rt.citizenById.has(relative.id));
+  assert.ok(state.citizens.length <= pop - 2);
+  assert.equal(state.sports.sales.at(-1).name, star.name);
+  assert.ok(state.sports.sales.at(-1).people >= 2);
+  assert.ok(state.news.pending.some((n) => n.kind === 'venda'));
+  assert.equal(squad(state, rt, c).length, SPORTS.kinds.futebol.squad, 'reposto');
+});
+
+test('save: v18 ganha escolinha e mercado; salvar com proposta aberta e base cheia dá o mesmo resultado', () => {
+  const { state: a, rt: ra, club: c } = club(9);
+  applyCommand(a, ra, { type: 'clubAcademy', id: c.id });
+  offerFor(a, ra, c);
+  const { state: b } = readSave(JSON.stringify(createSave(a, { id: 'base' })));
+  const rb = prepare(b);
+  advance(a, ra, TICKS_PER_DAY * 31);
+  advance(b, rb, TICKS_PER_DAY * 31);
+  assert.deepEqual(b.sports, a.sports);
+  assert.deepEqual(b.citizens.map((x) => [x.youth, x.athlete, x.skill]), a.citizens.map((x) => [x.youth, x.athlete, x.skill]));
+
+  const v18 = createSave(a, { id: 'v18' });
+  for (const club of v18.data.sports.clubs) {
+    delete club.academy;
+    delete club.youthBudget;
+    delete club.youth;
+  }
+  delete v18.data.sports.offers;
+  delete v18.data.sports.sales;
+  v18.version = 18;
+  v18.checksum = checksum(v18.data);
+  const { state: old } = readSave(JSON.stringify(v18));
+  assert.deepEqual(old.sports.offers, []);
+  assert.ok(old.sports.clubs.every((x) => x.academy === 0 && Array.isArray(x.youth)));
 });

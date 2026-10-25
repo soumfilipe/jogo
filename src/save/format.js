@@ -26,7 +26,7 @@ import { createNews } from '../systems/news.js';
 import { createSports } from '../systems/sports.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -244,6 +244,19 @@ const MIGRATIONS = {
     save.data.sports ??= createSports();
     save.data.economy.sportsIncome ??= 0;
     save.version = 18;
+    return save;
+  },
+  // v18 -> v19: escolinhas de base e mercado (propostas pelos craques).
+  18: (save) => {
+    const sports = save.data.sports;
+    for (const club of sports.clubs) {
+      club.academy ??= 0;
+      club.youthBudget ??= 0;
+      club.youth ??= [];
+    }
+    sports.offers ??= [];
+    sports.sales ??= [];
+    save.version = 19;
     return save;
   },
 };

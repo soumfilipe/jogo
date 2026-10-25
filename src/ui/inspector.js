@@ -15,7 +15,7 @@ import { nowShowing, showingAppeal } from '../systems/culture.js';
 import { homeStress, overloadedParents } from '../systems/childcare.js';
 import { CHILDCARE, CULTURE } from '../world/catalog.js';
 import { unlockedTypes } from '../systems/agenda.js';
-import { activeClubs, clubStrength, unlockedSports } from '../systems/sports.js';
+import { activeClubs, clubStrength, unlockedSports, youthCategory } from '../systems/sports.js';
 import { SPORTS } from '../world/catalog.js';
 import { companyJobs, usesCompanies } from '../world/runtime.js';
 import { vacantFloors } from '../systems/companies.js';
@@ -234,6 +234,14 @@ function athleteOf(state, rt, c) {
   return club ? `Atleta do ${esc(club.name)} (habilidade ${pct(c.skill ?? 0)})` : null;
 }
 
+/** "Base do {clube}, Sub-15 (habilidade X%)" ou null. */
+function youthOf(state, c) {
+  if (c.youth === undefined) return null;
+  const club = state.sports?.clubs.find((x) => x.id === c.youth);
+  const cat = youthCategory(c.age);
+  return club ? `Base do ${esc(club.name)}${cat ? `, ${cat.name}` : ''} (habilidade ${pct(c.skill ?? 0)})` : null;
+}
+
 function renderCitizen(el, c, state, rt, following) {
   const home = rt.buildingById.get(c.home);
   const job = c.job !== null ? rt.buildingById.get(c.job) : null;
@@ -256,6 +264,7 @@ function renderCitizen(el, c, state, rt, following) {
       ${studying ? `<dt>Estuda</dt><dd>${studying}</dd>` : ''}
       ${job ? `<dt>Turno</dt><dd>${esc(SHIFTS[c.shift ?? 'diurno'].name)}</dd>
       <dt>Rotina</dt><dd>sai ${formatClock(c.departWork)}, volta ${formatClock(c.departHome)}</dd>` : ''}
+      ${youthOf(state, c) ? `<dt>Esporte</dt><dd>${youthOf(state, c)}</dd>` : ''}
       ${childRow(overloadedParents(state, rt).get(c.id))}
       ${c.stress ? `<dt>Estresse</dt><dd>${pct(c.stress)}</dd>` : ''}
     </dl>
