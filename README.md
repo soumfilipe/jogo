@@ -1,5 +1,7 @@
 # Jogo
 
+[![Testes](https://github.com/soumfilipe/jogo/actions/workflows/testes.yml/badge.svg)](https://github.com/soumfilipe/jogo/actions/workflows/testes.yml)
+
 Jogo de construção de cidades (no estilo de [POLIS](https://polis-game.com/)) feito
 em JavaScript puro, que roda no navegador **localmente** e grava o progresso em
 **arquivos de save**.
@@ -33,7 +35,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
 | Avenida / Via expressa | como a estrada, mas mais rápidas e com mais capacidade (depois da pesquisa *Via expressa*); sobre uma rua, melhoram ela pagando só a diferença |
-| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` / `Q` Mapas | valor do terreno, poluição, energia, água, escolas, saúde, crime, satisfação, trânsito ou alimentos sobre o mapa |
+| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` / `Q` / `Y` Mapas | valor do terreno, poluição (também nos rios), energia, água, escolas, saúde, crime, satisfação, trânsito, alimentos ou lixo sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
@@ -162,6 +164,25 @@ Regras em `src/systems/food.js`; números em `FOOD` no catálogo.
   popular e pelo comércio de nível 2 (o mercado do bairro; o supermercado
   aumenta o raio). Casa sem mercado no raio perde saúde e satisfação; o mapa
   *Alimentos* (`Q`) mostra quem está bem servido.
+
+## Lixo e esgoto
+
+Regras em `src/systems/waste.js` e `sanitation.js`; números em `WASTE` e
+`SANITATION` no catálogo.
+
+- **Lixo**: cada morador e cada vaga geram lixo por dia. O lixão (desde o
+  começo) e o aterro sanitário (pesquisa) recolhem o lixo dos prédios no raio
+  até encher; o inspetor mostra quanto já está ocupado. O lixão polui em volta;
+  o aterro quase nada e, com o biogás, ainda gera energia. Prédio sem coleta
+  polui um pouco e a casa perde saúde e satisfação (mapa *Lixo*, `Y`).
+  Centro de reciclagem, coleta seletiva (lei) e reciclagem de entulho diminuem
+  o lixo; plásticos aumentam.
+- **Esgoto**: o consumo de água vira esgoto. A estação de tratamento (pesquisa)
+  trata até a capacidade dela; o resto polui os rios (aparece no mapa de
+  poluição e tira o valor da paisagem). Quem bebe água de bomba d'água em rio
+  poluído adoece; poço e água importada não. Com o tratamento avançado, a
+  estação também produz água. O painel do orçamento mostra quanto do esgoto é
+  tratado.
 
 ## Trânsito, transporte público e carga
 

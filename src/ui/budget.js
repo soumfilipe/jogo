@@ -46,6 +46,7 @@ export class BudgetPanel {
         </label>`).join('')}
       </div>
       <p class="muted small">Acima de ${ECONOMY.taxDefault}% a zona perde demanda; abaixo, ganha.</p>
+      <p class="muted small" data-sanitation></p>
 
       <h4>Este mês (previsão)</h4>
       <dl class="budget-lines">
@@ -124,6 +125,10 @@ export class BudgetPanel {
     this.state = state;
     this.rt = rt;
     const q = (sel) => this.el.querySelector(sel);
+    const san = rt.sanitation;
+    q('[data-sanitation]').textContent = san && san.sewage > 0
+      ? `Esgoto tratado: ${Math.round(san.treated * 100)}% · rios ${Math.round(san.river * 100)}% poluídos${san.healthLoss > 0.005 ? ' (bombas d\'água no rio trazem doenças)' : ''}.`
+      : '';
     const economy = state.economy;
     const budget = monthlyBudget(state, rt);
 

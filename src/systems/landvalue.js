@@ -6,9 +6,11 @@
 // e movimento (prédios em volta), e cai com a poluição das indústrias e dos
 // carros e com o barulho de avenidas e vias expressas.
 
-import { BUILDINGS, ROAD_TYPES, TERRAIN, TRAFFIC, ZONE } from '../world/catalog.js';
+import { BUILDINGS, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
 import { mod, utilityPollution } from './mods.js';
 import { countOccupancy } from './traffic.js';
+import { computeWaste } from './waste.js';
+import { computeSanitation } from './sanitation.js';
 
 const NATURE_RADIUS = 4;
 const COMMERCE_RADIUS = 8;
@@ -33,8 +35,11 @@ export function computeLandValue(state, rt) {
   const activity = new Float32Array(n);
   const industry = new Float32Array(n);
 
+  // Rio poluído pelo esgoto vale menos como paisagem (e aparece no mapa de poluição).
+  const river = computeSanitation(state, rt).river;
   for (let i = 0; i < n; i++) {
-    if (terrain[i] === TERRAIN.WATER || terrain[i] === TERRAIN.FOREST) nature[i] = 1;
+    if (terrain[i] === TERRAIN.WATER) nature[i] = 1 - 0.5 * river;
+    else if (terrain[i] === TERRAIN.FOREST) nature[i] = 1;
     else if (terrain[i] === TERRAIN.SAND) nature[i] = 0.5;
   }
   const industryPollution = mod(rt, 'pollution.industry');
@@ -49,6 +54,12 @@ export function computeLandValue(state, rt) {
     // Fazendas só poluem com adubo e agrotóxicos.
     if (info.zone === ZONE.RURAL) industry[b.tile] += weight * farmPollution;
     if (info.utility) industry[b.tile] += utilityPollution(rt, b.type);
+  }
+  // Lixo sem coleta polui em volta.
+  const waste = computeWaste(state, rt);
+  for (const b of state.buildings) {
+    const s = waste.status.get(b.id);
+    if (s && s.waste > 0 && s.by === null) industry[b.tile] += WASTE.pollution * s.waste;
   }
   // Carros na rua agora (contados das posições em viagem, que estão no estado).
   const occupancy = countOccupancy(state, rt);
@@ -89,7 +100,7 @@ export function computeLandValue(state, rt) {
   const { landValue, pollution } = rt;
   for (let i = 0; i < n; i++) {
     const p = Math.min(1, pollutionSum[i] / POLLUTION_FULL);
-    pollution[i] = p;
+    pollution[i] = terrain[i] === TERRAIN.WATER ? Math.max(p, river) : p;
     const value = 0.25
       + 0.3 * Math.min(1, natureSum[i] / NATURE_FULL)
       + 0.25 * Math.min(1, commerceSum[i] / COMMERCE_FULL)

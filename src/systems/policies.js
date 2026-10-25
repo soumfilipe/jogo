@@ -154,6 +154,11 @@ export const POLICIES = {
     desc: 'Lotes vazios viram hortas comunitárias: 5% menos comida comprada e terreno um pouco mais valorizado.',
     cost: { perResident: 0.2 }, effects: [{ mod: 'food.consumption', mul: 0.95 }, { mod: 'landValue.all', add: 0.02 }],
   },
+  coleta_seletiva: {
+    name: 'Coleta seletiva', tech: 'coleta_seletiva',
+    desc: 'Separar o lixo em casa: 20% menos lixo para os aterros e um pouco mais de satisfação.',
+    cost: { perResident: 0.3 }, effects: [{ mod: 'waste', mul: 0.8 }, { mod: 'satisfactionPolicy', add: 0.01 }],
+  },
 };
 
 export function createPolicies() {

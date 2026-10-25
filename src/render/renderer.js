@@ -76,7 +76,8 @@ for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RUR
 // O valor é arredondado em faixas para manter o agrupamento por cor.
 export const MAP_MODES = {
   valor: { name: 'Valor do terreno', label: 'Valor', layer: 'landValue', from: '#c0392b', mid: '#f1c40f', to: '#27ae60' },
-  poluicao: { name: 'Poluição', layer: 'pollution', from: '#7db460', mid: '#c9a227', to: '#5b2a86' },
+  // Poluição também nos rios e lagos (esgoto não tratado).
+  poluicao: { name: 'Poluição', layer: 'pollution', water: true, from: '#7db460', mid: '#c9a227', to: '#5b2a86' },
   // Energia e água: prédios abastecidos (verde) ou não (vermelho) e as ruas
   // das redes com ou sem produção. O resto do mapa fica com a cor normal.
   energia: { name: 'Energia', layer: 'powerMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
@@ -90,6 +91,8 @@ export const MAP_MODES = {
   satisfacao: { name: 'Satisfação', layer: 'satisfactionMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
   // Alimentos: casas com mercado no raio (verde) ou sem (vermelho).
   alimentos: { name: 'Alimentos', layer: 'foodMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
+  // Lixo: prédios com coleta (verde) ou com lixo acumulando (vermelho).
+  lixo: { name: 'Lixo', layer: 'wasteMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
   // Trânsito: só as ruas mudam de cor (verde livre, vermelho parado).
   transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71' },
 };
@@ -456,7 +459,7 @@ export class Renderer {
       const traffic = road[tile] && mode?.roads ? rt[mode.layer]?.[tile] : undefined;
       if (traffic !== undefined && !Number.isNaN(traffic)) color = mode.colors[Math.round(traffic * MAP_STEPS)];
       else if (road[tile]) color = ROAD_COLORS[road[tile]];
-      else if (mode && !mode.roads && terrain[tile] !== TERRAIN.WATER && !Number.isNaN(rt[mode.layer][tile])) {
+      else if (mode && !mode.roads && (mode.water || terrain[tile] !== TERRAIN.WATER) && !Number.isNaN(rt[mode.layer][tile])) {
         color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
       }
       else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]][state.map.density[tile]];

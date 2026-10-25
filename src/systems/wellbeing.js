@@ -1,8 +1,9 @@
 // Bem-estar das casas: saúde, crime e satisfação (de 0 a 1), uma vez por dia.
 //
-//   saúde      = base + cobertura de hospitais/clínicas ± acesso a alimentos − poluição (+ tecnologias e leis)
+//   saúde      = base + cobertura de hospitais/clínicas ± acesso a alimentos − poluição
+//                − lixo sem coleta − água de rio poluído (+ tecnologias e leis)
 //   crime      = (base + desemprego + insatisfação + densidade) × (1 − polícia)
-//   satisfação = base + saúde + segurança + lazer + escola ± alimentos − poluição
+//   satisfação = base + saúde + segurança + lazer + escola ± alimentos − lixo − poluição
 //                − desemprego − imposto residencial acima do padrão (+ leis)
 //
 // O crime usa a satisfação "sem a segurança" (todos os outros fatores), e a
@@ -24,6 +25,8 @@ import { canWork } from '../agents/citizens.js';
 import { chance } from '../core/rng.js';
 import { TICKS_PER_MONTH } from '../core/time.js';
 import { mod } from './mods.js';
+import { computeWaste, fillWasteMap, isCollected } from './waste.js';
+import { computeSanitation } from './sanitation.js';
 
 const clamp = (v) => Math.min(1, Math.max(0, v));
 
@@ -42,6 +45,8 @@ export function computeWellbeing(state, rt) {
   const leisureMul = mod(rt, 'leisure');
   const satisfactionAdd = mod(rt, 'satisfaction', 0) + mod(rt, 'satisfactionPolicy', 0);
   const tax = (state.economy.taxes.residential - ECONOMY.taxDefault) * S.taxPerPoint;
+  const waste = computeWaste(state, rt);
+  const sanitation = computeSanitation(state, rt);
 
   let people = 0;
   const sum = { health: 0, crime: 0, satisfaction: 0 };
@@ -67,15 +72,16 @@ export function computeWellbeing(state, rt) {
 
     // Acesso a alimentos: de −0,5 (sem mercado no raio) a +0,5 (bem servido).
     const food = (cov?.alimentos?.[t] ?? 0) - 0.5;
+    const dirty = isCollected(waste, b) ? 0 : 1;
     const health = clamp(H.base + H.coverage * (cov?.saude[t] ?? 0) + H.food * food + healthAdd
-      - H.pollution * pollution * pollutionHealth);
+      - H.pollution * pollution * pollutionHealth - H.garbage * dirty - sanitation.healthLoss);
     // Satisfação com tudo menos a segurança (o crime depende dela).
     const schoolOk = rt.schoolMap?.[t] === 1 ? 1 : 0;
     const content = clamp(
       S.base
       + S.health * (health - 0.5) * 2
       + S.leisure * Math.min(1, (cov?.lazer[t] ?? 0) * leisureMul)
-      + (info.residents ? S.school * schoolOk + S.food * food : 0)
+      + (info.residents ? S.school * schoolOk + S.food * food - S.garbage * dirty : 0)
       - S.pollution * pollution
       - S.unemployment * unemployment
       - tax
@@ -99,6 +105,9 @@ export function computeWellbeing(state, rt) {
   }
 
   rt.wellbeing = wellbeing;
+  rt.waste = waste;
+  rt.sanitation = sanitation;
+  fillWasteMap(state, rt, waste);
   rt.cityWellbeing = people
     ? { health: sum.health / people, crime: sum.crime / people, satisfaction: sum.satisfaction / people }
     : { health: WELLBEING.health.base, crime: 0, satisfaction: 0.5 };
