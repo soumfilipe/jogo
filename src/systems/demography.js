@@ -15,6 +15,8 @@ import { createCitizen, WORKING_AGE } from '../agents/citizens.js';
 import { chance, random, randomInt } from '../core/rng.js';
 import { calendar } from '../core/time.js';
 import { studyYear } from './education.js';
+import { mod } from './mods.js';
+import { mortalityFactor } from './wellbeing.js';
 
 /** Mês (1 a 12) do aniversário de um cidadão. */
 export const birthMonth = (c) => (c.id % 12) + 1;
@@ -67,11 +69,16 @@ export function moveInFamily(state, rt, home) {
   return adults;
 }
 
-/** Chance de morrer neste ano, pela idade. */
-export function deathChance(age) {
+/**
+ * Chance de morrer neste ano, pela idade. `extraLife`: anos a mais de
+ * expectativa de vida (tecnologias como a insulina e a vacina da pólio).
+ */
+export function deathChance(age, extraLife = 0) {
   if (age >= DEMOGRAPHY.maxAge) return 1;
-  if (age < DEMOGRAPHY.deathFromAge) return DEMOGRAPHY.baseDeath;
-  return Math.min(1, DEMOGRAPHY.deathAt60 * DEMOGRAPHY.deathGrowth ** (age - DEMOGRAPHY.deathFromAge));
+  if (age <= DEMOGRAPHY.childAges) return DEMOGRAPHY.childDeath;
+  const from = DEMOGRAPHY.deathFromAge + extraLife;
+  if (age < from) return DEMOGRAPHY.baseDeath;
+  return Math.min(1, DEMOGRAPHY.deathAt60 * DEMOGRAPHY.deathGrowth ** (age - from));
 }
 
 /**
@@ -93,8 +100,10 @@ export function closeDemographyMonth(state, rt) {
       if (c.state !== 'casa') sendHome(state, rt, c);
       setJob(rt, c, null);
     }
-    // Morte.
-    if (chance(state.rng, deathChance(c.age))) {
+    // Morte: pela idade, pela saúde da casa (e epidemia) e, nas crianças pequenas, pela vacinação.
+    let p = deathChance(c.age, mod(rt, 'lifeExpectancy', 0)) * mortalityFactor(state, rt, c);
+    if (c.age <= DEMOGRAPHY.childAges) p *= mod(rt, 'infantMortality');
+    if (chance(state.rng, Math.min(1, p))) {
       removeCitizen(state, rt, c.id);
       result.deaths++;
       continue;

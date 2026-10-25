@@ -6,7 +6,7 @@
 // Estrutura de um arquivo de save:
 // {
 //   "format":   "jogo-save",       // identifica o tipo de arquivo
-//   "version":  10,                 // versão do FORMATO (para migrações)
+//   "version":  11,                 // versão do FORMATO (para migrações)
 //   "meta":     { id, name, ... }, // informações leves, usadas na lista de saves
 //   "checksum": "a1b2c3d4",        // detecta arquivo corrompido/editado
 //   "data":     { ... }            // estado do jogo, já codificado
@@ -22,7 +22,7 @@ import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { hash2 } from '../core/rng.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -165,6 +165,16 @@ const MIGRATIONS = {
     data.citizens = encodeTable(citizens, { moves: { path: width } });
     data.education ??= createEducation();
     save.version = 10;
+    return save;
+  },
+  // v10 -> v11: leis, epidemias e as médias de bem-estar do dia (saúde,
+  // crime e satisfação, recalculadas no primeiro dia de jogo).
+  10: (save) => {
+    const data = save.data;
+    data.policies ??= { active: [] };
+    data.health ??= { epidemicUntil: 0 };
+    data.wellbeing ??= { health: 0.55, crime: 0, satisfaction: 0.5 };
+    save.version = 11;
     return save;
   },
 };

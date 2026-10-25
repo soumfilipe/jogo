@@ -16,6 +16,7 @@
 //   { type: 'funding', area, amount }    (verba de pesquisa por mês numa área)
 //   { type: 'priority', area, tech }     (tecnologia prioritária da área; null = automático)
 //   { type: 'course', area, weight }     (peso da área nos cursos da universidade, 0 a 5)
+//   { type: 'policy', id, on }           (liga ou desliga uma lei)
 
 import { BUILDINGS, COSTS, DENSITY, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
@@ -25,6 +26,8 @@ import { repayLoan, setTax, takeLoan } from '../systems/economy.js';
 import { computeMods, isUnlocked, mod, utilityCost } from '../systems/mods.js';
 import { setFunding, setPriority } from '../systems/research.js';
 import { refreshSchoolMap, setCourse } from '../systems/education.js';
+import { setPolicy } from '../systems/policies.js';
+import { computeCoverage } from '../systems/services.js';
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
@@ -86,6 +89,11 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'funding') return setFunding(state, cmd.area, cmd.amount);
   if (cmd.type === 'priority') return setPriority(state, rt, cmd.area, cmd.tech);
   if (cmd.type === 'course') return setCourse(state, cmd.area, cmd.weight);
+  if (cmd.type === 'policy') {
+    const result = setPolicy(state, rt, cmd.id, cmd.on);
+    if (result.ok) computeMods(state, rt);
+    return result;
+  }
 
   const { tiles, cost, reason } = planCommand(state, rt, cmd);
   if (reason) return { ok: false, cost, count: 0, reason };
@@ -105,6 +113,7 @@ export function applyCommand(state, rt, cmd) {
     state.economy.money -= cost;
     computeMods(state, rt);
     if (utility.school) refreshSchoolMap(state, rt);
+    if (utility.service) computeCoverage(state, rt);
     return { ok: true, cost, count: 1 };
   }
 

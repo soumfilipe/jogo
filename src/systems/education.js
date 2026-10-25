@@ -29,7 +29,7 @@ const STAGES = EDUCATION.stages;
 const schoolStage = (type) => BUILDINGS[type].utility?.school?.stage ?? null;
 const offers = (type, stage) => {
   const own = schoolStage(type);
-  return own === stage || (stage === 'pos' && own === 'superior');
+  return own === stage || (stage === 'pos' && own === 'superior') || (stage === 'eja' && own === 'fundamental');
 };
 
 /** Vagas de alunos de uma escola, com os modificadores. */
@@ -72,9 +72,11 @@ export function wantedStages(rt, c) {
   if (inAge('creche')) out.push('creche');
   if (edu < EDU.FUNDAMENTAL && inAge('fundamental')) out.push('fundamental');
   // Tempo integral só para quem não trabalha (ou já está matriculado nela).
-  const free = (stage) => c.job === null || c.stage === stage;
+  const free = (stage) => c.job === null || c.stage === stage
+    || (stage === 'superior' && mod(rt, 'universityForWorkers', 0) > 0);
   if (edu === EDU.FUNDAMENTAL && inAge('medio') && free('medio')) out.push('medio');
   if (edu === EDU.FUNDAMENTAL && inAge('tecnico')) out.push('tecnico');
+  if (edu === EDU.NONE && inAge('eja') && mod(rt, 'eja', 0) > 0) out.push('eja');
   if (edu === EDU.MEDIO && inAge('superior') && free('superior')) out.push('superior');
   if (edu === EDU.SUPERIOR && inAge('pos') && free('pos') && mod(rt, 'posGraduacao', 0) > 0) out.push('pos');
   return out;
@@ -110,7 +112,9 @@ export function enrollStudents(state, rt) {
       for (const s of schools) {
         if (!offers(s.type, stage) || free.get(s.id) <= 0) continue;
         const d = Math.abs((s.tile % width) - hx) + Math.abs(Math.floor(s.tile / width) - hy);
-        if (d <= radiusOf(rt, s.type) && d < bestDist) {
+        // A TV educativa leva a EJA para casas longe da escola.
+        const radius = radiusOf(rt, s.type) * (stage === 'eja' ? mod(rt, 'radius.eja') : 1);
+        if (d <= radius && d < bestDist) {
           best = s;
           bestDist = d;
         }

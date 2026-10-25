@@ -47,7 +47,7 @@ test('efeitos: apontam para tecnologias e prédios que existem', () => {
   for (const [id, effects] of Object.entries(EFFECTS)) {
     assert.ok(TECH_BY_ID.has(id), `efeito de ${id}, que não existe`);
     for (const e of effects) {
-      const kinds = ['mod', 'unlock', 'level', 'loan'].filter((k) => k in e);
+      const kinds = ['mod', 'unlock', 'level', 'loan', 'policy'].filter((k) => k in e);
       assert.equal(kinds.length, 1, `${id}: efeito ${JSON.stringify(e)}`);
       if (e.mod) assert.ok(('mul' in e) !== ('add' in e), `${id}: ${e.mod} precisa de mul ou add`);
       if (e.unlock) assert.ok(BUILDINGS[e.unlock]?.utility, `${id} libera ${e.unlock}, que não é prédio do jogador`);

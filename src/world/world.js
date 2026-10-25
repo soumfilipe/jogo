@@ -6,6 +6,7 @@ import { DENSITY, ECONOMY, TERRAIN } from './catalog.js';
 import { generateForest, generateTerrain } from './terrain.js';
 import { createResearch } from '../systems/research.js';
 import { createEducation } from '../systems/education.js';
+import { createPolicies } from '../systems/policies.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -53,6 +54,10 @@ export function createWorld({
     research: createResearch(startMarco),
     // Cursos da universidade (ver systems/education.js).
     education: createEducation(),
+    // Leis ativas (systems/policies.js), epidemia e médias do dia (wellbeing.js).
+    policies: createPolicies(),
+    health: { epidemicUntil: 0 },
+    wellbeing: { health: 0.55, crime: 0, satisfaction: 0.5 },
     nextId: 1,
   };
 }

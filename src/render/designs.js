@@ -676,6 +676,117 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  hospital(r) {
+    const w = r.pick([wall('#f4f5f6', '#d6d9dd'), wall('#e9edf2', '#c8ced6')]);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#9a9a8a', lift: 0 }];
+    const h = r.range(2.2, 2.8);
+    parts.push(block([0.15, 0.15, 1.85, 0.95], 0, h, w, {
+      windows: { cols: 6, style: 'grid' }, bands: [{ at: h * 0.94, thick: 0.06, color: '#c23b3b' }],
+    }));
+    parts.push(block([0.15, 1.05, 1.1, 1.85], 0, 1.0, w, { windows: { cols: 3, style: 'grid' }, doors: { count: 2, color: '#c23b3b' } }));
+    // Cruz vermelha no telhado e heliponto.
+    parts.push(block([0.85, 0.45, 1.15, 0.65], h, 0.04, wall('#c23b3b', '#a03024'), { top: '#e05a47' }));
+    parts.push(block([0.9, 0.35, 1.1, 0.75], h, 0.04, wall('#c23b3b', '#a03024'), { top: '#e05a47' }));
+    parts.push({ kind: 'slab', box: [1.25, 1.2, 1.85, 1.8], color: '#5b5f66', lines: true, lift: 0.01 });
+    return parts;
+  },
+
+  posto_saude() {
+    const parts = [{ kind: 'slab', box: [0.1, 0.1, 0.9, 0.9], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.15, 0.2, 0.85, 0.75], 0, 0.6, wall('#f4f5f6', '#d6d9dd'), {
+      windows: { cols: 3, style: 'grid' }, doors: { count: 1, color: '#3f6fc0' }, bands: [{ at: 0.5, thick: 0.06, color: '#3f6fc0' }],
+    }));
+    parts.push(block([0.42, 0.4, 0.58, 0.55], 0.6, 0.03, wall('#3f6fc0', '#2f5aa0'), { top: '#4f8ff7' }));
+    return parts;
+  },
+
+  clinica(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.12, 0.15, 0.88, 0.8], 0, 0.95, r.pick([wall('#f4f5f6', '#d6d9dd'), wall('#e6f0e3', '#c7d6c3')]), {
+      windows: { cols: 3, style: 'grid' }, doors: { count: 1, color: '#3d8f5a' }, bands: [{ at: 0.85, thick: 0.06, color: '#3d8f5a' }],
+    }));
+    parts.push(block([0.4, 0.42, 0.6, 0.53], 0.95, 0.03, wall('#3d8f5a', '#2f7148'), { top: '#51cf66' }));
+    return parts;
+  },
+
+  caps(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#9ab486', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.75, 0.6], 0, 0.7, r.pick([wall('#f2d7b4', '#d8bc97'), wall('#d7e3f2', '#bac8d8')]), {
+      roof: { kind: 'hip', color: '#8a5a3a', rise: 0.35 }, windows: { cols: 2, style: 'grid' }, doors: { count: 1, color: '#8e44ad' },
+    }));
+    for (const [x, y] of [[0.8, 0.3], [0.3, 0.8], [0.75, 0.78]]) parts.push({ kind: 'cylinder', cx: x, cy: y, r: 0.08, lift: 0, h: 0.35, color: '#4f8a3a', top: '#6fb04f' });
+    return parts;
+  },
+
+  delegacia() {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#7a7d84', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.88, 0.6], 0, 1.0, wall('#d9dde2', '#b9bec7'), {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 1, color: '#2c3e50' }, bands: [{ at: 0.85, thick: 0.08, color: '#2c3e50' }],
+    }));
+    // Viaturas no pátio.
+    for (const x of [0.2, 0.55]) parts.push(block([x, 0.7, x + 0.25, 0.85], 0, 0.12, wall('#f4f5f6', '#2c3e50'), { top: '#3f6fc0' }));
+    parts.push({ kind: 'antenna', cx: 0.8, cy: 0.2, lift: 1.0, h: 0.7 });
+    return parts;
+  },
+
+  guarda_municipal() {
+    const parts = [{ kind: 'slab', box: [0.1, 0.1, 0.9, 0.9], color: '#8a8f86', lift: 0 }];
+    parts.push(block([0.15, 0.2, 0.85, 0.7], 0, 0.6, wall('#e6e2da', '#c9c4ba'), {
+      windows: { cols: 3, style: 'grid' }, doors: { count: 1, color: '#16a085' }, bands: [{ at: 0.52, thick: 0.06, color: '#16a085' }],
+    }));
+    parts.push(block([0.3, 0.75, 0.55, 0.88], 0, 0.12, wall('#f4f5f6', '#16a085'), { top: '#16a085' }));
+    return parts;
+  },
+
+  central_cameras() {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#5b5f66', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.88, 0.75], 0, 1.2, wall('#5b7fa8', '#486889'), { windows: { cols: 4, style: 'bands' }, doors: { count: 1, color: '#2c3e50' } }));
+    parts.push({ kind: 'antenna', cx: 0.3, cy: 0.3, lift: 1.2, h: 1.0 });
+    parts.push({ kind: 'antenna', cx: 0.7, cy: 0.5, lift: 1.2, h: 0.7 });
+    return parts;
+  },
+
+  quartel_bombeiros() {
+    const red = wall('#c0392b', '#a03024');
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#7a7d84', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.88, 0.7], 0, 0.85, red, { doors: { count: 3, color: '#e6e2da' }, windows: { cols: 3, style: 'grid' } }));
+    // Torre de treino.
+    parts.push(block([0.7, 0.72, 0.88, 0.9], 0, 1.8, wall('#b5b0a6', '#98938a'), { windows: { cols: 1, style: 'grid' } }));
+    parts.push(block([0.2, 0.75, 0.55, 0.9], 0, 0.15, red, { top: '#e05a47' }));
+    return parts;
+  },
+
+  parque(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 0.96, 0.96], color: '#7fb069', lift: 0 }];
+    // Caminhos, árvores e um coreto.
+    parts.push({ kind: 'slab', box: [0.44, 0.04, 0.56, 0.96], color: '#d9c79a', lift: 0.01 });
+    parts.push({ kind: 'slab', box: [0.04, 0.44, 0.96, 0.56], color: '#d9c79a', lift: 0.01 });
+    for (const [x, y] of [[0.22, 0.22], [0.78, 0.22], [0.22, 0.78], [0.78, 0.78]]) {
+      parts.push({ kind: 'cylinder', cx: x, cy: y, r: 0.03, lift: 0, h: 0.25, color: '#6f4e37', top: '#6f4e37' });
+      parts.push({ kind: 'cylinder', cx: x, cy: y, r: r.range(0.12, 0.16), lift: 0.25, h: 0.3, color: '#3d7a35', top: '#5aa04a' });
+    }
+    parts.push({ kind: 'cylinder', cx: 0.5, cy: 0.5, r: 0.1, lift: 0, h: 0.3, color: '#f4f1ea', top: '#c0392b' });
+    return parts;
+  },
+
+  cinema(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#7a7d84', lift: 0 }];
+    const w = r.pick([wall('#8e44ad', '#73378c'), wall('#2c3e50', '#22303e'), wall('#c0392b', '#a03024')]);
+    parts.push(block([0.12, 0.12, 0.88, 0.85], 0, 1.1, w, { doors: { count: 2, color: '#f1c40f' }, sign: { color: '#f1c40f' } }));
+    parts.push(block([0.1, 0.8, 0.9, 0.9], 0.75, 0.12, wall('#f1c40f', '#d4a90d'), { top: '#f7dc6f' }));
+    return parts;
+  },
+
+  ginasio(r) {
+    const w = r.pick([wall('#e6e2da', '#c9c4ba'), wall('#d9dde2', '#b9bec7')]);
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#9a9a8a', lift: 0 }];
+    parts.push(block([0.15, 0.15, 1.85, 1.3], 0, 1.0, w, {
+      roof: { kind: 'gable-x', color: '#3f6fc0', rise: 0.45 }, windows: { cols: 5, style: 'bands' }, doors: { count: 2, color: '#3f6fc0' },
+    }));
+    parts.push({ kind: 'slab', box: [0.2, 1.42, 1.8, 1.88], color: '#c0703f', lines: true, lift: 0.01 });
+    return parts;
+  },
+
   parque_tecnologico(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#8fae7d', lift: 0 }];
     // Prédios de vidro baixos e um mais alto, com um pátio verde no meio.

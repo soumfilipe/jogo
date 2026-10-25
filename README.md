@@ -32,7 +32,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | Carvão / Bomba / Poço / Instituto… | coloca um prédio público ou estatal (um clique; precisa encostar numa rua). Os que dependem de pesquisa aparecem quando são liberados |
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
-| `L` / `P` / `N` / `H` / `U` Mapas | valor do terreno, poluição, energia, água ou escolas sobre o mapa |
+| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` Mapas | valor do terreno, poluição, energia, água, escolas, saúde, crime ou satisfação sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
@@ -108,13 +108,40 @@ faltam, está em [`docs/arvore-tecnologica.html`](docs/arvore-tecnologica.html)
   estatais e dão receita), liberam o nível 3 de residências e comércio (código
   de zoneamento) e mudam parâmetros do jogo: manutenção, juros, velocidade dos
   cidadãos, poluição, consumo, impostos, valor do terreno, demanda.
-- Nesta versão, 78 tecnologias podem ser pesquisadas (etapas 0 e 1). As
-  outras dependem de sistemas que ainda não existem (trânsito, saúde,
-  segurança, lixo...) e aparecem como "chega numa próxima versão".
+- Nesta versão, 140 tecnologias podem ser pesquisadas (etapas 0, 1 e 2). As
+  outras dependem de sistemas que ainda não existem (trânsito, lixo,
+  agricultura, turismo, desastres...) e aparecem como "chega numa próxima versão".
 - Pesquisadores (do instituto e da universidade) precisam de **curso
   superior**. Quem é formado numa área rende até 50% mais nela, e com a
   tecnologia de pós-graduação, mestres e doutores valem o dobro. A distribuição
   dos cursos da universidade fica no painel Pesquisa.
+
+## Saúde, segurança, satisfação e leis
+
+Regras em `src/systems/services.js`, `wellbeing.js`, `fire.js` e `policies.js`;
+números em `WELLBEING` e `FIRE` no catálogo.
+
+- **Serviços com raio** (menu Construir): hospital, clínica de bairro, posto de
+  vacinação, delegacia, guarda municipal, central de câmeras, quartel de
+  bombeiros, e lazer (praça, cinema, ginásio, centro de atenção psicossocial).
+  A cobertura cai do centro até a borda do raio, e o prédio só atende com
+  funcionários.
+- **Bem-estar de cada casa**, uma vez por dia:
+  - *saúde*: hospitais e clínicas por perto, menos a poluição; muda a chance de
+    morrer dos moradores (e das crianças pequenas, com a vacinação);
+  - *crime*: desemprego, insatisfação e densidade, menos a polícia;
+  - *satisfação*: saúde, segurança, lazer, escola, poluição, desemprego e
+    imposto residencial. A média aparece no topo (🙂) e puxa a demanda
+    residencial; casas abaixo de 25% perdem famílias.
+- **Incêndios**: cada prédio pode pegar fogo; com bombeiros no raio, a chance
+  de apagar é a cobertura. Sem apagar, vira ruína e o fogo pode passar aos
+  vizinhos.
+- **Epidemias**: numa cidade grande com a saúde média baixa, podem começar e
+  durar dois meses, com mais mortes onde a saúde é pior.
+- **Leis e políticas** (painel do orçamento): 27 leis liberadas pela pesquisa,
+  como o código contra incêndio, a merenda escolar, a saúde da família e o
+  orçamento participativo. Cada uma tem custo mensal (fixo, por morador, por
+  aluno...) e efeitos enquanto está ativa.
 
 ## Famílias, escolas e escolaridade
 
@@ -432,7 +459,7 @@ módulos JavaScript em `file://`.)
 ```jsonc
 {
   "format": "jogo-save",
-  "version": 10,                // versão do formato (migrações em src/save/format.js)
+  "version": 11,                // versão do formato (migrações em src/save/format.js)
   "meta": {                     // dados leves, usados na tela "Carregar"
     "id": "vila-nova-rqlkbx",
     "gameId": "vila-nova-rqlkbx",
@@ -457,6 +484,9 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 10 (antes da etapa 2) abrem sem leis ativas, sem epidemia e
+com a saúde, o crime e a satisfação calculados no primeiro dia.
 
 Saves do formato 9 (antes da escolaridade) abrem com os moradores adultos
 recebendo uma escolaridade sorteada pelo marco do mundo; ninguém está estudando.
