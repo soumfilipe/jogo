@@ -7,7 +7,7 @@ import { loanOffers, loanPayment, loanRate, monthlyBudget } from '../systems/eco
 import { POLICIES, policyCost, policyUnlocked } from '../systems/policies.js';
 import { calendar } from '../core/time.js';
 
-const ZONE_NAMES = { residential: 'Residencial', commercial: 'Comercial', industrial: 'Industrial' };
+const ZONE_NAMES = { residential: 'Residencial', commercial: 'Comercial', industrial: 'Industrial', rural: 'Rural' };
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const CHART_MONTHS = 24;
 const money = (v) => `${v < 0 ? '−' : ''}$${Math.abs(Math.round(v)).toLocaleString('pt-BR')}`;
@@ -52,10 +52,12 @@ export class BudgetPanel {
         <dt>Impostos</dt><dd data-line="income"></dd>
         <dt data-statal>Estatais</dt><dd data-statal data-line="statal"></dd>
         <dt data-fares>Passagens</dt><dd data-fares data-line="fares"></dd>
+        <dt data-food-export>Exportação de alimentos</dt><dd data-food-export data-line="food-export"></dd>
         <dt>Manutenção das ruas</dt><dd data-line="roads"></dd>
         <dt>Serviços públicos</dt><dd data-line="utilities"></dd>
         <dt>Pesquisa</dt><dd data-line="research"></dd>
         <dt>Leis e políticas</dt><dd data-line="policies"></dd>
+        <dt data-food-import>Alimentos importados</dt><dd data-food-import data-line="food-import"></dd>
         <dt>Parcelas de empréstimos</dt><dd data-line="loans"></dd>
         <dt class="total">Saldo do mês</dt><dd class="total" data-line="net"></dd>
       </dl>
@@ -135,7 +137,11 @@ export class BudgetPanel {
       q(`[data-tax-income="${zone}"]`).textContent = `${money(budget.income[zone])}/mês`;
     }
 
-    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal - budget.income.fares);
+    q('[data-line="income"]').textContent = money(budget.income.total - budget.income.statal - budget.income.fares - budget.income.food);
+    for (const el of this.el.querySelectorAll('[data-food-export]')) el.hidden = budget.income.food === 0;
+    q('[data-line="food-export"]').textContent = money(budget.income.food);
+    for (const el of this.el.querySelectorAll('[data-food-import]')) el.hidden = budget.expenses.food === 0;
+    q('[data-line="food-import"]').textContent = money(-budget.expenses.food);
     for (const el of this.el.querySelectorAll('[data-fares]')) el.hidden = budget.income.fares === 0;
     q('[data-line="fares"]').textContent = money(budget.income.fares);
     for (const el of this.el.querySelectorAll('[data-statal]')) el.hidden = budget.income.statal === 0;

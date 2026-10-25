@@ -2,14 +2,14 @@
 
 export const TERRAIN = { GRASS: 0, WATER: 1, FOREST: 2, SAND: 3 };
 
-export const ZONE = { NONE: 0, RESIDENTIAL: 1, COMMERCIAL: 2, INDUSTRIAL: 3 };
+export const ZONE = { NONE: 0, RESIDENTIAL: 1, COMMERCIAL: 2, INDUSTRIAL: 3, RURAL: 4 };
 
 // Densidade de uma zona residencial ou comercial, escolhida pelo jogador ao
 // zonear (state.map.density, por tile). Limita até onde os prédios crescem:
 //   maxLevel:  nível máximo (baixa fica em casas, sobrados, lojas e mercados,
 //              e não recebe prédios grandes)
 //   maxFloors: andares máximos dos prédios que crescem andar por andar
-// A indústria não usa densidade.
+// A indústria e a zona rural não usam densidade.
 export const DENSITY = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 export const DENSITY_INFO = {
   [DENSITY.LOW]: { name: 'Baixa', maxLevel: 2, maxFloors: 2 },
@@ -21,6 +21,7 @@ export const ZONE_INFO = {
   [ZONE.RESIDENTIAL]: { name: 'Residencial', color: '#5fbf5a', key: 'r' },
   [ZONE.COMMERCIAL]: { name: 'Comercial', color: '#4f8ff7', key: 'c' },
   [ZONE.INDUSTRIAL]: { name: 'Industrial', color: '#e8b931', key: 'i' },
+  [ZONE.RURAL]: { name: 'Rural', color: '#a3843f', key: 'f' },
 };
 
 // Prédios que crescem sozinhos nas zonas.
@@ -79,6 +80,22 @@ export const BUILDINGS = {
   },
   galpao: {
     name: 'Galpão logístico', zone: ZONE.INDUSTRIAL, level: 3, size: 2, residents: 0, jobs: 70, perFloor: 70,
+  },
+
+  // --- Rural (ver systems/food.js) --------------------------------------------
+  //   food: alimentos por mês com todas as vagas preenchidas (FOOD.perResident
+  //   por morador). Não usam a rede de energia e água.
+  sitio: {
+    name: 'Sítio', zone: ZONE.RURAL, level: 1, size: 1, residents: 0, jobs: 6, perFloor: 6, food: 40,
+  },
+  fazenda: {
+    name: 'Fazenda', zone: ZONE.RURAL, level: 2, size: 1, residents: 0, jobs: 10, perFloor: 10, food: 85,
+  },
+  fazenda_mecanizada: {
+    name: 'Fazenda mecanizada', zone: ZONE.RURAL, level: 3, size: 1, residents: 0, jobs: 12, perFloor: 12, food: 140,
+  },
+  agroindustria: {
+    name: 'Agroindústria', zone: ZONE.RURAL, level: 3, size: 2, residents: 0, jobs: 40, perFloor: 40, food: 520,
   },
 
   // --- Prédios colocados pelo jogador (serviços públicos e estatais) ----------
@@ -247,6 +264,18 @@ export const BUILDINGS = {
     name: 'Ginásio poliesportivo', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 10,
     utility: { power: 0, water: 0, cost: 12_000, upkeep: 300, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 16, strength: 0.8 } },
   },
+  mercado_municipal: {
+    name: 'Mercado municipal', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 8,
+    utility: { power: 0, water: 0, cost: 3_000, upkeep: 80, pollution: 0, income: 150, area: 'abastecimento', service: { kind: 'alimentos', radius: 10, strength: 0.75 } },
+  },
+  restaurante_popular: {
+    name: 'Restaurante popular', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 12,
+    utility: { power: 0, water: 0, cost: 5_000, upkeep: 300, pollution: 0, area: 'abastecimento', service: { kind: 'alimentos', radius: 8, strength: 1 } },
+  },
+  ceasa: {
+    name: 'Central de abastecimento (Ceasa)', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 40,
+    utility: { power: 0, water: 0, cost: 25_000, upkeep: 400, pollution: 3, area: 'abastecimento', mods: [{ mod: 'food.price', mul: 0.8 }] },
+  },
   base_samu: {
     name: 'Base do SAMU', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
     utility: { power: 0, water: 0, cost: 8_000, upkeep: 350, pollution: 0, area: 'saude', service: { kind: 'saude', radius: 22, strength: 0.5 } },
@@ -343,6 +372,8 @@ export const CONSUMPTION = {
   [ZONE.RESIDENTIAL]: { power: 1, water: 1.2 },
   [ZONE.COMMERCIAL]: { power: 1.5, water: 0.6 },
   [ZONE.INDUSTRIAL]: { power: 2.2, water: 1.4 },
+  // Fazendas ficam fora da rede (ver isServed).
+  [ZONE.RURAL]: { power: 0, water: 0 },
 };
 
 // Prédio sem energia ou água: a cada dia perde esta fração dos moradores ou
@@ -364,11 +395,12 @@ for (const [id, info] of Object.entries(BUILDINGS)) {
 export const MAX_LEVEL = 3;
 
 // Valor do terreno (0 a 1) necessário para um prédio chegar a cada nível.
-// A indústria não liga para valor do terreno, só para demanda e lotação.
+// A indústria e as fazendas não ligam para valor do terreno, só para demanda e lotação.
 export const LAND_VALUE_FOR_LEVEL = {
   [ZONE.RESIDENTIAL]: { 2: 0.45, 3: 0.62 },
   [ZONE.COMMERCIAL]: { 2: 0.45, 3: 0.6 },
   [ZONE.INDUSTRIAL]: { 2: 0, 3: 0 },
+  [ZONE.RURAL]: { 2: 0, 3: 0 },
 };
 
 // Dias mínimos entre uma mudança de nível e a próxima.
@@ -432,7 +464,7 @@ export const ECONOMY = {
   incomePerJob: 0.6,
   // Cada ponto percentual acima do padrão tira esta demanda da zona (e
   // abaixo do padrão, soma).
-  taxDemandEffect: { residential: 4, commercial: 3, industrial: 3 },
+  taxDemandEffect: { residential: 4, commercial: 3, industrial: 3, rural: 3 },
   // Empréstimos: valores oferecidos, juros ao ano, número de parcelas mensais
   // e quantos podem estar abertos ao mesmo tempo.
   loanOptions: [25_000, 50_000, 100_000],
@@ -443,7 +475,24 @@ export const ECONOMY = {
   historyMonths: 36,
 };
 
-export const TAX_ZONES = ['residential', 'commercial', 'industrial'];
+export const TAX_ZONES = ['residential', 'commercial', 'industrial', 'rural'];
+
+// Alimentos (ver systems/food.js), em unidades por mês.
+export const FOOD = {
+  // Consumo de cada morador, e a fração a mais que se perde no caminho
+  // (a cadeia do frio reduz).
+  perResident: 1,
+  waste: 0.3,
+  // Quanto uma vaga de fazenda produz, em média (para a demanda rural).
+  perJob: 7,
+  // Preço da unidade importada quando falta e da exportada quando sobra.
+  importPrice: 0.6,
+  exportPrice: 0.25,
+  // Fazenda em areia produz esta fração (a agricultura tropical resolve).
+  sand: 0.5,
+  // Comércio de nível 2 (o mercado) também vende alimentos no raio.
+  market: { radius: 6, strength: 0.6 },
+};
 
 // Pesquisa (ver systems/research.js e world/techs.js).
 export const RESEARCH = {
@@ -511,6 +560,9 @@ export const SECTORS = {
   textil: { name: 'Têxtil', kind: 'industria', label: 'Têxtil {L}', shifts: { diurno: 0.8, tarde: 0.1, noturno: 0.1 } },
   logistica: { name: 'Logística', kind: 'industria', label: '{L} Logística', shifts: { diurno: 0.7, noturno: 0.15, madrugada: 0.1, manha: 0.025, tarde: 0.025 } },
   quimica: { name: 'Química', kind: 'industria', label: 'Química {L}', shifts: { diurno: 0.8, noturno: 0.1, madrugada: 0.1 } },
+  graos: { name: 'Grãos', kind: 'agro', label: 'Fazenda {L}', shifts: { diurno: 0.95, manha: 0.05 } },
+  hortifruti: { name: 'Hortifrúti', kind: 'agro', label: 'Sítio {L}', shifts: { diurno: 0.9, madrugada: 0.1 } },
+  laticinios: { name: 'Laticínios', kind: 'agro', label: 'Laticínios {L}', shifts: { diurno: 0.7, madrugada: 0.3 } },
 };
 
 // Uma empresa nova tem COMPANY_GRACE_DAYS dias para contratar; depois, se
@@ -548,6 +600,7 @@ export const EDUCATION = {
     residential: {},
     commercial: { 1: EDU.NONE, 2: EDU.FUNDAMENTAL, 3: EDU.MEDIO },
     industrial: { 1: EDU.NONE, 2: EDU.FUNDAMENTAL, 3: EDU.FUNDAMENTAL },
+    rural: { 1: EDU.NONE, 2: EDU.NONE, 3: EDU.FUNDAMENTAL },
     buildings: {
       instituto_pesquisa: EDU.SUPERIOR, universidade: EDU.SUPERIOR, parque_tecnologico: EDU.SUPERIOR,
       biotecnologia: EDU.SUPERIOR, petroquimica: EDU.MEDIO, escola_media: EDU.SUPERIOR,
@@ -597,13 +650,14 @@ export const WELLBEING = {
   // Saúde: base, mais até `coverage` com hospital/clínica no raio, menos a
   // poluição. A saúde multiplica a chance de morrer (de healthDeath[0] com
   // saúde 1 até healthDeath[1] com saúde 0).
-  health: { base: 0.6, coverage: 0.35, pollution: 0.3 },
+  // `food`: acesso a alimentos (mercados no raio) soma até food/2 e a falta tira food/2.
+  health: { base: 0.6, coverage: 0.35, pollution: 0.3, food: 0.1 },
   healthDeath: [0.6, 1.8],
   // Crime: base mais desemprego, insatisfação e densidade, menos a polícia.
   crime: { base: 0.15, unemployment: 0.5, unhappiness: 0.35, density: 0.15, police: 0.7 },
   // Satisfação: base e o peso de cada fator.
   satisfaction: {
-    base: 0.6, health: 0.15, safety: 0.2, leisure: 0.15, school: 0.05,
+    base: 0.6, health: 0.15, safety: 0.2, leisure: 0.15, school: 0.05, food: 0.08,
     pollution: 0.2, unemployment: 0.3, taxPerPoint: 0.015,
   },
   // Casas com satisfação abaixo de `leaveBelow` perdem uma família por dia

@@ -25,7 +25,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | Controle | Ação |
 | --- | --- |
 | `E` Estrada | arraste para traçar uma estrada em "L" ($10 por tile) |
-| `R` / `C` / `I` Zonas | arraste um retângulo de zona residencial, comercial ou industrial ($5 por tile) |
+| `R` / `C` / `I` / `F` Zonas | arraste um retângulo de zona residencial, comercial, industrial ou rural ($5 por tile) |
 | `X` Densidade (Baixa / Média / Alta) | densidade das zonas residenciais e comerciais; arrastar sobre lotes construídos troca só a densidade |
 | `B` Demolir | arraste sobre prédios, estradas, árvores ou zonas |
 | `V` Inspecionar | clique num prédio ou num cidadão andando; arraste para mover a câmera |
@@ -33,7 +33,7 @@ npm test   # testes da simulação, do formato de save e do servidor
 | `O` Orçamento (ou clique no dinheiro) | impostos, receitas e despesas, histórico e empréstimos |
 | `T` Pesquisa (ou 🔬 no topo) | verba por área do conhecimento, alvo de cada área e marco do mundo |
 | Avenida / Via expressa | como a estrada, mas mais rápidas e com mais capacidade (depois da pesquisa *Via expressa*); sobre uma rua, melhoram ela pagando só a diferença |
-| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` Mapas | valor do terreno, poluição, energia, água, escolas, saúde, crime, satisfação ou trânsito sobre o mapa |
+| `L` / `P` / `N` / `H` / `U` / `G` / `K` / `J` / `M` / `Q` Mapas | valor do terreno, poluição, energia, água, escolas, saúde, crime, satisfação, trânsito ou alimentos sobre o mapa |
 | Botão direito/do meio, `WASD`, setas | mover a câmera |
 | Roda do mouse | zoom |
 | Espaço, `1`, `2`, `3` | pausar e velocidades |
@@ -143,6 +143,25 @@ números em `WELLBEING` e `FIRE` no catálogo.
   como o código contra incêndio, a merenda escolar, a saúde da família e o
   orçamento participativo. Cada uma tem custo mensal (fixo, por morador, por
   aluno...) e efeitos enquanto está ativa.
+
+## Agricultura e alimentos
+
+Regras em `src/systems/food.js`; números em `FOOD` no catálogo.
+
+- **Zona rural** (`F`): sítios, fazendas e, com a pesquisa, fazendas mecanizadas
+  e agroindústrias (2x2). Crescem enquanto a cidade importa comida (a quarta
+  barrinha da demanda, marrom), não precisam de energia nem de água e pagam o
+  imposto rural. O trator libera o nível 2 e a Revolução Verde, o nível 3.
+- **Balanço do mês**: cada morador consome 1 unidade (mais 30% de perda, que a
+  cadeia do frio reduz). O que as fazendas não dão conta é importado (despesa
+  *Alimentos importados*, mais barata com o Ceasa); a sobra é exportada.
+  Adubo, defensivos, eletrificação rural e Revolução Verde multiplicam a
+  produção, mas adubo e defensivos fazem as fazendas poluírem. Fazenda em areia
+  produz metade até a agricultura tropical.
+- **Acesso**: a comida chega às casas pelo mercado municipal, pelo restaurante
+  popular e pelo comércio de nível 2 (o mercado do bairro; o supermercado
+  aumenta o raio). Casa sem mercado no raio perde saúde e satisfação; o mapa
+  *Alimentos* (`Q`) mostra quem está bem servido.
 
 ## Trânsito, transporte público e carga
 
@@ -511,6 +530,8 @@ cada campo aparece uma vez só, ids viram diferenças, textos repetidos (turno,
 estado) viram um dicionário e as rotas de quem está viajando viram passos, uma
 letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
+
+Saves do formato 12 (antes da zona rural) abrem com o imposto rural no padrão.
 
 Saves do formato 11 (antes da etapa 3) abrem sem passagens acumuladas no mês.
 

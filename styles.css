@@ -66,6 +66,7 @@ button:disabled:hover { background: #3a3f4a; }
 #demand-r i { background: #5fbf5a; }
 #demand-c i { background: #4f8ff7; }
 #demand-i i { background: #e8b931; }
+#demand-f i { background: #a3843f; }
 
 main { position: relative; overflow: hidden; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }

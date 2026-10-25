@@ -19,8 +19,9 @@ import {
   BUILDINGS, COMPANY_CLOSE_DAYS, COMPANY_GRACE_DAYS, COMPANY_OPEN_CHANCE, SECTORS, ZONE, buildingFloors,
 } from '../world/catalog.js';
 import {
-  addCompany, companyJobs, removeCompany, setJob, touchMap, usesCompanies,
+  addCompany, companyJobs, removeCompany, setJob, singleOwner, touchMap, usesCompanies,
 } from '../world/runtime.js';
+import { ZONE_KEY } from './mods.js';
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { LAST_NAMES } from '../agents/names.js';
@@ -29,7 +30,7 @@ import { isServed } from './utilities.js';
 const SECTORS_BY_KIND = {};
 for (const [id, sector] of Object.entries(SECTORS)) (SECTORS_BY_KIND[sector.kind] ??= []).push(id);
 
-const DEMAND_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial' };
+const DEMAND_KEY = ZONE_KEY;
 
 /** Andares do prédio sem empresa, do mais baixo ao mais alto. */
 export function vacantFloors(rt, b) {
@@ -60,15 +61,15 @@ function openCompanyIn(state, rt, b) {
 
   let kind;
   let floors;
-  if (info.zone === ZONE.INDUSTRIAL) {
-    // A indústria cresce junto com o prédio: a empresa que já está lá ocupa o
-    // andar novo.
+  if (singleOwner(info)) {
+    // A indústria (e a fazenda) cresce junto com o prédio: a empresa que já
+    // está lá ocupa o andar novo.
     const [owner] = rt.companiesIn.get(b.id);
     if (owner) {
       owner.floors = buildingFloors(b);
       return run * info.perFloor;
     }
-    kind = 'industria';
+    kind = info.zone === ZONE.RURAL ? 'agro' : 'industria';
     floors = run;
   } else if (info.tall) {
     kind = floor === 0 && chance(state.rng, 0.5) ? 'varejo' : 'escritorio';
@@ -124,7 +125,7 @@ export function fitCompanies(state, rt, b) {
   const info = BUILDINGS[b.type];
   if (!usesCompanies(info)) return;
   const list = rt.companiesIn.get(b.id);
-  if (info.zone === ZONE.INDUSTRIAL && list.length === 1) list[0].floors = buildingFloors(b);
+  if (singleOwner(info) && list.length === 1) list[0].floors = buildingFloors(b);
   for (const co of list) {
     const extra = [...rt.companyWorkers.get(co.id)].sort((x, y) => x - y).slice(companyJobs(rt, co));
     for (const id of extra) setJob(rt, rt.citizenById.get(id), null);

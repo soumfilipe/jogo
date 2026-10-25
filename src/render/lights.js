@@ -18,6 +18,7 @@ export const LIGHT_COLORS = {
   [ZONE.RESIDENTIAL]: '#ffd98a',
   [ZONE.COMMERCIAL]: '#e9f3ff',
   [ZONE.INDUSTRIAL]: '#ffbf6b',
+  [ZONE.RURAL]: '#ffd98a',
   [ZONE.NONE]: '#ffe2a8', // serviços públicos
 };
 

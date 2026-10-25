@@ -149,6 +149,11 @@ export const POLICIES = {
     desc: 'Domingo sem carros: mais saúde e satisfação, um pouco menos de capacidade nas ruas.',
     cost: {}, effects: [{ mod: 'satisfactionPolicy', add: 0.03 }, { mod: 'health', add: 0.03 }, { mod: 'roadCapacity', mul: 0.97 }],
   },
+  hortas_urbanas: {
+    name: 'Hortas urbanas', tech: 'hortas_urbanas',
+    desc: 'Lotes vazios viram hortas comunitárias: 5% menos comida comprada e terreno um pouco mais valorizado.',
+    cost: { perResident: 0.2 }, effects: [{ mod: 'food.consumption', mul: 0.95 }, { mod: 'landValue.all', add: 0.02 }],
+  },
 };
 
 export function createPolicies() {

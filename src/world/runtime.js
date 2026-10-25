@@ -3,7 +3,7 @@
 // mudança em prédios, cidadãos ou estradas deve passar por aqui.
 
 import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN, ZONE, capacityOf } from './catalog.js';
-import { mod } from '../systems/mods.js';
+import { mod, ZONE_KEY } from '../systems/mods.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -22,7 +22,7 @@ export function buildRuntime(state) {
     roadComponent: new Int32Array(width * height), // rede de estradas de cada tile (0 = sem)
     access: new Map(), //    id do prédio -> tile de estrada de acesso (-1 = sem acesso)
     pathCache: new Map(),
-    demand: { residential: 0, commercial: 0, industrial: 0 },
+    demand: { residential: 0, commercial: 0, industrial: 0, rural: 0 },
     landValue: new Float32Array(width * height), // 0 a 1, ver systems/landvalue.js
     pollution: new Float32Array(width * height), // 0 a 1
     // Incrementado a cada mudança visível no mapa (o renderizador usa como cache).
@@ -155,9 +155,14 @@ export function openJobs(rt, b) {
 // Empresas (ver systems/companies.js)
 // ---------------------------------------------------------------------------
 
-/** Prédios cujas vagas vêm de empresas: os das zonas comercial e industrial. */
+/** Prédios cujas vagas vêm de empresas: os das zonas comercial, industrial e rural. */
 export function usesCompanies(info) {
-  return info.zone === ZONE.COMMERCIAL || info.zone === ZONE.INDUSTRIAL;
+  return info.zone === ZONE.COMMERCIAL || info.zone === ZONE.INDUSTRIAL || info.zone === ZONE.RURAL;
+}
+
+/** Prédio de uma empresa só, que cresce junto com ele (indústria e fazenda). */
+export function singleOwner(info) {
+  return info.zone === ZONE.INDUSTRIAL || info.zone === ZONE.RURAL;
 }
 
 /**
@@ -166,8 +171,7 @@ export function usesCompanies(info) {
  */
 export function companyJobs(rt, co) {
   const info = BUILDINGS[rt.buildingById.get(co.building).type];
-  const zone = info.zone === ZONE.COMMERCIAL ? 'commercial' : 'industrial';
-  return Math.round(co.floors * info.perFloor * mod(rt, `jobs.${zone}.${info.level}`));
+  return Math.round(co.floors * info.perFloor * mod(rt, `jobs.${ZONE_KEY[info.zone]}.${info.level}`));
 }
 
 /** Vagas de todas as empresas do prédio (andares alugados). */

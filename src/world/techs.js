@@ -48,8 +48,9 @@ export const START_TECHS = [
   'biblioteca', 'policia', 'bombeiros', 'feira_livre', 'patio_ferroviario',
 ];
 
-// Etapa de implementação já disponível no jogo (ver PHASES).
-export const IMPLEMENTED_PHASE = 3;
+// Etapa de implementação já disponível no jogo (ver PHASES). A etapa 4 chega
+// em partes: só as tecnologias que já têm efeito (EFFECTS) podem ser pesquisadas.
+export const IMPLEMENTED_PHASE = 4;
 
 // Sistemas do jogo de que as tecnologias dependem.
 //   status: existe | ampliar | novo;  phase: etapa em que fica pronto
@@ -949,7 +950,7 @@ const MECHANICS = {
   refrigeracao: ['Modificador', 'crescimento energia', 'Comércio nível 2 com 15% mais vagas e consumo de energia comercial ×1,1.'],
   plasticos: ['Modificador', 'crescimento residuos', 'Vagas industriais ×1,15 e lixo gerado ×1,1.'],
   craq_catalitico: ['Nível', 'especiais poluicao', 'A refinaria rende 30% mais e polui 30% menos.'],
-  agrotoxicos: ['Modificador', 'agricultura saude', 'Produção agrícola ×1,3 e saúde −5 perto das fazendas.'],
+  agrotoxicos: ['Modificador', 'agricultura saude', 'Produção agrícola ×1,3, mas as fazendas poluem em volta.'],
   detergentes: ['Modificador', 'saude saneamento', 'Saúde +5 e poluição dos rios +10%.'],
   tintas: ['Modificador', 'crescimento', 'ABANDON_AFTER_DAYS ×1,5. Funciona com o que já existe.'],
   petroquimica: ['Prédio', 'especiais poluicao educacao', 'Complexo petroquímico estatal: 80 vagas de nível médio, receita alta e muita poluição.'],
@@ -960,24 +961,24 @@ const MECHANICS = {
   nanomateriais: ['Modificador', 'economia', 'Manutenção dos prédios públicos ×0,9.'],
   etanol_2g: ['Nível', 'especiais', 'A usina de etanol rende 40% mais (energia e receita).'],
   hidrogenio_verde: ['Prédio', 'energia', 'Usina a hidrogênio: energia constante, sem poluição, manutenção alta.'],
-  feira_livre: ['Prédio', 'cobertura agricultura', 'Mercado municipal: distribui alimentos no raio.'],
+  feira_livre: ['Prédio', 'cobertura agricultura', 'Mercado municipal: vende alimentos às casas no raio.'],
   patio_ferroviario: ['Prédio', 'logistica especiais', 'Pátio de carga: a indústria ao alcance pela rua exporta por ele (sem terminal, receita −20%).'],
-  pasteurizacao: ['Modificador', 'saude agricultura', 'Alimentos não causam doenças.'],
+  pasteurizacao: ['Modificador', 'saude agricultura', 'Leite e alimentos seguros: saúde +3%.'],
   caminhao: ['Modificador', 'logistica transito', 'Carga por caminhão: alcance dos terminais pela rua ×10.'],
-  trator: ['Modificador', 'agricultura', 'Fazendas: mesma produção com 40% menos vagas.'],
-  adubo: ['Modificador', 'agricultura poluicao', 'Produção das fazendas ×2, com poluição nos rios.'],
-  supermercado: ['Nível', 'crescimento agricultura cobertura', 'O mercado (comércio nível 2) vende alimentos, com raio maior que a feira.'],
+  trator: ['Modificador', 'agricultura', 'Fazendas de nível 2 e a mesma produção com 40% menos vagas.'],
+  adubo: ['Modificador', 'agricultura poluicao', 'Produção das fazendas ×1,6, mas elas passam a poluir em volta.'],
+  supermercado: ['Nível', 'crescimento agricultura cobertura', 'Os mercados (comércio nível 2) vendem alimentos num raio 50% maior e mais completo.'],
   cadeia_frio: ['Modificador', 'agricultura logistica', 'Perda de alimentos −30%.'],
   container: ['Prédio', 'logistica especiais', 'Porto de contêineres (na água): a indústria ao alcance exporta 10% mais.'],
-  revolucao_verde: ['Modificador', 'agricultura', 'Produção agrícola ×1,5.'],
-  ceasa: ['Prédio', 'agricultura logistica especiais', 'Entreposto: alimentos chegam ao comércio 20% mais baratos.'],
-  agricultura_tropical: ['Modificador', 'agricultura', 'Fazendas produzem em terreno arenoso (SAND já existe no mapa).'],
+  revolucao_verde: ['Modificador', 'agricultura', 'Fazendas mecanizadas (nível 3) e agroindústrias; produção ×1,5.'],
+  ceasa: ['Prédio', 'agricultura logistica especiais', 'Entreposto: comida importada 20% mais barata.'],
+  agricultura_tropical: ['Modificador', 'agricultura', 'Fazendas em terreno arenoso produzem tanto quanto na terra boa.'],
   codigo_barras: ['Modificador', 'economia logistica', 'Imposto comercial +10%.'],
   centro_distribuicao: ['Prédio', 'logistica especiais', 'Abastece o comércio num raio de 30 tiles (+5% de receita) e escoa a indústria.'],
   comercio_eletronico: ['Modificador', 'logistica crescimento transito', 'Menos lojas e mais galpões: demanda comercial −5, industrial +8.'],
-  seguranca_alimentar: ['Prédio', 'cobertura agricultura saude satisfacao', 'Restaurante popular: refeições baratas, mais saúde e satisfação.'],
-  agricultura_precisao: ['Modificador', 'agricultura poluicao', 'Produção +20% e poluição do adubo ×0,5.'],
-  hortas_urbanas: ['Política', 'politicas agricultura crescimento', 'Lotes vazios viram hortas: comida local e terreno valorizado.'],
+  seguranca_alimentar: ['Prédio', 'cobertura agricultura saude satisfacao', 'Restaurante popular: o melhor acesso a alimentos no raio (mais saúde e satisfação).'],
+  agricultura_precisao: ['Modificador', 'agricultura poluicao', 'Produção +20% e poluição das fazendas ×0,5.'],
+  hortas_urbanas: ['Política', 'politicas agricultura crescimento', 'Hortas nos lotes vazios: consumo de comida comprada −5% e terreno valorizado.'],
   entrega_app: ['Modificador', 'logistica transito crescimento', 'Demanda comercial +10 e mais motos nas ruas (capacidade −5%).'],
   concreto_armado: ['Inicial', 'crescimento', 'Já existe: prédios até o nível 3.'],
   aco_estrutural: ['Nível', 'niveis', 'Arranha-céus: na densidade alta, o comércio cresce até 25 andares.'],
@@ -1001,7 +1002,7 @@ const MECHANICS = {
   impressao_3d: ['Modificador', 'economia', 'Habitação social ×0,6 de custo.'],
   termica_carvao: ['Inicial', 'energia', 'Já existe: usina a carvão.'],
   alta_tensao: ['Modificador', 'energia', 'Menos perdas na rede: todas as usinas entregam 10% mais energia.'],
-  eletrificacao_rural: ['Modificador', 'energia agricultura', 'Fazendas e áreas afastadas entram na rede de energia.'],
+  eletrificacao_rural: ['Modificador', 'energia agricultura', 'Fazendas com energia: produção +25%.'],
   hidreletrica: ['Prédio', 'energia', 'Hidrelétrica: na beira de rio ou lago, muita energia limpa.'],
   turbina_gas: ['Prédio', 'energia poluicao', 'Usina a gás: metade da poluição da usina a carvão.'],
   transistor: ['Base', '', 'Só pré-requisito.'],
@@ -1243,6 +1244,21 @@ export const EFFECTS = {
   veiculo_eletrico: [{ mod: 'pollution.traffic', mul: 0.5 }, { mod: 'consumption.residential', mul: 1.1 }],
   entrega_app: [{ mod: 'demand.commercial', add: 10 }, { mod: 'roadCapacity', mul: 0.95 }],
 
+  // Etapa 4a: agricultura e alimentos (ver systems/food.js)
+  feira_livre: [{ unlock: 'mercado_municipal' }],
+  pasteurizacao: [{ mod: 'health', add: 0.03 }],
+  trator: [{ level: ['rural', 2] }, { mod: 'jobs.rural.1', mul: 0.6 }, { mod: 'jobs.rural.2', mul: 0.6 }, { mod: 'jobs.rural.3', mul: 0.6 }],
+  agrotoxicos: [{ mod: 'food.output', mul: 1.3 }, { mod: 'pollution.farm', add: 0.3 }],
+  adubo: [{ mod: 'food.output', mul: 1.6 }, { mod: 'pollution.farm', add: 0.4 }],
+  eletrificacao_rural: [{ mod: 'food.output', mul: 1.25 }],
+  supermercado: [{ mod: 'radius.alimentos', mul: 1.5 }, { mod: 'service.alimentos', mul: 1.3 }],
+  cadeia_frio: [{ mod: 'food.waste', mul: 0.7 }],
+  revolucao_verde: [{ level: ['rural', 3] }, { mod: 'food.output', mul: 1.5 }],
+  ceasa: [{ unlock: 'ceasa' }],
+  agricultura_tropical: [{ mod: 'food.sand', add: 0.5 }],
+  seguranca_alimentar: [{ unlock: 'restaurante_popular' }],
+  agricultura_precisao: [{ mod: 'food.output', mul: 1.2 }, { mod: 'pollution.farm', mul: 0.5 }],
+
   // Leis (liberam a lei no painel do orçamento; ver systems/policies.js)
   codigo_incendio: [{ policy: 'codigo_incendio' }],
   previdencia: [{ policy: 'previdencia' }],
@@ -1272,6 +1288,7 @@ export const EFFECTS = {
   cotas: [{ policy: 'cotas' }],
   geracao_distribuida: [{ policy: 'geracao_distribuida' }],
   ciclovia_lazer: [{ policy: 'ciclovia_lazer' }],
+  hortas_urbanas: [{ policy: 'hortas_urbanas' }],
 };
 
 const PHASE_OF = (systems) => Math.max(0, ...systems.map((s) => SYSTEMS[s].phase));

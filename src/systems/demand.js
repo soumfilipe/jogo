@@ -1,4 +1,4 @@
-// Demanda RCI (residencial, comercial, industrial), em "pessoas" ou "vagas".
+// Demanda RCI (residencial, comercial, industrial) e rural, em "pessoas" ou "vagas".
 // É derivada do estado, então fica no runtime e é recalculada a cada hora.
 
 import { BUILDINGS, ZONE, capacityOf } from '../world/catalog.js';
@@ -6,6 +6,7 @@ import { canWork } from '../agents/citizens.js';
 import { leasedJobs, usesCompanies } from '../world/runtime.js';
 import { taxDemandShift } from './economy.js';
 import { mod } from './mods.js';
+import { ruralDemand } from './food.js';
 
 // Quanto a satisfação média move a demanda residencial (de −15 a +15).
 const SATISFACTION_DEMAND = 30;
@@ -14,6 +15,7 @@ export function computeDemand(state, rt) {
   let housing = 0;
   let commercialJobs = 0;
   let industrialJobs = 0;
+  let ruralJobs = 0;
   let otherJobs = 0; // serviços públicos
   for (const b of state.buildings) {
     if (b.abandoned !== undefined) continue; // abandonado não tem casa nem vaga
@@ -23,6 +25,7 @@ export function computeDemand(state, rt) {
     if (info.residents) housing += people;
     else if (info.zone === ZONE.COMMERCIAL) commercialJobs += people;
     else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += people;
+    else if (info.zone === ZONE.RURAL) ruralJobs += people;
     else otherJobs += people;
   }
 
@@ -34,7 +37,8 @@ export function computeDemand(state, rt) {
     else if (canWork(c)) unemployed++;
   }
   const workforce = employed + unemployed;
-  const openJobs = commercialJobs + industrialJobs + otherJobs - employed;
+  const jobs = commercialJobs + industrialJobs + ruralJobs + otherJobs;
+  const openJobs = jobs - employed;
 
   // Quanta gente quer vir morar aqui: vagas sobrando atraem, desemprego afasta,
   // imposto residencial alto afasta. A constante faz uma cidade vazia crescer.
@@ -52,7 +56,9 @@ export function computeDemand(state, rt) {
       + mod(rt, 'demand.commercial', 0),
     industrial: Math.round(workforce * 0.6) - industrialJobs + 10 + taxDemandShift(state, 'industrial')
       + mod(rt, 'demand.industrial', 0),
+    // Fazendas: enquanto a cidade importa comida (ver food.js).
+    rural: ruralDemand(state, rt) + taxDemandShift(state, 'rural') + mod(rt, 'demand.rural', 0),
   };
-  rt.stats = { population, housing, employed, unemployed, jobs: commercialJobs + industrialJobs + otherJobs };
+  rt.stats = { population, housing, employed, unemployed, jobs };
   return rt.demand;
 }

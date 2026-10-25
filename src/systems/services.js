@@ -1,17 +1,18 @@
-// Cobertura dos serviços: hospitais, polícia, bombeiros e lazer.
+// Cobertura dos serviços: hospitais, polícia, bombeiros, lazer e alimentos.
 //
 // Cada prédio com `utility.service` cobre os tiles num raio (distância em
 // "losango", como a das escolas). No centro a cobertura vale `strength` e cai
 // até metade dela na borda; o tile fica com a maior cobertura entre os
-// prédios que o alcançam (0 a 1). Prédio sem funcionário não cobre.
+// prédios que o alcançam (0 a 1). Prédio sem funcionário não cobre. Os
+// alimentos também vêm do comércio de nível 2 (o mercado, ver FOOD.market).
 //
 // Tudo aqui é derivado do estado (fica no runtime) e é refeito uma vez por
 // dia e quando um prédio é colocado ou demolido.
 
-import { BUILDINGS } from '../world/catalog.js';
+import { BUILDINGS, FOOD, ZONE } from '../world/catalog.js';
 import { mod } from './mods.js';
 
-export const SERVICE_KINDS = ['saude', 'policia', 'bombeiros', 'lazer'];
+export const SERVICE_KINDS = ['saude', 'policia', 'bombeiros', 'lazer', 'alimentos'];
 
 /** Raio de um prédio de serviço, com os modificadores (ex.: rádio policial). */
 export function serviceRadius(rt, type) {
@@ -25,20 +26,34 @@ export function serviceStrength(rt, type) {
   return Math.min(1, s.strength * mod(rt, `service.${s.kind}`));
 }
 
-/** Refaz rt.coverage = { saude, policia, bombeiros, lazer } (Float32Array por tile). */
+/** Refaz rt.coverage = { saude, policia, bombeiros, lazer, alimentos } (Float32Array por tile). */
 export function computeCoverage(state, rt) {
   const { width, height } = state.map;
   const n = width * height;
   const coverage = {};
   for (const kind of SERVICE_KINDS) coverage[kind] = new Float32Array(n);
+  const marketRadius = Math.round(FOOD.market.radius * mod(rt, 'radius.alimentos'));
 
   for (const b of state.buildings) {
-    const s = BUILDINGS[b.type].utility?.service;
-    if (!s || (rt.workers.get(b.id)?.size ?? 0) === 0) continue;
-    const radius = serviceRadius(rt, b.type);
-    const strength = serviceStrength(rt, b.type);
-    const map = coverage[s.kind];
-    const size = BUILDINGS[b.type].size;
+    const info = BUILDINGS[b.type];
+    if ((rt.workers.get(b.id)?.size ?? 0) === 0) continue;
+    let kind;
+    let radius;
+    let strength;
+    if (info.utility?.service) {
+      kind = info.utility.service.kind;
+      radius = serviceRadius(rt, b.type);
+      strength = serviceStrength(rt, b.type);
+    } else if (info.zone === ZONE.COMMERCIAL && info.level === 2 && b.abandoned === undefined) {
+      // O mercado do bairro vende alimentos.
+      kind = 'alimentos';
+      radius = marketRadius;
+      strength = Math.min(1, FOOD.market.strength * mod(rt, 'service.alimentos'));
+    } else {
+      continue;
+    }
+    const map = coverage[kind];
+    const size = info.size;
     const bx = b.tile % width + (size - 1) / 2;
     const by = Math.floor(b.tile / width) + (size - 1) / 2;
     for (let y = Math.max(0, Math.floor(by - radius)); y <= Math.min(height - 1, Math.ceil(by + radius)); y++) {

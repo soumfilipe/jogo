@@ -1,8 +1,8 @@
 // Bem-estar das casas: saúde, crime e satisfação (de 0 a 1), uma vez por dia.
 //
-//   saúde      = base + cobertura de hospitais/clínicas − poluição (+ tecnologias e leis)
+//   saúde      = base + cobertura de hospitais/clínicas ± acesso a alimentos − poluição (+ tecnologias e leis)
 //   crime      = (base + desemprego + insatisfação + densidade) × (1 − polícia)
-//   satisfação = base + saúde + segurança + lazer + escola − poluição
+//   satisfação = base + saúde + segurança + lazer + escola ± alimentos − poluição
 //                − desemprego − imposto residencial acima do padrão (+ leis)
 //
 // O crime usa a satisfação "sem a segurança" (todos os outros fatores), e a
@@ -65,14 +65,17 @@ export function computeWellbeing(state, rt) {
       unemployment = workers ? jobless / workers : 0;
     }
 
-    const health = clamp(H.base + H.coverage * (cov?.saude[t] ?? 0) + healthAdd - H.pollution * pollution * pollutionHealth);
+    // Acesso a alimentos: de −0,5 (sem mercado no raio) a +0,5 (bem servido).
+    const food = (cov?.alimentos?.[t] ?? 0) - 0.5;
+    const health = clamp(H.base + H.coverage * (cov?.saude[t] ?? 0) + H.food * food + healthAdd
+      - H.pollution * pollution * pollutionHealth);
     // Satisfação com tudo menos a segurança (o crime depende dela).
     const schoolOk = rt.schoolMap?.[t] === 1 ? 1 : 0;
     const content = clamp(
       S.base
       + S.health * (health - 0.5) * 2
       + S.leisure * Math.min(1, (cov?.lazer[t] ?? 0) * leisureMul)
-      + (info.residents ? S.school * schoolOk : 0)
+      + (info.residents ? S.school * schoolOk + S.food * food : 0)
       - S.pollution * pollution
       - S.unemployment * unemployment
       - tax
@@ -163,7 +166,7 @@ export function closeHealthMonth(state, rt) {
 // Saúde e satisfação só nas casas; crime em todas as zonas.
 function fillMaps(state, rt) {
   const n = state.map.width * state.map.height;
-  for (const key of ['healthMap', 'crimeMap', 'satisfactionMap']) {
+  for (const key of ['healthMap', 'crimeMap', 'satisfactionMap', 'foodMap']) {
     if (!rt[key] || rt[key].length !== n) rt[key] = new Float32Array(n);
     rt[key].fill(NaN);
   }
@@ -180,6 +183,7 @@ function fillMaps(state, rt) {
         if (info.zone === ZONE.RESIDENTIAL) {
           rt.healthMap[t] = w.health;
           rt.satisfactionMap[t] = w.satisfaction;
+          rt.foodMap[t] = Math.min(1, rt.coverage?.alimentos?.[b.tile] ?? 0);
         }
       }
     }

@@ -27,7 +27,10 @@ export function createWorld({
     economy: {
       money: ECONOMY.startMoney,
       // Impostos em % por zona.
-      taxes: { residential: ECONOMY.taxDefault, commercial: ECONOMY.taxDefault, industrial: ECONOMY.taxDefault },
+      taxes: {
+        residential: ECONOMY.taxDefault, commercial: ECONOMY.taxDefault, industrial: ECONOMY.taxDefault,
+        rural: ECONOMY.taxDefault,
+      },
       loans: [], //   { id, amount, balance, payment, monthsLeft }
       nextLoanId: 1,
       history: [], // um registro por mês fechado (ver systems/economy.js)
