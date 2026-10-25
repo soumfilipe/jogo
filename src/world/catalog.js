@@ -570,11 +570,14 @@ export const TAX_ZONES = ['residential', 'commercial', 'industrial', 'rural'];
 // Lixo (ver systems/waste.js), em unidades por dia.
 // Creches (ver systems/childcare.js): quem trabalha e tem filho de 0 a 5
 // anos sem vaga na creche rende só `productivity` do normal e acumula
-// estresse (`rise` por dia; com vaga, baixa `fall` por dia). O estresse médio
-// da casa tira satisfação e saúde.
+// estresse (`rise` por dia, até o tamanho da penalidade; acima dele, baixa
+// `fall` por dia). Com o filho na creche, a penalidade cai para `enrolled`
+// (25%: rende 85% e o estresse para em 25%) e some depois da pesquisa
+// Educação infantil. O estresse médio da casa tira satisfação e saúde.
 export const CHILDCARE = {
   ages: [0, 5],
   productivity: 0.4,
+  enrolled: 0.25,
   rise: 0.05,
   fall: 0.1,
   satisfaction: 0.25,

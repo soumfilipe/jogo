@@ -11,6 +11,8 @@ import { homeStress, overloadedParents, productivity, updateStress } from '../sr
 import { computeCoverage } from '../src/systems/services.js';
 import { computeWellbeing } from '../src/systems/wellbeing.js';
 import { monthlyBudget } from '../src/systems/economy.js';
+import { completeTech } from '../src/systems/research.js';
+import { isUnlocked } from '../src/systems/mods.js';
 
 const W = 60;
 
@@ -42,7 +44,8 @@ test('pais que trabalham, com filho de 0 a 5 anos fora da creche, rendem 40%', (
   const { state, rt } = town();
   const f = family(state, rt, 10);
   const over = overloadedParents(state, rt);
-  assert.ok(over.has(f.mom.id) && over.has(f.dad.id));
+  assert.equal(over.get(f.mom.id), 1, 'sem creche: penalidade cheia');
+  assert.ok(over.has(f.dad.id));
   assert.ok(!over.has(f.grandpa.id), 'quem não trabalha não perde produtividade');
   assert.ok(!over.has(f.neighbor.id), 'outra família na mesma casa não é afetada');
   assert.equal(productivity(over, f.mom.id), CHILDCARE.productivity);
@@ -52,16 +55,30 @@ test('pais que trabalham, com filho de 0 a 5 anos fora da creche, rendem 40%', (
   assert.ok(!overloadedParents(state, rt).has(older.mom.id));
 });
 
-test('com vaga na creche ninguém fica sobrecarregado; a arrecadação volta', () => {
+test('creche desde o começo: com vaga a penalidade cai para 25%; com Educação infantil, some', () => {
   const { state, rt } = town();
+  assert.equal(isUnlocked(rt, 'creche'), true, 'creche liberada desde o começo');
   const f = family(state, rt, 10);
   const without = monthlyBudget(state, rt).income.residential;
   const creche = addBuilding(state, rt, 'creche', 4 * W + 11);
   for (let i = 0; i < BUILDINGS.creche.jobs; i++) rt.workers.get(creche.id).add(-1 - i);
   enrollStudents(state, rt);
   assert.equal(f.kid.stage, 'creche');
+  const partial = overloadedParents(state, rt);
+  assert.equal(partial.get(f.mom.id), CHILDCARE.enrolled);
+  assert.ok(Math.abs(productivity(partial, f.mom.id) - (1 - (1 - CHILDCARE.productivity) * CHILDCARE.enrolled)) < 1e-9);
+  const withCreche = monthlyBudget(state, rt).income.residential;
+  assert.ok(withCreche > without);
+
+  // Estresse sobe bem mais devagar com o filho na creche e para em 25%.
+  updateStress(state, rt);
+  assert.ok(Math.abs(f.mom.stress - CHILDCARE.rise * CHILDCARE.enrolled) < 1e-9);
+  for (let d = 0; d < 200; d++) updateStress(state, rt);
+  assert.equal(f.mom.stress, CHILDCARE.enrolled);
+
+  completeTech(state, rt, 'jardim_infancia');
   assert.equal(overloadedParents(state, rt).size, 0);
-  assert.ok(monthlyBudget(state, rt).income.residential > without);
+  assert.ok(monthlyBudget(state, rt).income.residential > withCreche);
 });
 
 test('estresse sobe a cada dia sem creche, baixa depois, e tira satisfação da casa', () => {
