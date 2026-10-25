@@ -4,6 +4,7 @@
 //                − lixo sem coleta − água de rio poluído (+ tecnologias e leis)
 //   crime      = (base + desemprego + insatisfação + densidade) × (1 − polícia)
 //   satisfação = base + saúde + segurança + lazer + escola ± alimentos − lixo − poluição
+//                − estresse dos pais sem creche
 //                − desemprego − imposto residencial acima do padrão (+ leis)
 //
 // O crime usa a satisfação "sem a segurança" (todos os outros fatores), e a
@@ -19,7 +20,7 @@
 // Tudo é derivado do estado (rt.wellbeing), menos a epidemia, que tem data
 // para acabar (state.health.epidemicUntil).
 
-import { BUILDINGS, ECONOMY, TOURISM, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
+import { BUILDINGS, CHILDCARE, ECONOMY, TOURISM, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
 import { removeCitizen } from '../world/runtime.js';
 import { canWork } from '../agents/citizens.js';
 import { chance } from '../core/rng.js';
@@ -28,6 +29,7 @@ import { mod } from './mods.js';
 import { computeWaste, fillWasteMap, isCollected } from './waste.js';
 import { computeSanitation } from './sanitation.js';
 import { todaysEvents } from './events.js';
+import { homeStress } from './childcare.js';
 
 const clamp = (v) => Math.min(1, Math.max(0, v));
 
@@ -76,15 +78,17 @@ export function computeWellbeing(state, rt) {
     // Acesso a alimentos: de −0,5 (sem mercado no raio) a +0,5 (bem servido).
     const food = (cov?.alimentos?.[t] ?? 0) - 0.5;
     const dirty = isCollected(waste, b) ? 0 : 1;
+    // Estresse dos pais sem creche para o filho pequeno (ver childcare.js).
+    const stress = info.residents ? homeStress(rt, b) : 0;
     const health = clamp(H.base + H.coverage * (cov?.saude[t] ?? 0) + H.food * food + healthAdd
-      - H.pollution * pollution * pollutionHealth - H.garbage * dirty - sanitation.healthLoss);
+      - H.pollution * pollution * pollutionHealth - H.garbage * dirty - sanitation.healthLoss - CHILDCARE.health * stress);
     // Satisfação com tudo menos a segurança (o crime depende dela).
     const schoolOk = rt.schoolMap?.[t] === 1 ? 1 : 0;
     const content = clamp(
       S.base
       + S.health * (health - 0.5) * 2
       + S.leisure * Math.min(1, (cov?.lazer[t] ?? 0) * leisureMul)
-      + (info.residents ? S.school * schoolOk + S.food * food - S.garbage * dirty : 0)
+      + (info.residents ? S.school * schoolOk + S.food * food - S.garbage * dirty - CHILDCARE.satisfaction * stress : 0)
       - S.pollution * pollution
       - S.unemployment * unemployment
       - tax

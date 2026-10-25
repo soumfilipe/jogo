@@ -7,12 +7,15 @@ import { closeMonth, loanPayment, monthlyBudget } from '../src/systems/economy.j
 import { createSave, readSave, checksum } from '../src/save/format.js';
 import { TICKS_PER_DAY } from '../src/core/time.js';
 import { testCity } from './helpers.js';
+import { overloadedParents, productivity } from '../src/systems/childcare.js';
 
 test('impostos: arrecadação proporcional ao imposto de cada zona', () => {
   const { state, rt } = testCity();
   advance(state, rt, TICKS_PER_DAY * 3);
   const before = monthlyBudget(state, rt);
-  const employed = state.citizens.filter((c) => c.job !== null).length;
+  // Cada empregado conta o quanto rende (pais sem creche rendem menos).
+  const overloaded = overloadedParents(state, rt);
+  const employed = state.citizens.filter((c) => c.job !== null).reduce((s, c) => s + productivity(overloaded, c.id), 0);
   assert.equal(before.income.residential, Math.round(employed * ECONOMY.incomePerWorker * 9));
   assert.ok(before.income.commercial > 0 && before.income.industrial > 0);
 
