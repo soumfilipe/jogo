@@ -382,6 +382,19 @@ function publishEvent(ctx, e) {
     });
     return;
   }
+  if (e.kind === 'medalha') {
+    const medal = ['ouro', 'prata', 'bronze'][e.position - 1];
+    publish(ctx, {
+      cat: 'esporte',
+      tile: e.tile,
+      story: STORIES.medalha,
+      vars: {
+        atleta: e.name, clube: e.club, prova: e.event, posicao: e.position, etapa: e.round, sede: e.host,
+        modalidade: SPORTS.kinds[e.sport].name.toLowerCase(), medalha: medal, a_medalha: `a medalha de ${medal}`,
+      },
+    });
+    return;
+  }
   if (e.kind === 'escolinha') {
     publish(ctx, { cat: 'esporte', story: STORIES.escolinha, vars: { clube: e.club, categoria: e.category, modalidade: SPORTS.kinds[e.sport].name.toLowerCase() } });
     return;

@@ -82,6 +82,7 @@ const TOOLS = [
     ['lixao', 'Lixão', '#7a6a4f', 'waste'], ['aterro', 'Aterro', '#6f8a4f', 'waste'],
     ['centro_reciclagem', 'Reciclagem', '#3d8f5a', 'waste'], ['estacao_esgoto', 'Esgoto', '#5f8a7a', 'waste'],
     ['parque', 'Praça', '#7fb069', 'leisure'], ['cinema', 'Cinema', '#8e44ad', 'leisure'], ['ginasio', 'Ginásio', '#3f6fc0', 'leisure'],
+    ['pista_atletismo', 'Pista', '#c0703f', 'leisure'], ['parque_aquatico', 'Parque aquático', '#5fb7d8', 'leisure'],
     ['ponto_onibus', 'Ônibus', '#e8b931', 'transit'], ['estacao_brt', 'BRT', '#c0392b', 'transit'],
     ['estacao_vlt', 'VLT', '#16a085', 'transit'], ['estacao_metro', 'Metrô', '#9fc3e0', 'transit'],
     ['patio_ferroviario', 'Pátio', '#8a826f', 'freight'], ['porto', 'Porto', '#3f6fc0', 'freight'],

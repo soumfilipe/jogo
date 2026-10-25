@@ -305,6 +305,16 @@ export const BUILDINGS = {
     name: 'Parque temático', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 60,
     utility: { power: 0, water: 0, cost: 45_000, upkeep: 700, pollution: 1, income: 1_200, area: 'cultura', service: { kind: 'lazer', radius: 20, strength: 0.8 }, tourism: { appeal: 30, weekend: 150 } },
   },
+  // Pista de atletismo e parque aquático: casa dos clubes de atletismo e de
+  // natação (ver systems/sports.js); o parque aquático também chama turistas.
+  pista_atletismo: {
+    name: 'Pista de atletismo', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 6,
+    utility: { power: 0, water: 0, cost: 15_000, upkeep: 200, pollution: 0, area: 'cultura', service: { kind: 'lazer', radius: 12, strength: 0.6 } },
+  },
+  parque_aquatico: {
+    name: 'Parque aquático', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 30,
+    utility: { power: 0, water: 0, cost: 35_000, upkeep: 500, pollution: 0, income: 800, area: 'cultura', service: { kind: 'lazer', radius: 18, strength: 0.8 }, tourism: { appeal: 20, weekend: 120 } },
+  },
   hotel: {
     name: 'Hotel', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 20,
     utility: { power: 0, water: 0, cost: 12_000, upkeep: 200, pollution: 0, area: 'cultura', hotel: { rooms: 60 } },
@@ -725,12 +735,25 @@ export const SPORTS = {
     volei: { name: 'Vôlei', venues: ['ginasio'], weekday: 5, hour: 19, squad: 14, starters: 6, season: [4, 10], score: 'sets', tech: 'ginasio', points: [3, 0, 0] },
     basquete: { name: 'Basquete', venues: ['ginasio'], weekday: 5, hour: 19, squad: 13, starters: 5, season: [4, 10], score: 'pontos', tech: 'ginasio', points: [2, 0, 1] },
     handebol: { name: 'Handebol', venues: ['ginasio'], weekday: 5, hour: 19, squad: 14, starters: 7, season: [4, 10], score: 'gols', goals: 26, tech: 'ginasio', points: [2, 1, 0] },
+    criquete: { name: 'Críquete', venues: ['campo_futebol', 'estadio'], weekday: 6, hour: 10, squad: 15, starters: 11, season: [3, 11], score: 'pontos', base: 160, spread: 50, tech: 'futebol_profissional', points: [2, 1, 0] },
+    // Individuais: a temporada é feita de etapas (todos os times competem no
+    // mesmo dia, numa sede que gira); starters = atletas que competem por
+    // time; events: provas, com o artigo (para as notícias).
+    atletismo: { name: 'Atletismo', individual: true, venues: ['pista_atletismo'], weekday: 5, hour: 9, squad: 12, starters: 4, season: [4, 10], tech: 'educacao_fisica', events: ['nos 100 m', 'nos 400 m', 'no salto em distância', 'no arremesso de peso', 'na maratona'] },
+    ginastica: { name: 'Ginástica artística', individual: true, venues: ['ginasio'], weekday: 5, hour: 15, squad: 8, starters: 4, season: [4, 10], tech: 'ginasio', events: ['no solo', 'no salto', 'nas barras assimétricas', 'na trave', 'nas argolas'] },
+    natacao: { name: 'Natação', individual: true, venues: ['parque_aquatico'], weekday: 6, hour: 9, squad: 10, starters: 4, season: [4, 10], tech: 'parque_tematico', events: ['nos 50 m livre', 'nos 100 m borboleta', 'nos 200 m medley', 'nos 1.500 m livre'] },
   },
+  // Etapas das modalidades individuais: quantas por temporada e os pontos por colocação.
+  meets: 8,
+  meetPoints: [10, 8, 6, 5, 4, 3, 2, 1],
+  meetNoise: 0.08,
   // Lugares no estádio, no campo do clube e no ginásio; bônus de força de mandar o jogo ali.
   venues: {
     campo_futebol: { capacity: 2_000, bonus: 0 },
     estadio: { capacity: 20_000, bonus: 0.04 },
     ginasio: { capacity: 1_500, bonus: 0 },
+    pista_atletismo: { capacity: 3_000, bonus: 0.02 },
+    parque_aquatico: { capacity: 1_500, bonus: 0.02 },
   },
   // Divisões: força média das rivais, prêmio do campeão (os outros ganham
   // menos, pela posição) e patrocínio por mês.

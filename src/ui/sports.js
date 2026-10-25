@@ -24,6 +24,7 @@ const esc = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeA
 const TABS = [['clubes', 'Clubes'], ['tabela', 'Tabela'], ['jogos', 'Jogos'], ['elenco', 'Elenco'], ['base', 'Base'], ['mercado', 'Mercado'], ['historico', 'Histórico']];
 const sportName = (id) => SPORTS.kinds[id].name;
 const divName = (d) => SPORTS.divisions[d].name;
+const individual = (league) => Boolean(SPORTS.kinds[league.sport].individual);
 const score = (sport, [a, b]) => (sport === 'volei' ? `${a} × ${b} sets` : `${a} × ${b}`);
 
 export class SportsPanel {
@@ -164,10 +165,14 @@ export class SportsPanel {
         const t = l.table[i];
         const mine = l.teams[i].club !== undefined;
         const zone = pos < SPORTS.up && l.division < SPORTS.divisions.length - 1 ? 'good' : pos >= l.teams.length - SPORTS.down && l.division > 0 ? 'bad' : '';
-        return `<tr class="${zone}${mine ? ' mine' : ''}"><td>${pos + 1}</td><td>${esc(teamName(state, l.teams[i]))}</td><td>${t.pts}</td><td>${t.w + t.d + t.l}</td><td>${t.w}-${t.d}-${t.l}</td><td>${t.f - t.a > 0 ? '+' : ''}${t.f - t.a}</td></tr>`;
+        const cells = individual(l)
+          ? `<td>${t.pts}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>`
+          : `<td>${t.pts}</td><td>${t.w + t.d + t.l}</td><td>${t.w}-${t.d}-${t.l}</td><td>${t.f - t.a > 0 ? '+' : ''}${t.f - t.a}</td>`;
+        return `<tr class="${zone}${mine ? ' mine' : ''}"><td>${pos + 1}</td><td>${esc(teamName(state, l.teams[i]))}</td>${cells}</tr>`;
       }).join('');
-      return `<h4>${sportName(l.sport)} · campeonato ${divName(l.division).toLowerCase()} <small class="muted">ano ${l.season}${l.done ? ', encerrado' : `, ${played} de ${l.fixtures.length} jogos`}</small></h4>
-        <table class="history league"><thead><tr><th>#</th><th>Time</th><th>P</th><th>J</th><th>V-E-D</th><th>S</th></tr></thead><tbody>${rows}</tbody></table>`;
+      const head = individual(l) ? '<th>P</th><th>Ouro</th><th>Prata</th><th>Bronze</th>' : '<th>P</th><th>J</th><th>V-E-D</th><th>S</th>';
+      return `<h4>${sportName(l.sport)} · campeonato ${divName(l.division).toLowerCase()} <small class="muted">ano ${l.season}${l.done ? ', encerrado' : `, ${played} de ${l.fixtures.length} ${individual(l) ? 'etapas' : 'jogos'}`}</small></h4>
+        <table class="history league"><thead><tr><th>#</th><th>Time</th>${head}</tr></thead><tbody>${rows}</tbody></table>`;
     }).join('') + `<p class="small muted">Verde: sobe de divisão. Vermelho: cai.</p>`;
   }
 
@@ -176,8 +181,9 @@ export class SportsPanel {
     for (const l of state.sports.leagues) {
       for (const fx of l.fixtures) {
         const home = l.teams[fx.home];
-        const away = l.teams[fx.away];
-        if (home.club === undefined && away.club === undefined) continue;
+        const away = fx.away === null ? null : l.teams[fx.away];
+        // Etapas individuais: todos competem; jogos: só os da cidade.
+        if (away && home.club === undefined && away.club === undefined) continue;
         out.push({ l, fx, home, away });
       }
     }
@@ -187,8 +193,12 @@ export class SportsPanel {
   #games(state) {
     const all = this.#fixtures(state);
     const now = today(state);
+    const meet = (l, fx, home) => {
+      const mine = fx.score ? fx.score.findIndex((i) => l.teams[i].club !== undefined) : -1;
+      return `Etapa ${fx.round + 1} · sede: ${esc(teamName(state, home))}${mine >= 0 ? ` · <b>${mine + 1}º lugar</b>` : ''}`;
+    };
     const line = ({ l, fx, home, away }) => `<li><span><small class="muted">${dayLabel(fx.day)} · ${sportName(l.sport)}</small><br>
-      ${esc(teamName(state, home))} ${fx.score ? `<b>${score(l.sport, fx.score)}</b>` : '×'} ${esc(teamName(state, away))}</span>
+      ${away === null ? meet(l, fx, home) : `${esc(teamName(state, home))} ${fx.score ? `<b>${score(l.sport, fx.score)}</b>` : '×'} ${esc(teamName(state, away))}`}</span>
       ${fx.attendance ? `<small class="muted">${num(fx.attendance)} torcedores</small>` : ''}</li>`;
     const next = all.filter((x) => !x.fx.score && x.fx.day >= now).sort((a, b) => a.fx.day - b.fx.day || a.fx.id - b.fx.id).slice(0, 8);
     const past = all.filter((x) => x.fx.score).sort((a, b) => b.fx.day - a.fx.day || b.fx.id - a.fx.id).slice(0, 10);
