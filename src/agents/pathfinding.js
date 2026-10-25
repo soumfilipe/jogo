@@ -30,8 +30,12 @@ function getBuffers(size) {
   return buffers;
 }
 
-/** Caminho de estrada de `from` até `to` (inclusive), ou null. */
-export function findRoadPath(map, from, to) {
+/**
+ * Caminho de estrada de `from` até `to` (inclusive), ou null. `blocked`
+ * (opcional): tiles fechados (corrida de rua), que não são atravessados, a
+ * não ser que sejam a origem ou o destino.
+ */
+export function findRoadPath(map, from, to, blocked = null) {
   const { width, height, road } = map;
   if (!road[from] || !road[to]) return null;
   if (from === to) return [from];
@@ -68,7 +72,7 @@ export function findRoadPath(map, from, to) {
     if (x > 0) relax(current - 1);
 
     function relax(n) {
-      if (!road[n] || closed[n] === stamp) return;
+      if (!road[n] || closed[n] === stamp || (blocked && blocked[n] && n !== to)) return;
       const cost = g[current] + (STEP_COST[road[n]] ?? 1);
       if (seen[n] !== stamp || cost < g[n]) {
         seen[n] = stamp;

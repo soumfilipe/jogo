@@ -382,6 +382,19 @@ function publishEvent(ctx, e) {
     });
     return;
   }
+  if (e.kind === 'corrida') {
+    const time = e.minutes.toLocaleString('pt-BR');
+    publish(ctx, {
+      cat: 'esporte',
+      tile: e.tile,
+      story: STORIES.corrida,
+      vars: {
+        corrida: e.name, corredores: count(e.runners), km: e.km.toLocaleString('pt-BR'), vencedor: e.winner, ruas: count(e.streets),
+        resultado: e.local ? `${e.winner}, atleta da cidade, venceu em ${time} minutos.` : `${e.winner}, de ${e.from}, venceu em ${time} minutos.`,
+      },
+    });
+    return;
+  }
   if (e.kind === 'medalha') {
     const medal = ['ouro', 'prata', 'bronze'][e.position - 1];
     publish(ctx, {

@@ -194,7 +194,7 @@ function roadRoute(state, rt, fromBuilding, toBuilding) {
   const key = a * 100_000 + b;
   let route = rt.pathCache.get(key);
   if (route === undefined) {
-    route = findRoadPath(state.map, a, b);
+    route = findRoadPath(state.map, a, b, rt.blocked);
     if (rt.pathCache.size >= PATH_CACHE_LIMIT) evictOldest(rt.pathCache, PATH_CACHE_LIMIT / 4);
     rt.pathCache.set(key, route && Int32Array.from(route));
   }

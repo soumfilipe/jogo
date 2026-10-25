@@ -281,6 +281,14 @@ export const STORIES = {
       ['O resultado deixou tudo em aberto na tabela.', 'Os dois times saíram de campo reclamando da arbitragem.'],
     ],
   },
+  corrida: {
+    h: ['{corredores} pessoas correm a {corrida}', '{vencedor} vence a {corrida}', 'Ruas fechadas para a {corrida}'],
+    s: [
+      ['A {corrida} reuniu {corredores} corredores em {km} km pelas ruas de {cidade}.', 'Foram {corredores} corredores nos {km} km da {corrida}.'],
+      ['{resultado}'],
+      ['O trânsito foi desviado em {ruas} trechos de rua durante a manhã.', 'Motoristas reclamaram dos desvios, mas a festa tomou conta das calçadas.'],
+    ],
+  },
   medalha: {
     h: ['{atleta} leva {medalha} {prova}', '{modalidade}: {medalha} para o {clube}', 'Pódio: {clube} em {posicao}º na etapa'],
     s: [

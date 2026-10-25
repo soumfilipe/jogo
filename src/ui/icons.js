@@ -78,6 +78,7 @@ export const ICONS = {
   rural: `<path d="M12 21.5V5"/><path d="${ear(9)}${ear(13.5)}${ear(18)}"/><path d="M12 5V2.5"/>`,
   bulldoze: '<rect x="2.5" y="15.5" width="13" height="5" rx="2.5"/><path d="M4.5 15.5v-8h5l2 4h3.5v4M15.5 13.5h3"/><path class="t" d="M18.5 10v10.5l3-1V11z"/>',
   parque: '<path class="t" d="M12 2.5 7 9.5h3l-4 6.5h12l-4-6.5h3z"/><path d="M12 16v5.5"/>',
+  corrida: '<circle cx="14.5" cy="4.5" r="2"/><path d="M9 21l3-6 3 2.5V21M6 12l3.5-3.5H14l2.5 4 3 1M12 15l1.5-6.5"/><path class="t" d="M3 21h4"/>',
   revitalizar: '<path d="M3 21v-8l5-3v3l5-3v11zM2 21h13"/><path class="t" d="M18 3l1 2.6 2.5 1-2.5 1L18 10l-1-2.4-2.5-1 2.5-1z"/>',
 
   // --- Energia e água ------------------------------------------------------
