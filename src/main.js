@@ -1,5 +1,5 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, NEWS, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
 import { radiusOf, seatsOf } from './systems/education.js';
 import { serviceRadius } from './systems/services.js';
 
@@ -284,7 +284,13 @@ function renderHud() {
   let kids = 0;
   for (const c of state.citizens) if (c.age < 18) kids++;
   $('population').parentElement.title = `População: ${(s.population - kids).toLocaleString('pt-BR')} adultos e ${kids.toLocaleString('pt-BR')} crianças e jovens`;
-  $('employment').textContent = `${s.employed.toLocaleString('pt-BR')} / ${s.unemployed.toLocaleString('pt-BR')}`;
+  // Taxa de desemprego no topo; os números completos na dica.
+  const jobless = s.workforce ? s.unemployed / s.workforce : 0;
+  const employment = $('employment');
+  employment.textContent = `${(Math.round(jobless * 1000) / 10).toLocaleString('pt-BR')}%`;
+  employment.parentElement.title = `Desemprego ${employment.textContent}: ${s.unemployed.toLocaleString('pt-BR')} procurando trabalho, `
+    + `${s.employed.toLocaleString('pt-BR')} empregados, ${s.openJobs.toLocaleString('pt-BR')} vagas abertas`;
+  employment.parentElement.classList.toggle('short', jobless > NEWS.problems.desemprego);
   $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
   const demands = [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial],
     ['demand-i', rt.demand.industrial], ['demand-f', rt.demand.rural]];

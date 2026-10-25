@@ -34,20 +34,21 @@ export function activeGenres(year, kind) {
 /** Cena inicial (jogo novo ou save antigo): artistas de várias gerações e obras em cartaz. */
 export function createCulture(rng, year, tick = 0) {
   const culture = { artists: [], genres: {}, works: [], nextId: 1 };
-  for (const [id, g] of Object.entries(CULTURE.genres)) {
-    if (g.from <= year) culture.genres[id] = { hype: 0.3 + random(rng) * 0.6 };
-  }
+  // Só os gêneros que ainda têm novatos: os que já acabaram não estão na moda.
+  for (const id of activeGenres(year)) culture.genres[id] = { hype: 0.3 + random(rng) * 0.6 };
   for (let i = 0; i < CULTURE.startArtists; i++) {
     // Poucos famosos e muitos começando: fama ~ sorteio ao quadrado.
-    const debut = year - randomInt(rng, 0, 30);
     const kind = random(rng) < 0.8 ? 'musica' : 'teatro';
-    const genres = activeGenres(Math.max(debut, 1910), kind);
+    const genres = activeGenres(year, kind);
     if (!genres.length) continue;
-    addArtist(culture, rng, { kind, genre: pick(rng, genres), debut, fame: random(rng) ** 2 });
+    // A estreia nunca cai antes de o gênero surgir.
+    const genre = pick(rng, genres);
+    const debut = Math.max(year - randomInt(rng, 0, 30), CULTURE.genres[genre].from);
+    addArtist(culture, rng, { kind, genre, debut, fame: random(rng) ** 2 });
   }
   // Algumas obras já em cartaz, em pontos diferentes da temporada.
   for (const kind of ['filme', 'peca']) {
-    for (let i = 0; i < CULTURE.premieres[kind] * 2; i++) addWork(culture, rng, kind, tick - randomInt(rng, 0, 40) * TICKS_PER_DAY);
+    for (let i = 0; i < CULTURE.premieres[kind] * 2; i++) addWork(culture, rng, kind, year, tick - randomInt(rng, 0, 40) * TICKS_PER_DAY);
   }
   return culture;
 }
@@ -81,8 +82,13 @@ function addArtist(culture, rng, { kind, genre, debut, fame, local = false }) {
   return artist;
 }
 
-function addWork(culture, rng, kind, premiere) {
-  const genre = pick(rng, CULTURE.workGenres[kind]);
+/** Gêneros de filme ou peça que já existem no ano `year` do mundo. */
+export function workGenres(year, kind) {
+  return Object.entries(CULTURE.workGenres[kind]).filter(([, from]) => from <= year).map(([g]) => g);
+}
+
+function addWork(culture, rng, kind, year, premiere) {
+  const genre = pick(rng, workGenres(year, kind));
   const noun = pick(rng, CULTURE.titleNouns);
   // Às vezes sem o artigo ("Segredo do Sertão").
   const title = `${random(rng) < 0.7 ? noun : noun.replace(/^(O|A) /, '')} ${pick(rng, CULTURE.titlePlaces)}`;
@@ -154,6 +160,12 @@ export function closeCultureMonth(state, rt) {
     const fading = info.until && year >= info.until ? -0.04 : 0;
     genre.hype = clamp(genre.hype + (random(rng) - 0.5) * 0.12 + fading, 0.1, 1);
   }
+  // Gênero que acabou some da cena quando não sobra ninguém tocando.
+  const playing = new Set(culture.artists.map((a) => a.genre));
+  for (const g of Object.keys(culture.genres)) {
+    const until = CULTURE.genres[g].until;
+    if (until && year >= until && !playing.has(g)) delete culture.genres[g];
+  }
 
   for (const a of culture.artists) {
     const veteran = year - a.debut > CULTURE.veteranYears ? -0.06 : 0;
@@ -182,7 +194,7 @@ export function closeCultureMonth(state, rt) {
   const tick = state.time.tick;
   culture.works = culture.works.filter((w) => tick - w.premiere <= w.run * TICKS_PER_DAY);
   for (const kind of ['filme', 'peca']) {
-    for (let i = 0; i < CULTURE.premieres[kind]; i++) addWork(culture, rng, kind, tick + randomInt(rng, 0, 29) * TICKS_PER_DAY);
+    for (let i = 0; i < CULTURE.premieres[kind]; i++) addWork(culture, rng, kind, year, tick + randomInt(rng, 0, 29) * TICKS_PER_DAY);
   }
   // Um artista local às vezes vira sucesso (chance pequena, só para dar vida).
   for (const a of culture.artists) if (a.local && chance(rng, 0.02)) a.trend = clamp(a.trend + 0.5, -1, 1);
