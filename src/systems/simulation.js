@@ -28,6 +28,7 @@ import { runEventsOfDay } from './agenda.js';
 import { closeSportsMonth, runSportsOfDay } from './sports.js';
 import { startRacesOfDay, updateClosures, updateRaces } from './races.js';
 import { noteDemand } from './census.js';
+import { applyWeather, updateWeather } from './weather.js';
 import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
@@ -56,6 +57,7 @@ export function tick(state, rt) {
     // Uma vez por dia: efeitos da falta de energia/água e, depois, prédios
     // lotados sobem de nível (têm prioridade sobre lotes novos).
     if (t % TICKS_PER_DAY === 0) {
+      updateWeather(state, rt);
       applyUtilityEffects(state, rt);
       reviewCompanies(state, rt);
       enrollStudents(state, rt);
@@ -117,6 +119,7 @@ export function prepare(state) {
   indexVisitors(state, rt);
   grantLegacyResearch(state);
   computeMods(state, rt);
+  applyWeather(state, rt);
   updateClosures(state, rt);
   convertLegacyJobs(state, rt);
   computeDemand(state, rt);

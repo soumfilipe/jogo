@@ -573,6 +573,47 @@ export const RELIEF = {
   maxLevel: 32, px: 4, maxStep: 4, maxBuildSlope: 4, slopeCost: 0.5, terraformCost: 2, viewBonus: 0.06, viewFrom: 8,
 };
 
+// Clima do mapa (escolhido no jogo novo): chuva média do mês (mm) e máxima
+// média do mês (°C), de janeiro a dezembro. O tempo de cada dia sai daqui
+// (ver src/systems/weather.js). Hemisfério sul: o verão é em janeiro.
+export const CLIMATES = {
+  tropical: {
+    name: 'Tropical', desc: 'Quente o ano todo, verão de chuvas fortes e inverno seco.',
+    rain: [260, 240, 210, 120, 70, 35, 25, 30, 60, 120, 170, 230],
+    temp: [31, 31, 30, 29, 27, 26, 25, 27, 29, 30, 31, 31],
+  },
+  subtropical: {
+    name: 'Subtropical', desc: 'Chuva o ano todo e quatro estações; verão quente, inverno fresco.',
+    rain: [170, 160, 140, 110, 100, 110, 100, 90, 130, 140, 130, 150],
+    temp: [29, 29, 27, 24, 21, 19, 19, 21, 22, 25, 27, 28],
+  },
+  semiarido: {
+    name: 'Semiárido', desc: 'Calor e pouca chuva: secas longas, chuva concentrada em poucos meses.',
+    rain: [90, 110, 150, 110, 40, 15, 8, 4, 4, 8, 20, 50],
+    temp: [33, 32, 31, 30, 29, 28, 28, 30, 32, 33, 34, 33],
+  },
+  temperado: {
+    name: 'Temperado', desc: 'Chuva regular, verão ameno e inverno frio.',
+    rain: [70, 60, 65, 60, 70, 75, 70, 75, 70, 80, 85, 80],
+    temp: [26, 26, 22, 17, 13, 9, 8, 10, 13, 17, 21, 24],
+  },
+};
+
+// Tempo do dia (ver src/systems/weather.js):
+//   storm:        chuva do dia (mm) a partir da qual é tempestade
+//   hot / cold:   máxima a partir de (ou até) a qual é dia de calor (ou de frio),
+//                 desde que também 3° acima (ou abaixo) do normal do mês
+//   hotPower:     consumo de energia nos dias de calor (ar-condicionado) e de frio (aquecimento)
+//   rainTourists: turistas dos parques num dia de chuva
+//   forecast:     dias de previsão (a Ciência do clima soma o mod 'forecastDays')
+export const WEATHER = { storm: 30, hot: 30, cold: 8, hotPower: 1.1, rainTourists: 0.6, forecast: 3 };
+
+// Pontes: rua sobre a água, em linha reta de margem a margem.
+//   maxSpan:  vão máximo em tiles de água (a pesquisa Ponte estaiada soma o mod 'bridgeSpan')
+//   cost:     preço por tile de água (fora o tipo de rua)
+//   deck:     altura do tabuleiro acima da água, em níveis do relevo
+export const BRIDGE = { maxSpan: 4, cost: 80, deck: 2 };
+
 // Tipos de rua (o valor de state.map.road: 0 é sem rua). `speed` multiplica a
 // velocidade dos carros, `capacity` é quantos carros cabem num tile antes de
 // engarrafar, `cost` é o preço por tile (a avenida e a via expressa vêm da

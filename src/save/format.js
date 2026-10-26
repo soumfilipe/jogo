@@ -12,7 +12,7 @@
 //   "data":     { ... }            // estado do jogo, já codificado
 // }
 
-import { calendar } from '../core/time.js';
+import { TICKS_PER_DAY, calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
 import { generateElevation, generateForest } from '../world/terrain.js';
 import { flattenDeveloped } from '../world/relief.js';
@@ -25,9 +25,10 @@ import { createCulture } from '../systems/culture.js';
 import { talentOf } from '../agents/citizens.js';
 import { createNews } from '../systems/news.js';
 import { createSports } from '../systems/sports.js';
+import { createWeather, dayWeather } from '../systems/weather.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -283,6 +284,16 @@ const MIGRATIONS = {
     flattenDeveloped(map, lots);
     m.elevation = encodeState(map.elevation);
     save.version = 22;
+    return save;
+  },
+  // v22 -> v23: clima e tempo. Cidades antigas ficam no clima subtropical,
+  // com o tempo do dia em que o save estava e sem histórico de chuva.
+  22: (save) => {
+    const day = Math.floor(save.data.time.tick / TICKS_PER_DAY);
+    const weather = createWeather(save.data.seed);
+    weather.today = dayWeather(save.data.seed, weather.climate, day);
+    save.data.weather = weather;
+    save.version = 23;
     return save;
   },
 };

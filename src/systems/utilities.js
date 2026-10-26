@@ -43,6 +43,8 @@ export function consumption(info, people = info.residents || info.jobs, rt = nul
     power += info.shop * (rt ? shop.power * mod(rt, 'consumption.commercial') : shop.power);
     water += info.shop * shop.water;
   }
+  // Dia de calor (ar-condicionado) ou de frio (aquecimento): mais energia.
+  if (rt?.weatherPower) power *= rt.weatherPower;
   return { power: Math.ceil(power), water: Math.ceil(water) };
 }
 
