@@ -10,7 +10,8 @@
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
 import { BRIDGE, BUILDINGS, DENSITY, FOREST, RELIEF, ROAD_TYPES, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
-import { heightAt, surfaceAt } from '../world/relief.js';
+import { heightAt, surfaceAt, tileHeight } from '../world/relief.js';
+import { burningTiles, floodedTiles } from '../systems/disasters.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
@@ -311,6 +312,7 @@ export class Renderer {
     }
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (!mode) this.#drawWeather(ctx, state, cam, now / 1000, dark);
+    if (!mode) drawFires(ctx, state, cam, now / 1000);
 
     // Ruas fechadas pela corrida de rua (ver systems/races.js).
     if (overlay.closed?.length) this.#drawTiles(ctx, state, cam, overlay.closed, 'rgba(230,126,34,0.4)');
@@ -540,6 +542,7 @@ export class Renderer {
     const elev = state.map.elevation;
     const EW = width + 1;
     const dry = dryLevel(state);
+    const scar = state.map.scar;
     const edges = { left: [], right: [] };
 
     const ground = (x, y) => {
@@ -561,6 +564,8 @@ export class Renderer {
         color = FOREST_GROUNDS[Math.min(3, Math.floor(Math.max(0, forest[tile] - 1) * 4 / FOREST.maxDensity))];
       }
       else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
+      // Lama da enchente ou cinza da queimada, até sumir com os dias.
+      if (scar?.[tile] && !road[tile] && terrain[tile] !== TERRAIN.WATER && !mode) color = scarColor(color);
       // Seca longa: a grama (e o chão da mata) amarela.
       if (dry && !road[tile] && !mode && (terrain[tile] === TERRAIN.GRASS || terrain[tile] === TERRAIN.FOREST)) color = dryColor(color, dry);
 
@@ -665,6 +670,23 @@ export class Renderer {
     for (const [color, path] of [...paths].sort((p, q) => (p[0] < q[0] ? -1 : 1))) {
       ctx.fillStyle = color;
       ctx.fill(path);
+    }
+    // Enchente: lâmina de água rasa por cima dos tiles alagados.
+    const flooded = floodedTiles(state);
+    if (flooded.length && !mode) {
+      const water = new Path2D();
+      for (const t of flooded) {
+        const fx = t % width;
+        const fy = (t - fx) / width;
+        const hh = (elev ? Math.max(elev[fy * EW + fx], elev[fy * EW + fx + 1], elev[(fy + 1) * EW + fx], elev[(fy + 1) * EW + fx + 1]) : 0) + 0.6;
+        const [ax, ay] = worldToScreen(cam, fx, fy, hh);
+        water.moveTo(ax, ay - pad);
+        water.lineTo(ax + 32 * z + pad, ay + 16 * z);
+        water.lineTo(ax, ay + 32 * z + pad);
+        water.lineTo(ax - 32 * z - pad, ay + 16 * z);
+      }
+      ctx.fillStyle = FLOOD_WATER;
+      ctx.fill(water);
     }
     for (const [side, color] of [['left', EDGE_COLORS[0]], ['right', EDGE_COLORS[1]]]) {
       if (!edges[side].length) continue;
@@ -976,6 +998,49 @@ function addRoadMarkings(path, state, cam, x, y) {
   }
 }
 
+// Queimada: chamas que tremem e fumaça subindo dos tiles de mata em chamas.
+function drawFires(ctx, state, cam, time) {
+  const tiles = burningTiles(state);
+  if (!tiles.length) return;
+  const { width } = state.map;
+  const z = cam.zoom;
+  const flames = new Path2D();
+  const cores = new Path2D();
+  const smoke = new Path2D();
+  for (const t of tiles) {
+    const x = t % width;
+    const y = (t - x) / width;
+    const [sx, sy] = worldToScreen(cam, x + 0.5, y + 0.5, tileHeight(state.map, t));
+    if (sx < -60 || sy < -120 || sx > cam.viewW + 60 || sy > cam.viewH + 60) continue;
+    for (let k = 0; k < 3; k++) {
+      const ox = (hash2(t, k, 3) - 0.5) * 30 * z;
+      const oy = (hash2(t, k, 4) - 0.5) * 12 * z;
+      const h = (14 + 8 * Math.sin(time * 9 + t + k * 2)) * z;
+      const w = 6 * z;
+      flames.moveTo(sx + ox - w, sy + oy);
+      flames.quadraticCurveTo(sx + ox - w * 0.4, sy + oy - h * 0.6, sx + ox, sy + oy - h);
+      flames.quadraticCurveTo(sx + ox + w * 0.4, sy + oy - h * 0.6, sx + ox + w, sy + oy);
+      cores.moveTo(sx + ox - w * 0.45, sy + oy);
+      cores.quadraticCurveTo(sx + ox, sy + oy - h * 0.7, sx + ox + w * 0.45, sy + oy);
+    }
+    // Fumaça: bolas cinzas subindo e se abrindo.
+    for (let k = 0; k < 2; k++) {
+      const p = (time * 0.35 + hash2(t, k, 5)) % 1;
+      const r = (6 + p * 18) * z;
+      const px = sx + (hash2(t, k, 6) - 0.5) * 20 * z + p * 16 * z;
+      const py = sy - (20 + p * 70) * z;
+      smoke.moveTo(px + r, py);
+      smoke.arc(px, py, r, 0, Math.PI * 2);
+    }
+  }
+  ctx.fillStyle = 'rgba(70, 66, 62, 0.28)';
+  ctx.fill(smoke);
+  ctx.fillStyle = '#e8590c';
+  ctx.fill(flames);
+  ctx.fillStyle = '#ffd43b';
+  ctx.fill(cores);
+}
+
 // Ponte: viga sob as bordas da frente do tabuleiro, pilares a cada dois tiles
 // e, nos vãos longos (só com a Ponte estaiada), uma torre no meio com estais.
 const GIRDER = '#5d6168';
@@ -1222,6 +1287,15 @@ class TreeBatch {
 // Seca: de 0 (normal) a 3, a cada 15 dias seguidos sem chuva (a partir de 15).
 const dryLevel = (state) => Math.min(3, Math.floor((state.weather?.dry ?? 0) / 15));
 const DRY_GRASS = '#c4b06a';
+// Água da enchente e chão marcado depois dela (ou da queimada).
+const FLOOD_WATER = 'rgba(88, 132, 168, 0.68)';
+const SCAR = '#5d5141';
+const scarCache = new Map();
+function scarColor(color) {
+  let out = scarCache.get(color);
+  if (!out) scarCache.set(color, (out = color.startsWith('#') ? mix(color, SCAR, 0.55) : SCAR));
+  return out;
+}
 const dryCache = new Map();
 function dryColor(color, level) {
   const key = color + level;

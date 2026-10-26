@@ -67,6 +67,7 @@
     <button id="btn-import"><span class="ico" data-icon="import"></span>Importar arquivo</button>
     <button id="btn-code"><span class="ico" data-icon="code"></span>Código de save</button>
     <button id="btn-new"><span class="ico" data-icon="new"></span>Nova cidade</button>
+    <button id="btn-disasters" title="Enchentes, deslizamentos e queimadas: desligados, raros ou normais"><span class="ico" data-icon="tempestade"></span><span>Desastres: normais</span></button>
     <small id="storage-mode" class="muted"></small>
   </div>
   <input type="file" id="file-input" accept=".json,application/json" hidden>
@@ -115,6 +116,7 @@
         <button data-click="btn-import"><span class="ico" data-icon="import"></span>Importar arquivo</button>
         <button data-click="btn-code"><span class="ico" data-icon="code"></span>Código de save</button>
         <button data-click="btn-new"><span class="ico" data-icon="new"></span>Nova cidade</button>
+        <button data-click="btn-disasters"><span class="ico" data-icon="tempestade"></span><span data-disasters-label>Desastres: normais</span></button>
       </div>
       <p class="muted small" data-file-status></p>
     </section>
@@ -133,6 +135,10 @@
       <fieldset class="marcos">
         <legend>Clima</legend>
         <div id="new-climates"></div>
+      </fieldset>
+      <fieldset class="marcos">
+        <legend>Desastres</legend>
+        <div id="new-disasters"></div>
       </fieldset>
       <div class="row">
         <button value="ok" class="primary">Fundar a cidade</button>

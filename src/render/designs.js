@@ -839,6 +839,19 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  centro_defesa_civil() {
+    const orange = wall('#f08c00', '#c87400');
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#7a7d84', lift: 0 }];
+    parts.push(block([0.12, 0.12, 0.88, 0.62], 0, 0.9, wall('#e9ecef', '#c9ced4'), {
+      windows: { cols: 4, style: 'grid' }, doors: { count: 2, color: '#f08c00' }, bands: [{ at: 0.78, thick: 0.1, color: '#f08c00' }],
+    }));
+    // Caminhonete e barco de resgate no pátio.
+    parts.push(block([0.18, 0.7, 0.42, 0.86], 0, 0.14, orange, { top: '#ffa94d' }));
+    parts.push(block([0.55, 0.72, 0.85, 0.84], 0, 0.08, wall('#e8590c', '#c2410c'), { top: '#f4f5f6' }));
+    parts.push({ kind: 'antenna', cx: 0.78, cy: 0.25, lift: 0.9, h: 1.0 });
+    return parts;
+  },
+
   central_cameras() {
     const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#5b5f66', lift: 0 }];
     parts.push(block([0.12, 0.12, 0.88, 0.75], 0, 1.2, wall('#5b7fa8', '#486889'), { windows: { cols: 4, style: 'bands' }, doors: { count: 1, color: '#2c3e50' } }));

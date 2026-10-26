@@ -14,6 +14,7 @@
 // mesmo resultado.
 
 import { SPORTS } from '../world/catalog.js';
+import { disasterClosures } from './disasters.js';
 import { MINUTES_PER_DAY, TICKS_PER_DAY } from '../core/time.js';
 import { chance, pick, random, randomInt } from '../core/rng.js';
 import { FIRST_NAMES, LAST_NAMES } from '../agents/names.js';
@@ -115,17 +116,20 @@ export function updateClosures(state, rt) {
   const minute = state.time.tick % MINUTES_PER_DAY;
   const open = minute >= R.closed[0] * 60 && minute < R.closed[1] * 60;
   const races = open ? racesToday(state) : [];
-  const key = races.map((r) => r.id).join(',');
-  if (key === (rt.closedKey ?? '')) return;
+  // Ruas alagadas também ficam fechadas (ver disasters.js).
+  const floods = state.disasters?.floods ?? [];
+  const key = `${races.map((r) => r.id).join(',')}|${floods.map((f) => f.id).join(',')}`;
+  if (key === (rt.closedKey ?? '|')) return;
   rt.closedKey = key;
   rt.pathCache.clear();
-  if (!races.length) {
+  const flooded = disasterClosures(state);
+  if (!races.length && !flooded.length) {
     rt.blocked = null;
     rt.blockedTiles = [];
     return;
   }
   rt.blocked = new Uint8Array(state.map.road.length);
-  const tiles = new Set();
+  const tiles = new Set(flooded);
   for (const r of races) for (const t of r.route) tiles.add(t);
   for (const t of tiles) rt.blocked[t] = 1;
   rt.blockedTiles = [...tiles];

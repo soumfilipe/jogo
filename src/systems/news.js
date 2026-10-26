@@ -475,6 +475,8 @@ function publishEvent(ctx, e) {
           : 'Não há quartel de bombeiros perto dali, e o fogo só parou quando não havia mais o que queimar.',
       },
     });
+  } else if (e.kind === 'enchente' || e.kind === 'deslizamento' || e.kind === 'queimada') {
+    disasterNews(ctx, e);
   } else if (e.kind === 'fechou') {
     if (SECTORS[e.sector]?.kind === 'midia') {
       publish(ctx, { cat: 'imprensa', story: STORIES.veiculo_fim, vars: { veiculo: e.name } });
@@ -552,6 +554,39 @@ function footballNews(ctx) {
       lance: pick(rng, W.lances),
     },
   });
+}
+
+// Desastres (ver disasters.js): quantos prédios, desabrigados e mortes, e o
+// que a cidade tinha (ou não) para se proteger.
+function disasterNews(ctx, e) {
+  const people = (n, one, many) => `${count(n)} ${n === 1 ? one : many}`;
+  const parts = [];
+  if (e.lost) parts.push(`${people(e.lost, 'prédio foi perdido', 'prédios foram perdidos')}`);
+  if (e.damaged) parts.push(`${people(e.damaged, 'prédio ficou danificado', 'prédios ficaram danificados')} e vai passar por reparos`);
+  const harm = [
+    e.homeless ? `${people(e.homeless, 'pessoa ficou desabrigada', 'pessoas ficaram desabrigadas')}.` : '',
+    e.deaths ? `A defesa civil confirma ${people(e.deaths, 'morte', 'mortes')}.` : '',
+  ].filter(Boolean).join(' ');
+  const estragos = parts.length ? `${parts.join(' e ')}. ${harm}`.trim() : `Não houve estragos em prédios. ${harm}`.trim();
+  const vars = { estragos };
+  if (e.kind === 'enchente') {
+    vars.ruas = e.roads
+      ? `${people(e.roads, 'trecho de rua está fechado', 'trechos de rua estão fechados')} até a água baixar, em uns ${e.days} dias.`
+      : `A água deve baixar em uns ${e.days} dias.`;
+    vars.defesa = e.drained
+      ? 'Especialistas lembram que a drenagem da cidade evitou um estrago maior.'
+      : e.defended
+        ? 'A defesa civil acompanha as famílias desabrigadas.'
+        : 'Moradores cobram obras de drenagem e um centro de defesa civil.';
+  } else if (e.kind === 'deslizamento') {
+    vars.contencao = e.contained
+      ? 'As obras de contenção seguraram a maior parte das encostas da cidade.'
+      : 'Engenheiros pedem obras de contenção nas encostas ocupadas.';
+  } else {
+    vars.area = `${count(e.burned)} trechos de mata viraram cinza antes de o fogo parar.`;
+    vars.brigada = e.brigade ? 'A brigada florestal ajudou a conter as chamas.' : 'A cidade não tem brigada florestal, e o fogo só parou na chuva ou sem mata para queimar.';
+  }
+  publish(ctx, { cat: 'alerta', alert: e.deaths > 0 || e.lost + e.damaged >= 3 || e.kind === 'queimada', tile: e.tile, story: STORIES[e.kind], vars });
 }
 
 function epidemicNews(ctx) {

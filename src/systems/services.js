@@ -1,4 +1,5 @@
-// Cobertura dos serviços: hospitais, polícia, bombeiros, lazer e alimentos.
+// Cobertura dos serviços: hospitais, polícia, bombeiros, lazer, alimentos e
+// defesa civil.
 //
 // Cada prédio com `utility.service` cobre os tiles num raio (distância em
 // "losango", como a das escolas). No centro a cobertura vale `strength` e cai
@@ -12,7 +13,7 @@
 import { BUILDINGS, FOOD, ZONE } from '../world/catalog.js';
 import { mod } from './mods.js';
 
-export const SERVICE_KINDS = ['saude', 'policia', 'bombeiros', 'lazer', 'alimentos'];
+export const SERVICE_KINDS = ['saude', 'policia', 'bombeiros', 'lazer', 'alimentos', 'defesa'];
 
 /** Raio de um prédio de serviço, com os modificadores (ex.: rádio policial). */
 export function serviceRadius(rt, type) {

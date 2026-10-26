@@ -1,6 +1,6 @@
 import { createWorld } from './world/world.js';
 import { heightAt } from './world/relief.js';
-import { BUILDINGS, CLIMATES, WEATHER, DENSITY, DENSITY_INFO, EDUCATION, NEWS, RELIEF, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, CLIMATES, DISASTERS, WEATHER, DENSITY, DENSITY_INFO, EDUCATION, NEWS, RELIEF, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
 import { KIND_NAMES, forecast, monthRisk, rain30 } from './systems/weather.js';
 import { radiusOf, seatsOf } from './systems/education.js';
 import { serviceRadius } from './systems/services.js';
@@ -83,7 +83,7 @@ const TOOLS = [
     ['posto_saude', 'Vacinação', '#4f8ff7', 'services'], ['caps', 'CAPS', '#8e44ad', 'services'],
     ['delegacia', 'Delegacia', '#2c3e50', 'services'], ['guarda_municipal', 'Guarda', '#16a085', 'services'],
     ['central_cameras', 'Câmeras', '#5b7fa8', 'services'], ['quartel_bombeiros', 'Bombeiros', '#c0392b', 'services'],
-    ['base_samu', 'SAMU', '#e05a47', 'services'], ['conjunto_habitacional', 'Habitação', '#d9b38c', 'services'],
+    ['base_samu', 'SAMU', '#e05a47', 'services'], ['centro_defesa_civil', 'Defesa civil', '#f08c00', 'services'], ['conjunto_habitacional', 'Habitação', '#d9b38c', 'services'],
     ['mercado_municipal', 'Mercado', '#e9d48a', 'food'], ['restaurante_popular', 'Restaurante', '#d9822b', 'food'],
     ['ceasa', 'Ceasa', '#3d8f5a', 'food'],
     ['museu', 'Museu', '#f0e6d2', 'tourism'], ['campo_futebol', 'Campo', '#4f9a48', 'tourism'],
@@ -191,6 +191,7 @@ if (saves.backend.migrated) {
 function setWorld(next) {
   state = next;
   rt = prepare(state);
+  renderDisasterOption();
   newsReset = true;
   renderer.invalidate();
   cam = createCamera(state.map.width, state.map.height);
@@ -225,8 +226,8 @@ function renderWeather() {
   ].join('\n');
 }
 
-function newCity(name, startMarco = 1, climate = 'subtropical') {
-  setWorld(createWorld({ name, startMarco, climate }));
+function newCity(name, startMarco = 1, climate = 'subtropical', disasters = 'normal') {
+  setWorld(createWorld({ name, startMarco, climate, disasters }));
   saves.startNew(state.city.name);
 }
 
@@ -1200,6 +1201,24 @@ $('new-marcos').innerHTML = MARCOS.map((m, i) => {
 }).join('');
 $('new-climates').innerHTML = Object.entries(CLIMATES).map(([id, c]) => `<label><input type="radio" name="climate" value="${id}"${id === 'subtropical' ? ' checked' : ''}>
     <span>${c.name}<br><small>${c.desc}</small></span></label>`).join('');
+$('new-disasters').innerHTML = Object.entries(DISASTERS.levelNames).map(([id, name]) => `<label><input type="radio" name="disasters" value="${id}"${id === 'normal' ? ' checked' : ''}>
+    <span>${name}</span></label>`).join('');
+// Arquivo › Desastres: alterna desligados → raros → normais.
+const DISASTER_ORDER = ['off', 'rare', 'normal'];
+function renderDisasterOption() {
+  const level = state.settings?.disasters ?? 'normal';
+  const text = `Desastres: ${DISASTERS.levelNames[level].toLowerCase()}`;
+  $('btn-disasters').lastElementChild.textContent = text;
+  for (const el of document.querySelectorAll('[data-disasters-label]')) el.textContent = text;
+}
+$('btn-disasters').onclick = () => {
+  const level = state.settings?.disasters ?? 'normal';
+  const next = DISASTER_ORDER[(DISASTER_ORDER.indexOf(level) + 1) % DISASTER_ORDER.length];
+  applyCommand(state, rt, { type: 'disasters', level: next });
+  dirty = true;
+  renderDisasterOption();
+  status(`Desastres ${DISASTERS.levelNames[next].toLowerCase()}.`);
+};
 $('btn-new').onclick = () => {
   if (!confirmDiscard()) return;
   $('new-name').value = 'Nova Cidade';
@@ -1210,7 +1229,7 @@ $('new-dialog').addEventListener('close', () => {
   const name = $('new-name').value.trim() || 'Nova Cidade';
   const form = new FormData($('new-form'));
   const marco = Number(form.get('marco')) || 1;
-  newCity(name, marco, form.get('climate') || 'subtropical');
+  newCity(name, marco, form.get('climate') || 'subtropical', form.get('disasters') || 'normal');
   toolsKey = '';
   refreshTools();
   status(`Cidade fundada no marco ${marco}.`);

@@ -103,9 +103,16 @@ test('o relógio do mundo anda worldPace anos por ano de jogo', () => {
 
 test('tecnologias de etapas futuras não podem ser pesquisadas', () => {
   const { state, rt } = lab(3);
-  const future = TECHS.find((t) => !t.ready && !state.research.done.includes(t.id) && t.requires.every((r) => rt.techDone.has(r)));
+  // Hoje toda a árvore está pronta: marca uma como de etapa futura por um instante.
+  const future = TECHS.find((t) => !state.research.done.includes(t.id) && t.requires.every((r) => rt.techDone.has(r)));
   assert.ok(future);
-  assert.match(applyCommand(state, rt, { type: 'priority', area: future.area, tech: future.id }).reason, /ainda não/);
+  const ready = future.ready;
+  future.ready = false;
+  try {
+    assert.match(applyCommand(state, rt, { type: 'priority', area: future.area, tech: future.id }).reason, /ainda não/);
+  } finally {
+    future.ready = ready;
+  }
 });
 
 test('cidade rodando com instituto e verba pesquisa de verdade (e de forma determinística)', () => {

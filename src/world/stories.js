@@ -160,6 +160,32 @@ export const STORIES = {
       ['Vizinhos ajudaram com baldes até a situação se acalmar.', '{pessoa}, que mora em frente, diz que acordou com o cheiro de fumaça.'],
     ],
   },
+  enchente: {
+    h: ['Enchente alaga a {regiao} de {cidade}', 'Água invade ruas e casas na {regiao}', 'Chuva forte deixa a {regiao} debaixo d\'água'],
+    s: [
+      ['A chuva dos últimos dias fez o rio subir e alagar a parte baixa da {regiao}.', 'Depois de dias de chuva, a água tomou as ruas mais baixas da {regiao} de {cidade}.'],
+      ['{estragos}'],
+      ['{ruas}'],
+      ['{defesa}'],
+    ],
+  },
+  deslizamento: {
+    h: ['Deslizamento de terra atinge a {regiao}', 'Encosta cede na {regiao} de {cidade}', 'Terra desce o morro na {regiao}'],
+    s: [
+      ['Com o solo encharcado, parte de uma encosta da {regiao} deslizou.', 'Uma encosta íngreme da {regiao} cedeu depois da chuva forte.'],
+      ['{estragos}'],
+      ['{contencao}'],
+    ],
+  },
+  queimada: {
+    h: ['Queimada consome mata perto da {regiao}', 'Fogo na mata assusta moradores da {regiao}', 'Incêndio florestal atinge a {regiao} de {cidade}'],
+    s: [
+      ['Depois de semanas sem chuva, o fogo tomou a mata perto da {regiao}.', 'A seca e o calor ajudaram o fogo a se espalhar pela mata da {regiao}.'],
+      ['{area}'],
+      ['{estragos}'],
+      ['{brigada}'],
+    ],
+  },
   fechou: {
     h: ['{empresa} fecha as portas', 'Fim da linha para {empresa}', '{empresa} encerra as atividades e demite funcionários'],
     s: [

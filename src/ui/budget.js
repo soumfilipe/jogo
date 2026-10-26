@@ -63,6 +63,7 @@ export class BudgetPanel {
         <dt>Pesquisa</dt><dd data-line="research"></dd>
         <dt>Leis e políticas</dt><dd data-line="policies"></dd>
         <dt data-sports-out>Repasse aos clubes</dt><dd data-sports-out data-line="sports-out"></dd>
+        <dt data-rebuild>Reconstrução (desastres)</dt><dd data-rebuild data-line="rebuild"></dd>
         <dt data-food-import>Alimentos importados</dt><dd data-food-import data-line="food-import"></dd>
         <dt>Parcelas de empréstimos</dt><dd data-line="loans"></dd>
         <dt class="total">Saldo do mês</dt><dd class="total" data-line="net"></dd>
@@ -174,6 +175,8 @@ export class BudgetPanel {
     q('[data-line="sports-in"]').textContent = money(budget.income.sports ?? 0);
     for (const el of this.el.querySelectorAll('[data-sports-out]')) el.hidden = !budget.expenses.sports;
     q('[data-line="sports-out"]').textContent = money(-(budget.expenses.sports ?? 0));
+    for (const el of this.el.querySelectorAll('[data-rebuild]')) el.hidden = !budget.expenses.rebuild;
+    q('[data-line="rebuild"]').textContent = money(-(budget.expenses.rebuild ?? 0));
     q('[data-line="net"]').textContent = money(budget.net);
 
     const loans = q('[data-loans]');

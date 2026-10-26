@@ -274,6 +274,11 @@ export const BUILDINGS = {
     name: 'Guarda municipal', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 8,
     utility: { power: 0, water: 0, cost: 5_000, upkeep: 200, pollution: 0, area: 'seguranca', service: { kind: 'policia', radius: 12, strength: 0.6 } },
   },
+  // Defesa civil (pesquisa): no raio, desastres estragam menos e os reparos andam mais rápido.
+  centro_defesa_civil: {
+    name: 'Centro de defesa civil', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 10,
+    utility: { power: 0, water: 0, cost: 8_000, upkeep: 350, pollution: 0, area: 'seguranca', service: { kind: 'defesa', radius: 20, strength: 1 } },
+  },
   central_cameras: {
     name: 'Central de videomonitoramento', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
     utility: { power: 0, water: 0, cost: 12_000, upkeep: 400, pollution: 0, area: 'seguranca', service: { kind: 'policia', radius: 20, strength: 0.5 } },
@@ -607,6 +612,33 @@ export const CLIMATES = {
 //   rainTourists: turistas dos parques num dia de chuva
 //   forecast:     dias de previsão (a Ciência do clima soma o mod 'forecastDays')
 export const WEATHER = { storm: 30, hot: 30, cold: 8, hotPower: 1.1, rainTourists: 0.6, forecast: 3 };
+
+// Desastres (ver src/systems/disasters.js). Saem do tempo e do relevo; a
+// opção do jogo (state.settings.disasters) multiplica as chances.
+//   deathChance: chance de morrer de quem morava ou trabalhava num prédio perdido
+//   repairDays / repairCost: tempo de reparo de um prédio danificado e o preço
+//                por nível × área (pago no fechamento do mês, em "Reconstrução")
+//   defense:     no raio da defesa civil, estragos × damage e reparos × repair
+//   flood:       rain = chuva de 30 dias acima da do mês mais chuvoso do clima
+//                (ou de 1,6× a média do ano, o que for maior) × rain, ou dayRain mm num dia; área de terra baixa (até
+//                maxHeight níveis) a até radius tiles da água, no máximo maxTiles
+//   landslide:   dayRain mm num dia, ou soakedRain mm com a chuva de 30 dias da enchente; chance
+//                por encosta íngreme ocupada; mata na encosta segura (forest)
+//   gap:         dias mínimos entre duas enchentes (ou duas queimadas)
+//   wildfire:    dias sem chuva (dry num dia de calor, ou dryAlone em qualquer
+//                dia); o fogo passa de um tile de mata ao vizinho com `spread`
+//                por hora; prédios encostados pegam fogo com `building`
+export const DISASTERS = {
+  levels: { off: 0, rare: 0.4, normal: 1 },
+  levelNames: { off: 'Desligados', rare: 'Raros', normal: 'Normais' },
+  deathChance: 0.03,
+  repairDays: 12,
+  repairCost: 150,
+  defense: { damage: 0.6, repair: 0.5 },
+  flood: { rain: 1, dayRain: 60, chance: 0.12, gap: 20, maxHeight: 2, radius: 4, maxTiles: 500, days: [2, 5], damage: 0.5, lose: 0.05, scar: 20 },
+  landslide: { dayRain: 40, soakedRain: 15, chance: 0.02, maxPerDay: 2, forest: 0.3, lower: 2 },
+  wildfire: { dry: 20, dryAlone: 40, chance: 0.06, gap: 15, spread: 0.3, building: 0.12, maxHours: 72, park: 0.3, scar: 60, smoke: 3 },
+};
 
 // Pontes: rua sobre a água, em linha reta de margem a margem.
 //   maxSpan:  vão máximo em tiles de água (a pesquisa Ponte estaiada soma o mod 'bridgeSpan')

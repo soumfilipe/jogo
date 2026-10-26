@@ -29,6 +29,7 @@ import { closeSportsMonth, runSportsOfDay } from './sports.js';
 import { startRacesOfDay, updateClosures, updateRaces } from './races.js';
 import { noteDemand } from './census.js';
 import { applyWeather, updateWeather } from './weather.js';
+import { dailyDisasters, spreadFires } from './disasters.js';
 import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
@@ -44,6 +45,7 @@ export function tick(state, rt) {
 
   if (t % 60 === 0) {
     computeMods(state, rt);
+    spreadFires(state, rt);
     computeTransit(state, rt);
     updateTrafficMap(state, rt);
     // Rush das 8h: quanto das ruas está parado (para as notícias).
@@ -58,6 +60,7 @@ export function tick(state, rt) {
     // lotados sobem de nível (têm prioridade sobre lotes novos).
     if (t % TICKS_PER_DAY === 0) {
       updateWeather(state, rt);
+      dailyDisasters(state, rt);
       applyUtilityEffects(state, rt);
       reviewCompanies(state, rt);
       enrollStudents(state, rt);

@@ -54,6 +54,15 @@ export function applyFires(state, rt) {
 }
 
 function burn(state, rt, b) {
+  ruin(state, rt, b, 'incendio');
+}
+
+/**
+ * Prédio perdido (incêndio ou desastre, ver disasters.js): os moradores vão
+ * embora da cidade, os funcionários perdem o emprego, e a ruína desaba como
+ * os abandonados. `reason` fica em b.ruined (o incêndio marca b.burned).
+ */
+export function ruin(state, rt, b, reason) {
   for (const id of [...rt.residents.get(b.id)]) removeCitizen(state, rt, id);
   for (const id of [...rt.workers.get(b.id)]) {
     const c = rt.citizenById.get(id);
@@ -61,7 +70,9 @@ function burn(state, rt, b) {
     setJob(rt, c, null);
   }
   b.abandoned = state.time.tick;
-  b.burned = true;
+  if (reason === 'incendio') b.burned = true;
+  else b.ruined = reason;
+  delete b.damaged;
   touchMap(rt, b.tile, BUILDINGS[b.type].size);
 }
 

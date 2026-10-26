@@ -102,9 +102,11 @@ export function monthlyBudget(state, rt) {
     loans: state.economy.loans.reduce((sum, loan) => sum + loanInstallment(loan), 0),
     // Repasse mensal aos clubes da cidade (ver sports.js).
     sports: sportsSubsidy(state),
+    // Reparos dos prédios danificados por desastres neste mês (ver disasters.js).
+    rebuild: Math.round(state.economy.rebuild ?? 0),
   };
   expenses.total = expenses.roads + expenses.utilities + expenses.research + expenses.policies + expenses.food
-    + expenses.loans + expenses.sports;
+    + expenses.loans + expenses.sports + expenses.rebuild;
 
   return { income, expenses, net: income.total - expenses.total };
 }
@@ -118,6 +120,7 @@ export function closeMonth(state, rt) {
   economy.tourism = 0; // e o gasto dos turistas também
   economy.eventsIncome = 0; // e os ingressos dos eventos
   economy.sportsIncome = 0; // e a taxa dos jogos
+  economy.rebuild = 0; // os reparos do mês foram pagos
 
   for (const loan of economy.loans) {
     const interest = Math.round(loan.balance * monthlyRate(loan));
