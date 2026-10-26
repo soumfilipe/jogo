@@ -144,6 +144,12 @@ function lose(state, rt, b, reason) {
   return [homeless, deaths];
 }
 
+/** Dias desde o último desastre do tipo (Infinity se não houve). */
+function daysSince(state, kind) {
+  const last = state.disasters.log.findLast((e) => e.kind === kind);
+  return last ? Math.floor(state.time.tick / TICKS_PER_DAY) - last.day : Infinity;
+}
+
 function logEvent(state, entry) {
   const log = state.disasters.log;
   log.push({ day: Math.floor(state.time.tick / TICKS_PER_DAY), ...entry });
@@ -186,7 +192,7 @@ function maybeFlood(state, rt, level) {
   const F = DISASTERS.flood;
   const w = state.weather;
   if (rain30(state) <= floodThreshold(state) && w.today.mm < F.dayRain) return;
-  if (state.disasters.floods.length) return; // uma por vez
+  if (state.disasters.floods.length || daysSince(state, 'enchente') < F.gap) return; // uma por vez, com intervalo
   if (!chance(state.rng, F.chance * level)) return;
   // Drenagem e cidade-esponja: área e estragos menores.
   const soft = mod(rt, 'floodDamage');
@@ -338,7 +344,7 @@ function maybeWildfire(state, rt, level) {
   const w = state.weather;
   const dry = w.dry ?? 0;
   if (!((dry >= W.dry && w.today.hot) || dry >= W.dryAlone)) return;
-  if (state.disasters.fires.length) return;
+  if (state.disasters.fires.length || daysSince(state, 'queimada') < W.gap) return;
   if (!chance(state.rng, W.chance * level * mod(rt, 'wildfire'))) return;
   const { terrain, park } = state.map;
   const forest = [];

@@ -624,6 +624,7 @@ export const WEATHER = { storm: 30, hot: 30, cold: 8, hotPower: 1.1, rainTourist
 //                maxHeight níveis) a até radius tiles da água, no máximo maxTiles
 //   landslide:   dayRain mm num dia, ou a chuva de 30 dias da enchente; chance
 //                por encosta íngreme ocupada; mata na encosta segura (forest)
+//   gap:         dias mínimos entre duas enchentes (ou duas queimadas)
 //   wildfire:    dias sem chuva (dry num dia de calor, ou dryAlone em qualquer
 //                dia); o fogo passa de um tile de mata ao vizinho com `spread`
 //                por hora; prédios encostados pegam fogo com `building`
@@ -634,9 +635,9 @@ export const DISASTERS = {
   repairDays: 12,
   repairCost: 150,
   defense: { damage: 0.6, repair: 0.5 },
-  flood: { rain: 1.15, dayRain: 60, chance: 0.6, maxHeight: 2, radius: 4, maxTiles: 500, days: [2, 5], damage: 0.5, lose: 0.05, scar: 20 },
+  flood: { rain: 1, dayRain: 60, chance: 0.12, gap: 20, maxHeight: 2, radius: 4, maxTiles: 500, days: [2, 5], damage: 0.5, lose: 0.05, scar: 20 },
   landslide: { dayRain: 40, chance: 0.05, maxPerDay: 3, forest: 0.3, lower: 2 },
-  wildfire: { dry: 20, dryAlone: 40, chance: 0.3, spread: 0.3, building: 0.12, maxHours: 72, park: 0.3, scar: 60, smoke: 3 },
+  wildfire: { dry: 20, dryAlone: 40, chance: 0.06, gap: 15, spread: 0.3, building: 0.12, maxHours: 72, park: 0.3, scar: 60, smoke: 3 },
 };
 
 // Pontes: rua sobre a água, em linha reta de margem a margem.

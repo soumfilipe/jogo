@@ -84,6 +84,7 @@ test('opção dos desastres: desligados nunca acontecem; raros acontecem menos',
       for (let i = 0; i < 20; i++) {
         soak(state);
         state.disasters.floods = [];
+        state.disasters.log = []; // sem o intervalo entre enchentes
         dailyDisasters(state, rt);
         floods += state.disasters.floods.length;
       }
@@ -170,6 +171,7 @@ test('defesa civil: prédio com a pesquisa; no raio, estragos menores e reparo n
   // Uma enchente por vez: limpa a anterior a cada tentativa.
   assert.ok(until(state, rt, () => {
     state.disasters.floods = [];
+    state.disasters.log = [];
     return state.buildings.some((b) => b.damaged);
   }, 200));
   const b = state.buildings.find((x) => x.damaged);
