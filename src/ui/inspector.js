@@ -193,6 +193,7 @@ function renderUtility(el, b, state, rt) {
     <p class="muted">${kind} · ${info.size}×${info.size}</p>
     <dl>
       ${res ? `<dt>Produz</dt><dd>${fmt(utilityOutput(rt, b.type, res))} de ${label}</dd>` : ''}
+      ${u.storage ? `<dt>Guarda</dt><dd>até ${fmt(u.storage)} de energia solar ou eólica da rede (a rede usa ${fmt(rt.utilityNets?.get(rt.roadComponent[access])?.power.stored ?? 0)} agora)</dd>` : ''}
       ${u.income && (!u.gated?.income || mod(rt, u.gated.income, 0) > 0) ? `<dt>Receita</dt><dd>$${fmt(u.income * (workers / jobs) * mod(rt, `output.${b.type}`))}/mês</dd>` : ''}
       <dt>Manutenção</dt><dd>$${fmt(utilityUpkeep(rt, b.type))}/mês</dd>
       <dt>${u.institute ? 'Pesquisadores' : 'Funcionários'}</dt><dd>${workers} / ${jobs}</dd>

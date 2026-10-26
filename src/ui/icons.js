@@ -85,6 +85,8 @@ export const ICONS = {
   usina_carvao: '<path d="M2.5 21h19M4 21v-7l4-2.5V14l4-2.5V21M14 21V8h3.5v13"/><path class="t" d="M15 5.5a2 2 0 0 1 3.4-1.6A2.2 2.2 0 1 1 20.5 7.5h-5A1 1 0 0 1 15 5.5z"/>',
   usina_gas: '<path class="t" d="M12 21.5c-3.9 0-6.5-2.6-6.5-6.2 0-4.2 4-6.3 4.5-11.3 2.6 1.9 4 4.4 4 7 1-.6 1.6-1.8 1.7-3 1.7 1.7 2.8 4.2 2.8 6.9 0 4-2.6 6.6-6.5 6.6z"/>',
   hidreletrica: `<path class="t" d="M13 4h3l5 17h-8z"/><path d="${wave(8.5)}${wave(13)}${wave(17.5)}M12 21h10"/>`,
+  usina_nuclear: '<path class="t" d="M4 21c1-4 1-9 0-13h6c-1 4-1 9 0 13zM13 21c1-4 1-9 0-13h6c-1 4-1 9 0 13z"/><path d="M2.5 21h19M6 5.5c.5-1 1.5-1.5 2.5-1M15 5.5c.5-1 1.5-1.5 2.5-1"/>',
+  bateria_rede: '<rect x="3" y="7" width="16" height="11" rx="1.5"/><path d="M19 10.5h2v4h-2"/><path class="t" d="M12 9l-3 4h3l-1 3 3-4h-3z"/>',
   usina_eolica: '<path d="M12 10.5v11M9.5 21.5h5M12 7.6V2.5M13.2 9.7l4.4 2.6M10.8 9.7l-4.4 2.6"/><circle class="t" cx="12" cy="9" r="1.6"/>',
   usina_solar: '<path class="t" d="M4 15 7 8h13l-3 7z"/><path d="M5.5 11.5h13M10.6 8l-2 7M15.3 8l-2 7M10.5 15v4M7 21h7"/><circle cx="5" cy="4.5" r="1.8"/>',
   usina_hidrogenio: '<circle cx="7.5" cy="12" r="4.5"/><circle cx="16.5" cy="12" r="4.5"/><path d="M5.8 10v4M9.2 10v4M5.8 12h3.4M14.8 10v4M18.2 10v4M14.8 12h3.4"/>',

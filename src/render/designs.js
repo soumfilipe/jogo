@@ -508,6 +508,26 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  usina_nuclear(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#9a9a8a', lift: 0 }];
+    // Duas torres de resfriamento (cilindros largos) e o prédio do reator com cúpula.
+    for (const [cx, cy] of [[0.75, 0.8], [0.8, 2.15]]) {
+      parts.push({ kind: 'cylinder', cx, cy, r: 0.55, lift: 0, h: 2.2, color: '#d9dde2', top: '#b9bec7' });
+    }
+    parts.push(block([1.6, 0.6, 2.7, 1.9], 0, 0.9, wall('#e9edf2', '#c8ced6'), { windows: { cols: 3, style: 'bands' }, doors: { count: 1, color: '#5b7fa8' } }));
+    parts.push({ kind: 'cylinder', cx: 2.15, cy: 1.25, r: 0.42, lift: 0.9, h: 0.5, color: '#c8ced6', top: '#e9edf2' });
+    parts.push(block([1.7, 2.2, 2.6, 2.8], 0, 0.5, wall(r.pick(['#5b7fa8', '#3f6fc0']), '#2c3e50')));
+    return parts;
+  },
+
+  bateria_rede(r) {
+    const parts = [{ kind: 'slab', box: [0.06, 0.06, 0.94, 0.94], color: '#b5b0a6', lift: 0 }];
+    // Fileiras de contêineres de baterias.
+    const c = r.pick(['#e9edf2', '#d9dde2']);
+    for (const y of [0.15, 0.55]) parts.push(block([0.12, y, 0.88, y + 0.3], 0, 0.32, wall(c, '#b9bec7'), { bands: [{ at: 0.2, thick: 0.05, color: '#3d8f5a' }] }));
+    return parts;
+  },
+
   usina_eolica(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: r.pick(['#8fae7d', '#9ab486']), lift: 0 }];
     for (const [cx, cy] of [[0.5, 0.5], [1.5, 0.6], [0.6, 1.5], [1.45, 1.45]]) {

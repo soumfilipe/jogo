@@ -14,6 +14,7 @@
 //   { type: 'tax', zone, percent }       (zone: residential | commercial | industrial)
 //   { type: 'loan', amount }             (um dos valores de loanOffers())
 //   { type: 'repay', id }                (quita o empréstimo de uma vez)
+//   { type: 'ppp', on }                  (obras públicas por PPP, com a pesquisa)
 //   { type: 'funding', area, amount }    (verba de pesquisa por mês numa área)
 //   { type: 'priority', area, tech }     (tecnologia prioritária da área; null = automático)
 //   { type: 'course', area, weight }     (peso da área nos cursos da universidade, 0 a 5)
@@ -38,7 +39,7 @@ import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
 import { isBuildable } from './world.js';
 import { BUILDING_TECH, TECH_BY_ID, marcoAt } from './techs.js';
-import { repayLoan, setTax, takeLoan } from '../systems/economy.js';
+import { pppActive, pppContract, repayLoan, setPpp, setTax, takeLoan } from '../systems/economy.js';
 import { computeMods, isUnlocked, mod, utilityCost } from '../systems/mods.js';
 import { setFunding, setPriority } from '../systems/research.js';
 import { refreshSchoolMap, setCourse } from '../systems/education.js';
@@ -150,6 +151,7 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'tax') return setTax(state, cmd.zone, cmd.percent);
   if (cmd.type === 'loan') return takeLoan(state, rt, cmd.amount);
   if (cmd.type === 'repay') return repayLoan(state, cmd.id);
+  if (cmd.type === 'ppp') return setPpp(state, rt, cmd.on);
   if (cmd.type === 'funding') return setFunding(state, cmd.area, cmd.amount);
   if (cmd.type === 'priority') return setPriority(state, rt, cmd.area, cmd.tech);
   if (cmd.type === 'course') return setCourse(state, cmd.area, cmd.weight);
@@ -179,7 +181,12 @@ export function applyCommand(state, rt, cmd) {
   const { tiles, cost, reason } = planCommand(state, rt, cmd);
   if (reason) return { ok: false, cost, count: 0, reason };
   if (tiles.length === 0) return { ok: false, cost: 0, count: 0, reason: 'Nada a fazer aqui.' };
-  if (cost > state.economy.money) {
+  // PPP: o prédio público sai sem pagar à vista (contrato em parcelas).
+  const financed = cmd.type === 'place' && BUILDINGS[cmd.building]?.utility && pppActive(state, rt);
+  if (financed) {
+    const contract = pppContract(state, rt, BUILDINGS[cmd.building].name, cost);
+    if (!contract.ok) return { ok: false, cost, count: 0, reason: contract.reason };
+  } else if (cost > state.economy.money) {
     return { ok: false, cost, count: 0, reason: `Dinheiro insuficiente (custa $${cost}).` };
   }
 
@@ -196,19 +203,20 @@ export function applyCommand(state, rt, cmd) {
 
   if (cmd.type === 'place') {
     for (const t of tiles) state.map.zone[t] = ZONE.NONE;
-    addBuilding(state, rt, cmd.building, cmd.tile);
+    const placed = addBuilding(state, rt, cmd.building, cmd.tile);
+    if (financed) state.economy.loans.at(-1).building = `${BUILDINGS[cmd.building].name} #${placed.id}`;
     // A primeira usina (ou bomba/poço) própria encerra a importação daquele recurso.
     const utility = BUILDINGS[cmd.building].utility;
     const imported = state.utilities.imported;
     if (utility.power) imported.power = false;
     if (utility.water) imported.water = false;
-    state.economy.money -= cost;
+    if (!financed) state.economy.money -= cost;
     computeMods(state, rt);
     if (utility.school) refreshSchoolMap(state, rt);
     if (utility.service) computeCoverage(state, rt);
     if (utility.transit) computeTransit(state, rt);
     if (utility.freight) computeFreight(state, rt);
-    return { ok: true, cost, count: 1 };
+    return { ok: true, cost: financed ? 0 : cost, count: 1, ppp: Boolean(financed) };
   }
 
   const { road, zone, terrain, density } = state.map;

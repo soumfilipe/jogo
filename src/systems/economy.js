@@ -170,7 +170,7 @@ export function takeLoan(state, rt, amount) {
   const economy = state.economy;
   const offer = loanOffers(rt).find((o) => o.amount === amount);
   if (!offer) return { ok: false, reason: 'Valor de empréstimo não oferecido.' };
-  if (economy.loans.length >= ECONOMY.maxLoans) {
+  if (economy.loans.filter((l) => l.kind !== 'ppp').length >= ECONOMY.maxLoans) {
     return { ok: false, reason: `No máximo ${ECONOMY.maxLoans} empréstimos ao mesmo tempo.` };
   }
   const rate = loanRate(rt);
@@ -186,10 +186,46 @@ export function takeLoan(state, rt, amount) {
   return { ok: true, cost: -amount, count: 1 };
 }
 
+/** As obras públicas saem por PPP? (pesquisa e opção no orçamento ligadas) */
+export const pppActive = (state, rt) => Boolean(state.economy.ppp) && mod(rt, 'ppp', 0) > 0;
+
+/** Liga ou desliga a PPP (comando 'ppp'). */
+export function setPpp(state, rt, on) {
+  if (mod(rt, 'ppp', 0) <= 0) return { ok: false, cost: 0, reason: 'As PPPs precisam da tecnologia Parcerias público-privadas.' };
+  state.economy.ppp = Boolean(on);
+  return { ok: true, cost: 0 };
+}
+
+/** Parcela mensal de um contrato de PPP de `cost`. */
+export function pppPayment(rt, cost) {
+  return loanPayment(cost, loanRate(rt) + ECONOMY.pppExtraRate, ECONOMY.pppMonths);
+}
+
+/**
+ * Obra pública por PPP: em vez de pagar à vista, a cidade assina um contrato
+ * pago em parcelas (entra nas "Parcelas de empréstimos"). Recusa se as
+ * parcelas de PPP passariam do limite da receita. Devolve { ok, reason }.
+ */
+export function pppContract(state, rt, name, cost) {
+  const economy = state.economy;
+  const payment = pppPayment(rt, cost);
+  const current = economy.loans.filter((l) => l.kind === 'ppp').reduce((s, l) => s + l.payment, 0);
+  const limit = ECONOMY.pppShare * monthlyBudget(state, rt).income.total;
+  if (current + payment > limit) {
+    return { ok: false, reason: `Parcelas de PPP passariam de ${Math.round(ECONOMY.pppShare * 100)}% da receita ($${Math.round(current + payment).toLocaleString('pt-BR')} de $${Math.round(limit).toLocaleString('pt-BR')} por mês).` };
+  }
+  economy.loans.push({
+    id: economy.nextLoanId++, kind: 'ppp', building: name, amount: cost, balance: cost, payment,
+    monthsLeft: ECONOMY.pppMonths, rate: loanRate(rt) + ECONOMY.pppExtraRate,
+  });
+  return { ok: true };
+}
+
 export function repayLoan(state, id) {
   const economy = state.economy;
   const loan = economy.loans.find((l) => l.id === id);
   if (!loan) return { ok: false, reason: 'Empréstimo não encontrado.' };
+  if (loan.kind === 'ppp') return { ok: false, reason: 'O contrato de PPP é pago até o fim (10 anos).' };
   if (economy.money < loan.balance) {
     return { ok: false, reason: `Dinheiro insuficiente para quitar ($${loan.balance}).` };
   }

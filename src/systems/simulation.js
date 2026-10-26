@@ -27,6 +27,7 @@ import { closeCultureMonth } from './culture.js';
 import { runEventsOfDay } from './agenda.js';
 import { closeSportsMonth, runSportsOfDay } from './sports.js';
 import { startRacesOfDay, updateClosures, updateRaces } from './races.js';
+import { noteDemand } from './census.js';
 import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
@@ -73,6 +74,8 @@ export function tick(state, rt) {
       computeUtilities(state, rt);
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
+      // Amostra do dia para a previsão de demanda do censo (só interface).
+      noteDemand(rt, Math.floor(t / TICKS_PER_DAY));
       // Turistas de hoje (meia-noite): plano de chegadas e gasto do dia.
       // Eventos de hoje (público sorteado, encerramentos, séries) e, com eles,
       // os turistas e o público que vão andar pela cidade.
