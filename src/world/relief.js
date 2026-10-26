@@ -5,7 +5,7 @@
 // Cantos vizinhos na horizontal ou vertical diferem no máximo RELIEF.maxStep
 // (ver constrain). A água fica no nível 0.
 
-import { RELIEF } from './catalog.js';
+import { BRIDGE, RELIEF, TERRAIN } from './catalog.js';
 
 /** Índice do canto (cx, cy). */
 export const cornerIndex = (map, cx, cy) => cy * (map.width + 1) + cx;
@@ -71,6 +71,13 @@ export function heightAt(map, x, y) {
   const top = e[i] + (e[i + 1] - e[i]) * fx;
   const bottom = e[i + W] + (e[i + W + 1] - e[i + W]) * fx;
   return top + (bottom - top) * fy;
+}
+
+/** Altura do que se pisa no ponto: o chão, ou o tabuleiro da ponte sobre a água. */
+export function surfaceAt(map, x, y) {
+  const h = heightAt(map, x, y);
+  const t = Math.floor(y) * map.width + Math.floor(x);
+  return map.road?.[t] && map.terrain?.[t] === TERRAIN.WATER ? h + BRIDGE.deck : h;
 }
 
 /**

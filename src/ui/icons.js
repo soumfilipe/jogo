@@ -74,6 +74,11 @@ export const ICONS = {
   calcadao: '<circle cx="13" cy="4.5" r="1.8"/><path d="M12.5 8 10 13l3 2.5V21M10 13l-2.5 7.5M12.5 8l3.5 3.5 3 .5M12.5 8 9 9.5l-1.5 3"/>',
   residencial: '<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
   comercial: '<path d="M4 10.5V20h16v-9.5"/><path d="M3.5 4h17L22 9a2.5 2.5 0 0 1-5 .5 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0A2.5 2.5 0 0 1 2 9z"/><path d="M9.5 20v-5h5v5"/>',
+  // Tempo: sol, nublado, chuva e tempestade.
+  sol: '<circle class="t" cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  nublado: '<path class="t" d="M7 18.5h10.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.6-1A4.5 4.5 0 0 0 7 18.5z"/>',
+  chuva: '<path class="t" d="M7 14.5h10.5a3.6 3.6 0 0 0 .3-7.2 5 5 0 0 0-9.6-.9A4 4 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 3M12.5 17.5l-1 3M16.5 17.5l-1 3"/>',
+  tempestade: '<path class="t" d="M7 13.5h10.5a3.6 3.6 0 0 0 .3-7.2 5 5 0 0 0-9.6-.9A4 4 0 0 0 7 13.5z"/><path d="M12.5 13.5 10 18h3.5L11 22.5"/>',
   // Terraplanagem: morro com seta para cima, para baixo, e terreno nivelado.
   subir: '<path d="M2 20h20M4 20l5-7 3 3 3-5 5 9"/><path class="t" d="M12 2.5v6M9.5 5 12 2.5 14.5 5"/>',
   descer: '<path d="M2 20h20M4 20l5-7 3 3 3-5 5 9"/><path class="t" d="M12 2.5v6M9.5 6 12 8.5 14.5 6"/>',

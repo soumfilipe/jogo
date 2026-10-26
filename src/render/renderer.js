@@ -9,8 +9,8 @@
 //
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
-import { BUILDINGS, DENSITY, FOREST, RELIEF, ROAD_TYPES, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
-import { heightAt } from '../world/relief.js';
+import { BRIDGE, BUILDINGS, DENSITY, FOREST, RELIEF, ROAD_TYPES, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
+import { heightAt, surfaceAt } from '../world/relief.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
@@ -208,7 +208,7 @@ export class Renderer {
       this.lastZoom = cam.zoom;
       this.zoomChangedAt = now;
     }
-    const key = [this.canvas.width, this.canvas.height, overlay.mapMode, mode ? rt.landValueVersion : 0].join(':');
+    const key = [this.canvas.width, this.canvas.height, overlay.mapMode, mode ? rt.landValueVersion : 0, dryLevel(state)].join(':');
     let view = this.cacheCam && this.#cacheTransform(cam);
     const zooming = now - this.zoomChangedAt < ZOOM_SETTLE_MS;
     const outOfCache = view && (view.k !== 1 ? !zooming : Math.abs(view.tx + this.margin) > this.margin || Math.abs(view.ty + this.margin) > this.margin);
@@ -310,6 +310,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (!mode) this.#drawWeather(ctx, state, cam, now / 1000, dark);
 
     // Ruas fechadas pela corrida de rua (ver systems/races.js).
     if (overlay.closed?.length) this.#drawTiles(ctx, state, cam, overlay.closed, 'rgba(230,126,34,0.4)');
@@ -326,6 +327,60 @@ export class Renderer {
       this.#outlineTile(ctx, state, cam, overlay.hover.y * state.map.width + overlay.hover.x, 'rgba(255,255,255,0.8)', 1.5);
     }
     stats.total = performance.now() - now;
+  }
+
+  // Tempo do dia por cima do mapa: céu fechado, sombras de nuvens, chuva e
+  // relâmpagos. Tudo em tempo real e só visual.
+  #drawWeather(ctx, state, cam, time, dark) {
+    const kind = state.weather?.today?.kind;
+    if (!kind || kind === 'sol') return;
+    const w = cam.viewW;
+    const h = cam.viewH;
+    const tint = { nublado: 0.1, chuva: 0.2, tempestade: 0.3 }[kind];
+    ctx.fillStyle = `rgba(70, 80, 96, ${tint})`;
+    ctx.fillRect(0, 0, w, h);
+    // Sombras de nuvens presas ao mapa, derivando devagar.
+    if (cam.zoom >= 0.2) {
+      const { width } = state.map;
+      for (let i = 0; i < 14; i++) {
+        const wx = (hash2(i, 1, 31) * width + time * 0.25) % width;
+        const wy = hash2(i, 2, 31) * width;
+        const [sx, sy] = worldToScreen(cam, wx, wy);
+        const r = (8 + hash2(i, 3, 31) * 10) * 32 * cam.zoom;
+        if (sx < -r || sy < -r || sx > w + r || sy > h + r) continue;
+        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+        g.addColorStop(0, `rgba(40, 48, 60, ${0.16 * (1 - dark * 0.6)})`);
+        g.addColorStop(1, 'rgba(40, 48, 60, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, r, r * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (kind === 'nublado') return;
+    // Chuva: riscos inclinados que caem e voltam por cima.
+    const drops = kind === 'tempestade' ? 420 : 220;
+    const len = kind === 'tempestade' ? 18 : 12;
+    const rain = new Path2D();
+    for (let i = 0; i < drops; i++) {
+      const speed = 500 + hash2(i, 5, 7) * 300;
+      const x = (hash2(i, 6, 7) * (w + 200) + time * 120) % (w + 200) - 100;
+      const y = (hash2(i, 7, 7) * (h + 100) + time * speed) % (h + 100) - 50;
+      rain.moveTo(x, y);
+      rain.lineTo(x - len * 0.3, y + len);
+    }
+    ctx.strokeStyle = `rgba(205, 220, 240, ${0.45 - dark * 0.15})`;
+    ctx.lineWidth = 1;
+    ctx.stroke(rain);
+    // Relâmpago de vez em quando na tempestade.
+    if (kind === 'tempestade') {
+      const cycle = time % 7;
+      const flash = cycle < 0.12 || (cycle > 0.25 && cycle < 0.32);
+      if (flash) {
+        ctx.fillStyle = 'rgba(235, 240, 255, 0.35)';
+        ctx.fillRect(0, 0, w, h);
+      }
+    }
   }
 
   /** Redesenha o mapa no próximo quadro (depois de uma ação do jogador). */
@@ -484,6 +539,7 @@ export class Renderer {
     const pad = 0.5;
     const elev = state.map.elevation;
     const EW = width + 1;
+    const dry = dryLevel(state);
     const edges = { left: [], right: [] };
 
     const ground = (x, y) => {
@@ -505,14 +561,18 @@ export class Renderer {
         color = FOREST_GROUNDS[Math.min(3, Math.floor(Math.max(0, forest[tile] - 1) * 4 / FOREST.maxDensity))];
       }
       else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
+      // Seca longa: a grama (e o chão da mata) amarela.
+      if (dry && !road[tile] && !mode && (terrain[tile] === TERRAIN.GRASS || terrain[tile] === TERRAIN.FOREST)) color = dryColor(color, dry);
 
       // Relevo: os 4 cantos na altura deles; a luz vem do alto à esquerda,
       // então a encosta virada para lá clareia e a do outro lado escurece.
       const ci = y * EW + x;
-      const hT = elev ? elev[ci] : 0;
-      const hR = elev ? elev[ci + 1] : 0;
-      const hB = elev ? elev[ci + EW + 1] : 0;
-      const hL = elev ? elev[ci + EW] : 0;
+      // Ponte: o tabuleiro fica um pouco acima da água.
+      const deck = road[tile] && terrain[tile] === TERRAIN.WATER ? BRIDGE.deck : 0;
+      const hT = (elev ? elev[ci] : 0) + deck;
+      const hR = (elev ? elev[ci + 1] : 0) + deck;
+      const hB = (elev ? elev[ci + EW + 1] : 0) + deck;
+      const hL = (elev ? elev[ci + EW] : 0) + deck;
       if (elev && terrain[tile] !== TERRAIN.WATER) {
         // Inclinação suavizada em 3 tiles (sem o xadrez dos degraus) e um
         // pouco mais claro no alto.
@@ -662,6 +722,8 @@ export class Renderer {
           const service = rt.service?.get(b.id);
           if (service && (!service.power || !service.water)) drawServiceBadges(ctx, g, service, z);
         }
+      } else if (road[tile] && terrain[tile] === TERRAIN.WATER) {
+        drawBridge(ctx, state, cam, x, y);
       } else if (treesVisible && !road[tile] && terrain[tile] !== TERRAIN.WATER) {
         const list = treesFor(state, x, y);
         if (list.length === 0) continue;
@@ -899,19 +961,75 @@ function diamond(path, cam, x, y, inset, size = 1, map = null) {
 // Faixa tracejada no meio da estrada, ligando aos vizinhos que também são estrada.
 function addRoadMarkings(path, state, cam, x, y) {
   const { width, height, road } = state.map;
-  const [cx, cy] = worldToScreen(cam, x + 0.5, y + 0.5, heightAt(state.map, x + 0.5, y + 0.5));
+  const [cx, cy] = worldToScreen(cam, x + 0.5, y + 0.5, surfaceAt(state.map, x + 0.5, y + 0.5));
   const neighbors = [[1, 0], [0, 1]];
   for (const [dx, dy] of neighbors) {
     const nx = x + dx;
     const ny = y + dy;
     if (nx >= width || ny >= height || !road[ny * width + nx]) continue;
     // Passa pelo meio da borda entre os dois tiles (segue o declive).
-    const [mx, my] = worldToScreen(cam, x + 0.5 + dx / 2, y + 0.5 + dy / 2, heightAt(state.map, x + 0.5 + dx / 2, y + 0.5 + dy / 2));
-    const [ex, ey] = worldToScreen(cam, nx + 0.5, ny + 0.5, heightAt(state.map, nx + 0.5, ny + 0.5));
+    const [mx, my] = worldToScreen(cam, x + 0.5 + dx / 2, y + 0.5 + dy / 2, surfaceAt(state.map, x + 0.5 + dx / 2, y + 0.5 + dy / 2));
+    const [ex, ey] = worldToScreen(cam, nx + 0.5, ny + 0.5, surfaceAt(state.map, nx + 0.5, ny + 0.5));
     path.moveTo(cx, cy);
     path.lineTo(mx, my);
     path.lineTo(ex, ey);
   }
+}
+
+// Ponte: viga sob as bordas da frente do tabuleiro, pilares a cada dois tiles
+// e, nos vãos longos (só com a Ponte estaiada), uma torre no meio com estais.
+const GIRDER = '#5d6168';
+const PILLAR = '#9aa0a8';
+function drawBridge(ctx, state, cam, x, y) {
+  const { width, height, road, terrain } = state.map;
+  const isBridge = (bx, by) => bx >= 0 && by >= 0 && bx < width && by < height && road[by * width + bx] && terrain[by * width + bx] === TERRAIN.WATER;
+  const z = cam.zoom;
+  const d = BRIDGE.deck;
+  const P = (wx, wy, h) => worldToScreen(cam, wx, wy, h);
+  ctx.fillStyle = GIRDER;
+  // Bordas da frente: a do lado +x (direita) e a do lado +y (esquerda).
+  for (const [nx, ny, a, b] of [[x + 1, y, [x + 1, y], [x + 1, y + 1]], [x, y + 1, [x, y + 1], [x + 1, y + 1]]]) {
+    if (isBridge(nx, ny)) continue;
+    const p = [P(a[0], a[1], d), P(b[0], b[1], d), P(b[0], b[1], d - 1.2), P(a[0], a[1], d - 1.2)];
+    ctx.beginPath();
+    ctx.moveTo(p[0][0], p[0][1]);
+    for (let k = 1; k < 4; k++) ctx.lineTo(p[k][0], p[k][1]);
+    ctx.fill();
+  }
+  if ((x + y) % 2 === 0) {
+    const [px, top] = P(x + 0.5, y + 0.5, d - 1);
+    const bottom = P(x + 0.5, y + 0.5, -1.5)[1];
+    ctx.fillStyle = PILLAR;
+    ctx.fillRect(px - 2.5 * z, top, 5 * z, bottom - top);
+  }
+  // Vão longo: torre no meio do trecho, com cabos até o tabuleiro.
+  const alongX = isBridge(x - 1, y) || isBridge(x + 1, y);
+  const [dx, dy] = alongX ? [1, 0] : [0, 1];
+  let a = 0;
+  let b = 0;
+  while (isBridge(x - (a + 1) * dx, y - (a + 1) * dy)) a++;
+  while (isBridge(x + (b + 1) * dx, y + (b + 1) * dy)) b++;
+  const run = a + b + 1;
+  if (run <= BRIDGE.maxSpan || a !== Math.floor((run - 1) / 2)) return;
+  const cx = x + 0.5;
+  const cy = y + 0.5;
+  const towerH = d + 10 + run;
+  const [tx, ty] = P(cx, cy, towerH);
+  const [bx, by] = P(cx, cy, d);
+  ctx.strokeStyle = '#e8eaed';
+  ctx.lineWidth = Math.max(1, 0.8 * z);
+  ctx.beginPath();
+  for (let k = -a; k <= b; k++) {
+    if (k === 0) continue;
+    const [ex, ey] = P(cx + k * dx, cy + k * dy, d);
+    ctx.moveTo(tx, ty + 4 * z);
+    ctx.lineTo(ex, ey);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#d9dde2';
+  ctx.fillRect(tx - 3 * z, ty, 6 * z, by - ty);
+  ctx.fillStyle = '#b5bac2';
+  ctx.fillRect(tx, ty, 3 * z, by - ty);
 }
 
 // Ícones sobre prédios sem energia (raio amarelo) ou sem água (gota azul).
@@ -1099,6 +1217,17 @@ class TreeBatch {
       ctx.fill(light);
     }
   }
+}
+
+// Seca: de 0 (normal) a 3, a cada 15 dias seguidos sem chuva (a partir de 15).
+const dryLevel = (state) => Math.min(3, Math.floor((state.weather?.dry ?? 0) / 15));
+const DRY_GRASS = '#c4b06a';
+const dryCache = new Map();
+function dryColor(color, level) {
+  const key = color + level;
+  let out = dryCache.get(key);
+  if (!out) dryCache.set(key, (out = mix(color, DRY_GRASS, level * 0.16)));
+  return out;
 }
 
 // Cor do chão clareada (s > 0) ou escurecida (s < 0) pela inclinação.

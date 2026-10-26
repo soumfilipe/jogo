@@ -1,6 +1,7 @@
 import { createWorld } from './world/world.js';
 import { heightAt } from './world/relief.js';
-import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, NEWS, RELIEF, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
+import { BUILDINGS, CLIMATES, WEATHER, DENSITY, DENSITY_INFO, EDUCATION, NEWS, RELIEF, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
+import { KIND_NAMES, forecast, monthRisk, rain30 } from './systems/weather.js';
 import { radiusOf, seatsOf } from './systems/education.js';
 import { serviceRadius } from './systems/services.js';
 
@@ -200,8 +201,32 @@ function setWorld(next) {
   updateInspector();
 }
 
-function newCity(name, startMarco = 1) {
-  setWorld(createWorld({ name, startMarco }));
+// Tempo no topo: ícone e máxima de hoje; a previsão na dica.
+let weatherKey = '';
+function renderWeather() {
+  const w = state.weather;
+  const t = w?.today;
+  if (!t) return;
+  const next = forecast(state, rt);
+  const key = `${state.seed}:${w.climate}:${t.day}:${t.kind}:${next.length}`;
+  if (key === weatherKey) return;
+  weatherKey = key;
+  const el = $('weather');
+  el.firstElementChild.innerHTML = icon(t.kind);
+  el.lastElementChild.textContent = `${t.temp}°`;
+  const line = (d) => `${KIND_NAMES[d.kind]}, ${d.temp}°${d.mm >= 1 ? `, ${Math.round(d.mm)} mm` : ''}${d.hot ? ' (calor)' : d.cold ? ' (frio)' : ''}`;
+  const days = ['Amanhã', 'Depois de amanhã'];
+  el.title = [
+    `Hoje: ${line(t)} · clima ${CLIMATES[w.climate].name.toLowerCase()}`,
+    ...next.map((d, i) => `${days[i] ?? `Em ${i + 1} dias`}: ${line(d)}`),
+    `Chuva nos últimos 30 dias: ${Math.round(rain30(state))} mm${w.dry >= 7 ? ` · ${w.dry} dias sem chuva` : ''}`,
+    // Ciência do clima: o risco do mês.
+    ...(next.length > WEATHER.forecast ? [`Risco do mês (Ciência do clima): enchente ${monthRisk(state).flood}, seca ${monthRisk(state).drought}`] : []),
+  ].join('\n');
+}
+
+function newCity(name, startMarco = 1, climate = 'subtropical') {
+  setWorld(createWorld({ name, startMarco, climate }));
   saves.startNew(state.city.name);
 }
 
@@ -311,6 +336,7 @@ function renderHud() {
     + (s.outside ? ` (${s.outside.toLocaleString('pt-BR')} trabalham em cidades vizinhas)` : '');
   employment.parentElement.classList.toggle('short', jobless > NEWS.problems.desemprego);
   $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
+  renderWeather();
   // Com o censo, a dica do botão de demanda traz a previsão de 3 meses.
   $('btn-zones').title = ['Demanda por zona (R, C, I e rural): para cima falta, para baixo sobra. Clique para zonear e escolher a densidade.', forecastText(rt)].filter(Boolean).join('\n');
   const demands = [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial],
@@ -1172,6 +1198,8 @@ $('new-marcos').innerHTML = MARCOS.map((m, i) => {
   return `<label><input type="radio" name="marco" value="${m.id}"${i === 0 ? ' checked' : ''}>
     <span>${m.id}. ${m.name}<br><small>${i === 0 ? 'só o básico' : `${ready} tecnologias já prontas`}</small></span></label>`;
 }).join('');
+$('new-climates').innerHTML = Object.entries(CLIMATES).map(([id, c]) => `<label><input type="radio" name="climate" value="${id}"${id === 'subtropical' ? ' checked' : ''}>
+    <span>${c.name}<br><small>${c.desc}</small></span></label>`).join('');
 $('btn-new').onclick = () => {
   if (!confirmDiscard()) return;
   $('new-name').value = 'Nova Cidade';
@@ -1180,8 +1208,9 @@ $('btn-new').onclick = () => {
 $('new-dialog').addEventListener('close', () => {
   if ($('new-dialog').returnValue !== 'ok') return;
   const name = $('new-name').value.trim() || 'Nova Cidade';
-  const marco = Number(new FormData($('new-form')).get('marco')) || 1;
-  newCity(name, marco);
+  const form = new FormData($('new-form'));
+  const marco = Number(form.get('marco')) || 1;
+  newCity(name, marco, form.get('climate') || 'subtropical');
   toolsKey = '';
   refreshTools();
   status(`Cidade fundada no marco ${marco}.`);

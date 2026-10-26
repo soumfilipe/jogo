@@ -11,6 +11,7 @@
   <header class="topbar">
     <strong id="city-name">—</strong>
     <span id="date" class="mono"></span>
+    <span id="weather" title="Tempo"><span class="ico" data-icon="sol"></span><span>—</span></span>
     <span title="População"><span class="ico" data-icon="people"></span><span id="population">0</span></span>
     <span title="Desemprego"><span class="ico" data-icon="jobs"></span><span id="employment">0%</span></span>
     <span id="happiness" title="Satisfação média dos moradores"><span class="ico" data-icon="face-neutral"></span><span>50%</span></span>
@@ -129,6 +130,10 @@
       </fieldset>
       <p class="muted small">As tecnologias dos marcos anteriores já vêm prontas. O mundo segue
         descobrindo coisas novas com o tempo, e a sua cidade pode chegar antes dele pesquisando.</p>
+      <fieldset class="marcos">
+        <legend>Clima</legend>
+        <div id="new-climates"></div>
+      </fieldset>
       <div class="row">
         <button value="ok" class="primary">Fundar a cidade</button>
         <button value="cancel" formnovalidate>Cancelar</button>

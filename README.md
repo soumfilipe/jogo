@@ -770,6 +770,45 @@ O mapa tem morros (`src/world/relief.js`, números em `RELIEF` no catálogo):
   tudo o que a cidade já ocupa (ruas, zonas, parques e prédios) fica plano no
   nível 0, com rampas até os morros em volta.
 
+## Pontes, clima e tempo
+
+### Pontes
+- **Rua sobre a água** (a ferramenta de rua de sempre): cada trecho de água da
+  linha vira ponte se for reto e tiver terra firme nas duas pontas.
+- **Vão máximo:** 4 tiles de água; com a *Ponte estaiada*, 16.
+- **Custo:** $80 a mais por tile de água.
+- **Desenho:**
+  - o tabuleiro fica um pouco acima da água, com viga lateral e pilares;
+  - os vãos longos ganham uma torre no meio com estais;
+  - os carros passam na altura do tabuleiro.
+
+### Clima e tempo (`src/systems/weather.js`, `CLIMATES` e `WEATHER` no catálogo)
+**Clima do mapa**, escolhido no jogo novo:
+
+| Clima | Chuva | Temperatura |
+| --- | --- | --- |
+| Tropical | verão de chuvas fortes, inverno seco | quente o ano todo |
+| Subtropical | chuva o ano todo (padrão) | quatro estações |
+| Semiárido | pouca chuva, secas de meses | calor |
+| Temperado | chuva regular | inverno frio |
+
+- **Tempo do dia:**
+  - sorteado da chuva e da temperatura médias do mês, com um sorteio próprio da semente e do dia (não mexe no da simulação);
+  - tipos: sol, nublado, chuva ou tempestade (a partir de 30 mm), com a máxima do dia;
+  - calor e frio valem quando a máxima foge 3° do normal do mês e passa de 30° (ou fica abaixo de 8°).
+- **Histórico:** a cidade guarda a chuva dos últimos 30 dias e os dias seguidos sem chuva. É o que vai mover enchentes, secas e queimadas na etapa dos desastres.
+- **Previsão de 3 dias** na dica do tempo, no topo. Ela é o tempo de verdade que vem.
+  - Com a *Ciência do clima*: 7 dias e o risco de enchente e de seca do mês.
+- **Efeitos por enquanto:**
+  - dia de calor ou de frio gasta 10% mais energia (ar-condicionado, aquecimento);
+  - chuva espanta 40% dos turistas dos parques.
+- **Desenho:**
+  - céu fechado nos dias nublados e de chuva;
+  - sombras de nuvens passando pelo mapa;
+  - chuva caindo e relâmpagos na tempestade;
+  - grama amarelada depois de 15, 30 e 45 dias sem chuva.
+- **Saves antigos** (formato 22): ficam no clima subtropical, sem histórico de chuva.
+
 ## Ambiente
 
 Efeitos só visuais (nada vai para o save), animados em tempo real mesmo com o
@@ -918,7 +957,8 @@ Saves do formato 19 (antes das corridas de rua) abrem sem corridas marcadas.
 Saves do formato 20 (antes da zona mista) abrem sem mudança; o formato 21 só
 impede que uma versão antiga do jogo abra um save com prédios mistos.
 Saves do formato 21 (antes do relevo) ganham a altitude da semente, com a
-cidade já construída aplainada no nível 0.
+cidade já construída aplainada no nível 0. Saves do formato 22 (antes do
+clima) ficam no clima subtropical.
 
 Saves do formato 18 (antes da base) abrem com as escolinhas fechadas e sem propostas.
 
@@ -975,7 +1015,7 @@ src/world/              estado (world.js), catálogo de prédios, terreno, relev
                         índices derivados (runtime.js), ações do jogador,
                         textos das notícias (stories.js)
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes
-src/systems/            demanda, valor do terreno, energia e água, crescimento e níveis, empresas,
+src/systems/            demanda, clima e tempo (weather.js), valor do terreno, energia e água, crescimento e níveis, empresas,
                         economia, ordem dos sistemas
 src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa

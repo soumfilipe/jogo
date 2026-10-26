@@ -37,7 +37,7 @@
 //   { type: 'race', from, to, day?, name?, marketing?, annual? }  (corrida de rua; ver systems/races.js)
 //   { type: 'cancelRace', id } / { type: 'raceOptions', id, annual?, marketing? }
 
-import { BUILDINGS, COSTS, DENSITY, RELIEF, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
+import { BRIDGE, BUILDINGS, COSTS, DENSITY, RELIEF, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
 import { canBuildOn, isBuildable } from './world.js';
 import { slopeOf } from './relief.js';
@@ -84,6 +84,9 @@ export function planCommand(state, rt, cmd) {
   const buildings = new Set(); // prédios grandes ocupam vários tiles: conta uma vez
   const c = costs(rt);
   let cost = 0;
+  // Trechos de água da linha de rua viram pontes (ou a linha é recusada).
+  const bridges = cmd.type === 'road' ? planBridges(state, rt, cmd.tiles) : null;
+  if (bridges?.reason) return { tiles: [], cost: 0, reason: bridges.reason };
 
   for (const tile of new Set(cmd.tiles)) {
     if (tile < 0 || tile >= road.length) continue;
@@ -95,7 +98,8 @@ export function planCommand(state, rt, cmd) {
       if (!forest || park?.[tile] || road[tile] || rt.buildingAt[tile]) continue;
       cost += COSTS.park * mod(rt, 'buildCost');
     } else if (cmd.type === 'road') {
-      if (rt.buildingAt[tile] || !canBuildOn(state, tile)) continue;
+      const bridge = bridges.tiles.has(tile);
+      if (rt.buildingAt[tile] || (!bridge && !canBuildOn(state, tile))) continue;
       // O calçadão troca com qualquer rua (nos dois sentidos); entre as vias de
       // carro, só se melhora (avenida sobre expressa não piora a via).
       const pedestrian = ROAD_TYPES[roadType].pedestrian || ROAD_TYPES[road[tile]]?.pedestrian;
@@ -103,7 +107,9 @@ export function planCommand(state, rt, cmd) {
       // Rua nova paga o tipo inteiro; mudar uma rua paga só a diferença (no mínimo uma rua).
       cost += road[tile]
         ? Math.max(roadCost(rt, 1), roadCost(rt, roadType) - roadCost(rt, road[tile]))
-        : roadCost(rt, roadType) * slopeFactor(state, tile) + (forest ? c.clearForest : 0);
+        : bridge
+          ? roadCost(rt, roadType) + BRIDGE.cost * mod(rt, 'buildCost')
+          : roadCost(rt, roadType) * slopeFactor(state, tile) + (forest ? c.clearForest : 0);
     } else if (cmd.type === 'zone') {
       if (road[tile] || !isBuildable(state, tile)) continue;
       const sameZone = zone[tile] === cmd.zone;
@@ -322,6 +328,41 @@ export function applyCommand(state, rt, cmd) {
 }
 
 const zoneDensity = (cmd) => cmd.density ?? DENSITY.MEDIUM;
+/** Vão máximo de uma ponte (a Ponte estaiada aumenta). */
+export const bridgeSpan = (rt) => BRIDGE.maxSpan + mod(rt, 'bridgeSpan', 0);
+
+/**
+ * Pontes de uma linha de rua (os tiles em ordem, como lineTiles devolve):
+ * cada trecho de água precisa ser reto, ter terra nas duas pontas e caber no
+ * vão máximo. Devolve { tiles: Set dos tiles de ponte, reason? }.
+ */
+function planBridges(state, rt, list) {
+  const { terrain, width } = state.map;
+  const tiles = new Set();
+  const water = (t) => terrain[t] === TERRAIN.WATER;
+  const span = bridgeSpan(rt);
+  for (let i = 0; i < list.length; i++) {
+    if (!water(list[i])) continue;
+    let j = i;
+    while (j + 1 < list.length && water(list[j + 1])) j++;
+    const before = list[i - 1];
+    const after = list[j + 1];
+    if (before === undefined || after === undefined) return { tiles, reason: 'A ponte precisa começar e terminar em terra firme.' };
+    // Reto: o mesmo passo do começo ao fim, das margens inclusive.
+    const step = list[i] - before;
+    for (let k = i; k <= j + 1; k++) {
+      if (list[k] - list[k - 1] !== step) return { tiles, reason: 'A ponte precisa ser reta (sem curva sobre a água).' };
+    }
+    if (Math.abs(step) !== 1 && Math.abs(step) !== width) return { tiles, reason: 'A ponte precisa ser reta.' };
+    if (j - i + 1 > span) {
+      return { tiles, reason: `Vão de ${j - i + 1} tiles: o máximo é ${span}${span <= BRIDGE.maxSpan ? ' (pontes longas precisam da Ponte estaiada)' : ''}.` };
+    }
+    for (let k = i; k <= j; k++) tiles.add(list[k]);
+    i = j;
+  }
+  return { tiles };
+}
+
 /** Rua ou prédio em declive custa mais (ver RELIEF.slopeCost). */
 const slopeFactor = (state, tile) => 1 + (RELIEF.slopeCost * slopeOf(state.map, tile)) / RELIEF.maxStep;
 

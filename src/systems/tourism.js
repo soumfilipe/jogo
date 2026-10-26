@@ -20,6 +20,7 @@
 
 import { BUILDINGS, CULTURE, METRO, SPORTS, TOURISM } from '../world/catalog.js';
 import { CITIZEN_SPEED } from '../world/catalog.js';
+import { touristWeather } from './weather.js';
 import { MINUTES_PER_DAY, calendar } from '../core/time.js';
 import { randomInt } from '../core/rng.js';
 import { findRoadPath } from '../agents/pathfinding.js';
@@ -100,7 +101,8 @@ export function parkTourists(state, rt) {
   if (!park) return 0;
   let tiles = 0;
   for (let i = 0; i < park.length; i++) tiles += park[i];
-  return Math.round(tiles * TOURISM.parkAppeal * mod(rt, 'tourism'));
+  // Chuva espanta parte de quem vem ver a mata.
+  return Math.round(tiles * TOURISM.parkAppeal * mod(rt, 'tourism') * touristWeather(state));
 }
 
 /** Quartos de hotel com funcionários. */

@@ -6,7 +6,7 @@ import { advance, prepare } from '../src/systems/simulation.js';
 import { findRoadPath } from '../src/agents/pathfinding.js';
 import { applyCommand, lineTiles, planCommand, rectTiles } from '../src/world/commands.js';
 import { createWorld } from '../src/world/world.js';
-import { TERRAIN, ZONE, COSTS } from '../src/world/catalog.js';
+import { BRIDGE, TERRAIN, ZONE, COSTS } from '../src/world/catalog.js';
 import { createSave, readSave, checksum, encodeState } from '../src/save/format.js';
 import { testCity } from './helpers.js';
 import * as SHIFT_HELPERS from '../src/agents/citizens.js';
@@ -60,14 +60,18 @@ test('pathfinding segue as estradas e falha sem ligação', () => {
 test('comandos validam terreno, custo e dinheiro', () => {
   const state = createWorld({ width: 16, height: 16, seed: 3 });
   state.map.terrain.fill(TERRAIN.GRASS);
+  state.map.elevation.fill(0);
   state.map.terrain[2] = TERRAIN.WATER;
   state.map.terrain[3] = TERRAIN.FOREST;
   const rt = prepare(state);
   const tiles = lineTiles(16, 0, 0, 5, 0);
 
+  // A água entre duas margens vira ponte (mais cara).
   const plan = planCommand(state, rt, { type: 'road', tiles });
-  assert.equal(plan.tiles.length, 5, 'não constrói na água');
-  assert.equal(plan.cost, 5 * COSTS.road + COSTS.clearForest);
+  assert.equal(plan.tiles.length, 6, 'a água vira ponte');
+  assert.equal(plan.cost, 6 * COSTS.road + COSTS.clearForest + BRIDGE.cost);
+  // Linha que termina na água não constrói.
+  assert.match(planCommand(state, rt, { type: 'road', tiles: lineTiles(16, 0, 0, 2, 0) }).reason, /terra firme/);
 
   const before = state.economy.money;
   assert.ok(applyCommand(state, rt, { type: 'road', tiles }).ok);
