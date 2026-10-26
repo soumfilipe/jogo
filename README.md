@@ -187,6 +187,34 @@ faltam, está em [`docs/arvore-tecnologica.html`](docs/arvore-tecnologica.html)
   - o comércio rende 10% mais com os clientes de fora;
   - uma amostra desses carros (cinza-azulados) entra e sai pela borda de manhã e no fim da tarde.
 
+### Zona mista e uso misto do solo (etapa 4e-c)
+
+**Zona mista** (menu Zonas, liberada desde o começo, com densidade): prédios
+com **comércio no térreo e apartamentos em cima**. Não tem tecla de atalho.
+
+| Nível | Prédio | Moradores | Vagas no térreo |
+| --- | --- | --- | --- |
+| 1 | Sobrado com loja | 4 | 2 |
+| 2 | Prédio com lojas | 8 | 4 |
+| 3 | Edifício misto (ganha andares) | 16 | 8 |
+
+- Prédios mistos:
+  - Cresce com a **demanda residencial** e sobe de nível com as mesmas pesquisas
+    e valores do terreno da zona residencial. Andares a mais só somam moradores.
+  - O térreo é um comércio de bairro, sem empresas: as vagas contam na demanda
+    comercial (a zona comercial cresce menos) e os funcionários pagam o
+    **imposto comercial**. Os moradores pagam o residencial, como sempre.
+  - Energia e água: o consumo residencial dos moradores mais o comercial das vagas.
+  - O desenho é uma vitrine com toldo colorido e os apartamentos em cima. O
+    inspetor mostra moradores, vagas do térreo e quem trabalha nele.
+- *Uso misto do solo* (pesquisa) é o planejamento que tira proveito da mistura:
+  - quem mora num prédio misto e trabalha no térreo de outro a até 6 tiles
+    **vai a pé** (um pontinho na calçada), sem carro e sem pesar no trânsito;
+  - o terreno a até 2 tiles de um prédio misto vale 5% mais.
+- Numa cidade de teste de 6 meses, trocar duas faixas residenciais por mistas
+  deu população, empregos e receita um pouco maiores (~+2% de população, +0,5%
+  de receita); com a pesquisa, umas duas dezenas de pessoas vão a pé.
+
 ## Saúde, segurança, satisfação e leis
 
 Regras em `src/systems/services.js`, `wellbeing.js`, `fire.js` e `policies.js`;
@@ -576,6 +604,9 @@ da rua em que estão encostados (`src/systems/utilities.js`).
 | 3 | Prédio de apartamentos (16) | Escritórios (32) | Complexo industrial (30) |
 | Grande 2×2 | Condomínio (48) | Shopping (80) | Galpão logístico (70) |
 
+A zona mista tem os próprios prédios (moradia em cima, lojas no térreo): veja
+"Zona mista e uso misto do solo".
+
 - Um prédio 1×1 sobe um nível quando está **lotado**, o **valor do terreno** é
   suficiente (residencial 45% / 62%, comercial 45% / 60%; indústria não exige),
   a demanda da zona não está negativa e o nível já foi liberado pela pesquisa
@@ -848,6 +879,8 @@ letra por tile (`"19772,urrdd…"`). Uma cidade de 10 mil habitantes no pico da
 manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
 
 Saves do formato 19 (antes das corridas de rua) abrem sem corridas marcadas.
+Saves do formato 20 (antes da zona mista) abrem sem mudança; o formato 21 só
+impede que uma versão antiga do jogo abra um save com prédios mistos.
 
 Saves do formato 18 (antes da base) abrem com as escolinhas fechadas e sem propostas.
 

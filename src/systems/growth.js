@@ -40,7 +40,7 @@ export function growBuildings(state, rt) {
   const total = zone.length;
   const allowLarge = rt.stats.population >= LARGE_MIN_POPULATION;
   // Prédios grandes são de nível 3: dependem da tecnologia que libera o nível.
-  const largeUnlocked = (z) => levelUnlocked(rt, z, BUILDINGS[LARGE_BUILDINGS[z][0]].level);
+  const largeUnlocked = (z) => LARGE_BUILDINGS[z] && levelUnlocked(rt, z, BUILDINGS[LARGE_BUILDINGS[z][0]].level);
   const need = (info) => consumption(info, undefined, rt);
   // Licenciamento ambiental: indústria nova longe das casas.
   const buffer = mod(rt, 'industryBuffer', 0);
@@ -57,12 +57,13 @@ export function growBuildings(state, rt) {
     if (access < 0) continue;
     // Só cresce onde a rede tem energia e água sobrando para o prédio novo.
     if (!fits(state, rt, access, need(BUILDINGS[LEVELS[z][1][0]]))) continue;
-    if (buffer && z === ZONE.INDUSTRIAL && nearZone(state, tile, ZONE.RESIDENTIAL, buffer)) continue;
+    if (buffer && z === ZONE.INDUSTRIAL && (nearZone(state, tile, ZONE.RESIDENTIAL, buffer) || nearZone(state, tile, ZONE.MIXED, buffer))) continue;
     if (!chance(state.rng, GROW_CHANCE)) continue;
 
     let type = pick(state.rng, LEVELS[z][1]);
-    const large = pick(state.rng, LARGE_BUILDINGS[z]);
+    const large = LARGE_BUILDINGS[z] && pick(state.rng, LARGE_BUILDINGS[z]);
     if (
+      large &&
       allowLarge &&
       largeUnlocked(z) &&
       remaining[key] >= Math.min(capacity(BUILDINGS[large]) / 4, 8) &&
@@ -78,6 +79,7 @@ export function growBuildings(state, rt) {
     if (usesCompanies(BUILDINGS[type])) foundCompanies(state, rt, b);
     reserve(state, rt, access, need(BUILDINGS[type]));
     remaining[key] -= capacity(BUILDINGS[type]);
+    remaining.commercial -= BUILDINGS[type].shop ?? 0;
   }
 }
 

@@ -19,6 +19,7 @@ export const LIGHT_COLORS = {
   [ZONE.COMMERCIAL]: '#e9f3ff',
   [ZONE.INDUSTRIAL]: '#ffbf6b',
   [ZONE.RURAL]: '#ffd98a',
+  [ZONE.MIXED]: '#ffd98a',
   [ZONE.NONE]: '#ffe2a8', // serviços públicos
 };
 
@@ -50,7 +51,7 @@ export function windowSchedules(b, info, count) {
       out[o + 2 + i * 2] = Math.floor(end) % 1440;
     };
 
-    if (info.zone === ZONE.RESIDENTIAL) {
+    if (info.residents) {
       const on = H(17.5) + r(2) * H(2.5); //                  17h30 a 20h
       const nightOwl = r(6) < 0.08;
       const off = nightOwl ? H(2) + r(3) * H(2) : H(22) + r(3) * H(3.5); // 22h a 1h30 (ou 2h a 4h)

@@ -74,6 +74,8 @@ export const ICONS = {
   calcadao: '<circle cx="13" cy="4.5" r="1.8"/><path d="M12.5 8 10 13l3 2.5V21M10 13l-2.5 7.5M12.5 8l3.5 3.5 3 .5M12.5 8 9 9.5l-1.5 3"/>',
   residencial: '<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
   comercial: '<path d="M4 10.5V20h16v-9.5"/><path d="M3.5 4h17L22 9a2.5 2.5 0 0 1-5 .5 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0A2.5 2.5 0 0 1 2 9z"/><path d="M9.5 20v-5h5v5"/>',
+  // Mista: apartamentos com toldo de loja no térreo.
+  mista: '<path d="M5.5 20V3.5h13V20M3 20.5h18"/><path d="M8.5 7h2M13.5 7h2M8.5 10.5h2M13.5 10.5h2"/><path class="t" d="M4 13.5h16l-1.5 2.5h-13z"/><path d="M10.5 20v-3h3v3"/>',
   industrial: '<path d="M3 20.5V12l5-3v3l5-3v3l5-3V3.5h2.5v17zM2 20.5h20"/><path d="M6.5 16.5h1.5M10.5 16.5H12M14.5 16.5H16"/>',
   rural: `<path d="M12 21.5V5"/><path d="${ear(9)}${ear(13.5)}${ear(18)}"/><path d="M12 5V2.5"/>`,
   bulldoze: '<rect x="2.5" y="15.5" width="13" height="5" rx="2.5"/><path d="M4.5 15.5v-8h5l2 4h3.5v4M15.5 13.5h3"/><path class="t" d="M18.5 10v10.5l3-1V11z"/>',

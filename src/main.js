@@ -45,7 +45,7 @@ const TOOLS = [
   { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57', group: 'road' },
   { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047', group: 'road' },
   { id: 'calcadao', name: 'Calçadão', shape: 'line', road: 4, color: 'rgba(216,207,189,0.7)', swatch: '#d8cfbd', group: 'road' },
-  ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL].map((zone) => ({
+  ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.MIXED, ZONE.INDUSTRIAL, ZONE.RURAL].map((zone) => ({
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color, group: 'zone',
   })),
@@ -122,13 +122,15 @@ const MAP_MENU = [
   ['Cidade', ['valor', 'poluicao', 'satisfacao', 'escolaridade', 'desemprego']],
 ];
 // Ícone de cada ferramenta (src/ui/icons.js): o do prédio, da zona ou o id.
-const ZONE_ICON = { [ZONE.RESIDENTIAL]: 'residencial', [ZONE.COMMERCIAL]: 'comercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
+const ZONE_ICON = { [ZONE.RESIDENTIAL]: 'residencial', [ZONE.COMMERCIAL]: 'comercial', [ZONE.MIXED]: 'mista', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
 const toolIcon = (t) => (t.building === 'parque' ? 'praca' : t.building ?? ZONE_ICON[t.zone] ?? t.id);
 /** Ícone sobre a cor da ferramenta (a mesma do prédio ou da zona no mapa). */
 const glyph = (t) => `<span class="glyph" style="--c:${t.swatch};color:${inkFor(t.swatch)}">${icon(toolIcon(t))}</span>`;
 const DEMAND_KEY = {
   [ZONE.RESIDENTIAL]: 'residential', [ZONE.COMMERCIAL]: 'commercial',
   [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural',
+  // A mista cresce com a demanda residencial (o térreo ocupa parte da comercial).
+  [ZONE.MIXED]: 'residential',
 };
 
 /** Preço mostrado nos botões do painel "Construir" (celular). */
@@ -147,10 +149,10 @@ let rt;
 let cam;
 let speed = 1;
 let tool = TOOLS[1];
-// Densidade usada ao zonear residencial e comercial (tecla X troca).
+// Densidade usada ao zonear residencial, comercial e misto (tecla X troca).
 let density = DENSITY.MEDIUM;
 const DENSITY_KEY = 'x';
-const usesDensity = (t) => t.zone === ZONE.RESIDENTIAL || t.zone === ZONE.COMMERCIAL;
+const usesDensity = (t) => t.zone === ZONE.RESIDENTIAL || t.zone === ZONE.COMMERCIAL || t.zone === ZONE.MIXED;
 let dirty = false; // mudanças desde o último save manual
 let newsReset = true; // cidade nova ou carregada: as notícias que já existem contam como lidas
 let hover = null;
@@ -401,7 +403,7 @@ function menuSections(menu, extra = []) {
     nodes.push(title, grid);
     if (group === 'zone') {
       const dens = document.createElement('h4');
-      dens.innerHTML = `Densidade <small>residencial e comercial · tecla ${DENSITY_KEY.toUpperCase()}</small>`;
+      dens.innerHTML = `Densidade <small>residencial, comercial e mista · tecla ${DENSITY_KEY.toUpperCase()}</small>`;
       nodes.push(dens, densityButtons('density'));
     }
   }

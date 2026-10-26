@@ -6,7 +6,7 @@
 // e movimento (prédios em volta), e cai com a poluição das indústrias e dos
 // carros e com o barulho de avenidas e vias expressas.
 
-import { BUILDINGS, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
+import { BUILDINGS, MIXED, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
 import { mod, utilityPollution } from './mods.js';
 import { countOccupancy } from './traffic.js';
 import { computeWaste } from './waste.js';
@@ -34,6 +34,7 @@ export function computeLandValue(state, rt) {
   const commerce = new Float32Array(n);
   const activity = new Float32Array(n);
   const industry = new Float32Array(n);
+  const mixed = new Float32Array(n);
 
   // Rio poluído pelo esgoto vale menos como paisagem (e aparece no mapa de poluição).
   const river = computeSanitation(state, rt).river;
@@ -50,6 +51,11 @@ export function computeLandValue(state, rt) {
     const weight = info.level * info.size * info.size;
     activity[b.tile] += info.size * info.size;
     if (info.zone === ZONE.COMMERCIAL) commerce[b.tile] += weight;
+    // Térreo do prédio misto: comércio de bairro, conta pela metade.
+    if (info.shop) {
+      commerce[b.tile] += weight / 2;
+      mixed[b.tile] = 1;
+    }
     if (info.zone === ZONE.INDUSTRIAL) industry[b.tile] += weight * industryPollution;
     // Fazendas só poluem com adubo e agrotóxicos.
     if (info.zone === ZONE.RURAL) industry[b.tile] += weight * farmPollution;
@@ -99,6 +105,9 @@ export function computeLandValue(state, rt) {
   const pollutionSum = boxSum(industry, width, height, POLLUTION_RADIUS);
   const noiseSum = boxSum(noise, width, height, NOISE_RADIUS);
   const noiseMod = mod(rt, 'noise');
+  // Uso misto (pesquisa): o terreno perto dos prédios mistos valoriza.
+  const bonusMixed = mod(rt, 'mixedLand', 0);
+  const mixedSum = bonusMixed ? boxSum(mixed, width, height, MIXED.landRadius) : null;
 
   const { landValue, pollution } = rt;
   for (let i = 0; i < n; i++) {
@@ -112,7 +121,8 @@ export function computeLandValue(state, rt) {
       - Math.min(NOISE_MAX, noiseSum[i] * NOISE_WEIGHT) * noiseMod
       + bonusAll
       + signal[i]
-      + (zone[i] === ZONE.COMMERCIAL ? bonusCommercial : 0);
+      + (zone[i] === ZONE.COMMERCIAL ? bonusCommercial : 0)
+      + (mixedSum && mixedSum[i] > 0 ? bonusMixed : 0);
     landValue[i] = Math.min(1, Math.max(0, value));
   }
 }

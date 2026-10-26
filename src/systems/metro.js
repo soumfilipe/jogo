@@ -1,7 +1,7 @@
 // Região metropolitana (pesquisa `regiao_metropolitana`): com estrada saindo
 // do mapa, a cidade troca trabalhadores e clientes com as vizinhas.
-//   - trabalhadores de fora ocupam parte das vagas abertas do comércio e da
-//     indústria (contam no imposto dessas zonas, sem morar aqui);
+//   - trabalhadores de fora ocupam parte das vagas abertas do comércio (com o
+//     térreo dos prédios mistos) e da indústria (contam no imposto dessas zonas, sem morar aqui);
 //   - parte dos desempregados da cidade trabalha nas vizinhas (conta no
 //     imposto residencial e sai do desemprego);
 //   - clientes de fora: o comércio rende um pouco mais.
@@ -28,7 +28,7 @@ export function commutersIn(state, rt) {
   let open = 0;
   for (const b of state.buildings) {
     const zone = BUILDINGS[b.type].zone;
-    if (zone === ZONE.COMMERCIAL || zone === ZONE.INDUSTRIAL) open += openJobs(rt, b);
+    if (zone === ZONE.COMMERCIAL || zone === ZONE.INDUSTRIAL || zone === ZONE.MIXED) open += openJobs(rt, b);
   }
   if (!open) return { total: 0, ratio: 0 };
   const pool = METRO.pool + state.citizens.length * METRO.poolShare;

@@ -144,6 +144,8 @@ export function vacancies(rt, b) {
 export function openJobs(rt, b) {
   if (b.abandoned !== undefined) return 0;
   const info = BUILDINGS[b.type];
+  // Térreo do prédio misto: comércio de bairro, sem empresas.
+  if (info.shop) return info.shop - rt.workers.get(b.id).size;
   if (!info.jobs) return 0;
   if (!usesCompanies(info)) return capacityOf(b) - rt.workers.get(b.id).size;
   let open = 0;

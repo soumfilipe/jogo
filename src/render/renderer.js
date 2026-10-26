@@ -67,7 +67,7 @@ const ROAD_LINE = 'rgba(255, 255, 255, 0.35)';
 // Cor dos lotes vazios por zona e densidade: quanto mais densa, mais forte.
 const DENSITY_TINT = { [DENSITY.LOW]: 0.28, [DENSITY.MEDIUM]: 0.45, [DENSITY.HIGH]: 0.65 };
 const ZONE_TINT = {};
-for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL]) {
+for (const zone of [ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.INDUSTRIAL, ZONE.RURAL, ZONE.MIXED]) {
   ZONE_TINT[zone] = {};
   for (const [density, amount] of Object.entries(DENSITY_TINT)) {
     // A indústria e a zona rural não têm densidade: sempre a cor média.

@@ -15,7 +15,7 @@
 //   x, y:  posição em tiles (contínua),
 //   path:  tiles da viagem atual | null,   step: índice no path
 //   edu, field, school, stage, study: escolaridade e estudo (ver systems/education.js)
-//   mode:  transporte da viagem atual ('onibus', 'brt', 'vlt', 'metro'; null = carro)
+//   mode:  transporte da viagem atual ('onibus', 'brt', 'vlt', 'metro', 'pe' a pé; null = carro)
 //   talent: talento (0 a 1);  calling: vocação ('arte' | 'esporte' | null)
 //   artist?: id do artista (state.culture) quando é artista da cidade;
 //            fullTime?: vive da arte (true) ou do esporte ('esporte'): não procura emprego
@@ -28,7 +28,7 @@
 
 import { BUILDINGS, CITIZEN_SPEED, CULTURE, SECTORS, SHIFTS, TRAFFIC } from '../world/catalog.js';
 import { congestionFactor, countOccupancy, roadSpeed } from '../systems/traffic.js';
-import { chooseMode, payFare } from '../systems/transit.js';
+import { chooseMode, payFare, walksToWork } from '../systems/transit.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { pick, random, randomInt } from '../core/rng.js';
 import {
@@ -180,8 +180,9 @@ function processPathQueue(state, rt) {
       continue;
     }
     const [x, y] = tileCenter(state, from.tile);
-    // Transporte público, se a casa e o trabalho estão no raio de estações do mesmo modo.
-    const mode = chooseMode(rt, from, to);
+    // A pé (uso misto) ou transporte público, se a casa e o trabalho estão
+    // no raio de estações do mesmo modo.
+    const mode = walksToWork(state, rt, from, to) ? 'pe' : chooseMode(rt, from, to);
     if (mode) payFare(state, mode);
     Object.assign(c, { state: 'viajando', path: [from.tile, ...route, to.tile], step: 0, x, y, mode });
     rt.movers.add(c.id);

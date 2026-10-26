@@ -26,7 +26,7 @@ import { createNews } from '../systems/news.js';
 import { createSports } from '../systems/sports.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -263,6 +263,12 @@ const MIGRATIONS = {
   19: (save) => {
     save.data.sports.races ??= [];
     save.version = 20;
+    return save;
+  },
+  // v20 -> v21: zona mista (ZONE.MIXED) e prédios mistos. Nada muda nos
+  // dados; a versão nova só impede que um jogo antigo abra o save.
+  20: (save) => {
+    save.version = 21;
     return save;
   },
 };
