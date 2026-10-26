@@ -327,6 +327,14 @@ export const BUILDINGS = {
     name: 'Parque aquático', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 30,
     utility: { power: 0, water: 0, cost: 35_000, upkeep: 500, pollution: 0, income: 800, area: 'cultura', service: { kind: 'lazer', radius: 18, strength: 0.8 }, tourism: { appeal: 20, weekend: 120 } },
   },
+  // Conjunto habitacional (Habitação social): moradia pública colocada pelo
+  // jogador. Tem moradores como uma casa (zone residencial), mas não cresce
+  // nem sobe de nível; os moradores não pagam imposto residencial (aluguel
+  // social) e ficam mais satisfeitos.
+  conjunto_habitacional: {
+    name: 'Conjunto habitacional', zone: ZONE.RESIDENTIAL, level: 0, size: 2, residents: 120, jobs: 0,
+    utility: { power: 0, water: 0, cost: 40_000, upkeep: 600, pollution: 0, housing: { satisfaction: 0.08 } },
+  },
   hotel: {
     name: 'Hotel', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 20,
     utility: { power: 0, water: 0, cost: 12_000, upkeep: 200, pollution: 0, area: 'cultura', hotel: { rooms: 60 } },
@@ -842,6 +850,13 @@ export const SPORTS = {
   rivalTeams: ['Ferroviário', 'Operário', 'União', 'Atlético', 'Comercial', 'Guarani', 'Independente', 'Esporte Clube', 'Ypiranga', 'Industrial', 'Juventude', 'Palmeirense', 'Real', 'América', 'Botafogo', 'Náutico'],
   rivalCities: ['Vila Serrana', 'São Bento da Mata', 'Porto do Sul', 'Santa Clara do Rio', 'Campo Belo', 'Serra Azul', 'Lagoa Seca', 'Rio Claro do Norte', 'Monte Verde', 'Pedra Branca', 'Barra Funda', 'Vale do Sol', 'Bom Jardim', 'Três Pontes', 'Águas Claras', 'Nova Esperança', 'Porto Real', 'Cachoeira Alta', 'São Miguel', 'Santa Rita'],
 };
+
+// Região metropolitana (ver systems/metro.js): trabalhadores de fora ocupam
+// até `fill` das vagas abertas do comércio e da indústria, limitados a pool
+// + poolShare × população; `outShare` dos desempregados trabalha nas
+// vizinhas; o comércio rende ×customers com os clientes de fora; até
+// `visible` carros de cada lado aparecem nas ruas.
+export const METRO = { fill: 0.5, pool: 200, poolShare: 0.1, outShare: 0.5, customers: 1.1, visible: 150 };
 
 // Turismo (ver systems/tourism.js).
 // Notícias (ver systems/news.js): a imprensa da cidade transforma o que

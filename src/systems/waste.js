@@ -38,7 +38,7 @@ function center(state, b) {
 /** Lixo por dia de um prédio, sem a reciclagem. */
 export function wasteOf(rt, b) {
   const info = BUILDINGS[b.type];
-  if (info.utility || b.abandoned !== undefined) return 0;
+  if ((info.utility && !info.utility.housing) || b.abandoned !== undefined) return 0;
   const people = capacityOf(b);
   const per = info.residents ? WASTE.perResident : WASTE.perJob[ZONE_KEY[info.zone]] ?? 0;
   return people * per * mod(rt, 'waste');

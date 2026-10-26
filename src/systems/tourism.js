@@ -15,9 +15,10 @@
 //     until: minuto do dia em que vai embora, fan: torcedor da cidade?,
 //     event?: id do evento da agenda (ver agenda.js), match?: id do jogo (ver sports.js),
 //     race?: id da corrida de rua (ver races.js; corre o percurso com o ritmo `pace`),
+//     commute?: true para quem vem trabalhar de fora ou vai trabalhar fora (ver metro.js),
 //     state: 'indo' | 'visitando' | 'voltando', x, y, path, step }
 
-import { BUILDINGS, CULTURE, SPORTS, TOURISM, ZONE } from '../world/catalog.js';
+import { BUILDINGS, CULTURE, METRO, SPORTS, TOURISM, ZONE } from '../world/catalog.js';
 import { CITIZEN_SPEED } from '../world/catalog.js';
 import { MINUTES_PER_DAY, calendar } from '../core/time.js';
 import { randomInt } from '../core/rng.js';
@@ -28,6 +29,8 @@ import { mod } from './mods.js';
 import { eventsToday, venueOf } from './agenda.js';
 import { clubHomes, matchesToday } from './sports.js';
 import { raceWave, runnerPace, runnersToday } from './races.js';
+import { commutersIn, commutersOut } from './metro.js';
+import { openJobs } from '../world/runtime.js';
 
 export function createTourism() {
   return { plan: [] }; // { at: minuto do dia, dest, src, until, fan }
@@ -188,6 +191,23 @@ export function planDay(state, rt) {
     add(Math.round(fromOutside * scale), () => entries[randomInt(state.rng, 0, entries.length - 1)], false);
     if (homes.length) add(Math.round((total - fromOutside) * scale), () => rt.access.get(homes[randomInt(state.rng, 0, homes.length - 1)].id), true);
   }
+  // Região metropolitana: uma amostra de quem vem trabalhar de fora (das
+  // entradas até prédios com vagas) e de quem trabalha fora (das casas até a
+  // borda); chegam de manhã e voltam no fim da tarde.
+  if (entries.length) {
+    const sample = (n) => Math.min(METRO.visible, n);
+    const jobsAt = state.buildings.filter((b) => openJobs(rt, b) > 0 && rt.access.get(b.id) >= 0);
+    const inside = jobsAt.length ? sample(commutersIn(state, rt).total) : 0;
+    for (let i = 0; i < inside; i++) {
+      const b = jobsAt[randomInt(state.rng, 0, jobsAt.length - 1)];
+      plan.push({ at: randomInt(state.rng, 6 * 60 + 30, 8 * 60), dest: b.id, src: entries[randomInt(state.rng, 0, entries.length - 1)], until: randomInt(state.rng, 17 * 60, 18 * 60), fan: false, commute: true });
+    }
+    const leaving = homes.length ? sample(commutersOut(state, rt)) : 0;
+    for (let i = 0; i < leaving; i++) {
+      const home = homes[randomInt(state.rng, 0, homes.length - 1)];
+      plan.push({ at: randomInt(state.rng, 6 * 60, 7 * 60 + 30), dest: null, destTile: entries[randomInt(state.rng, 0, entries.length - 1)], src: rt.access.get(home.id), until: randomInt(state.rng, 17 * 60, 18 * 60), fan: false, commute: true });
+    }
+  }
   // Corredores: largam em ondas a partir das 7h e correm o percurso (as ruas estão fechadas).
   for (const r of races) {
     const until = SPORTS.race.closed[1] * 60 - 1;
@@ -253,6 +273,7 @@ export function updateVisitors(state, rt) {
     if (p.event) v.event = p.event;
     if (p.match) v.match = p.match;
     if (p.race) Object.assign(v, { race: p.race, pace: p.pace });
+    if (p.commute) v.commute = true;
     addVisitor(state, rt, v);
   }
 

@@ -7,6 +7,7 @@ import { leasedJobs, usesCompanies } from '../world/runtime.js';
 import { taxDemandShift } from './economy.js';
 import { mod } from './mods.js';
 import { ruralDemand } from './food.js';
+import { commutersOut } from './metro.js';
 
 // Quanto a satisfação média move a demanda residencial (de −15 a +15).
 const SATISFACTION_DEMAND = 30;
@@ -41,9 +42,13 @@ export function computeDemand(state, rt) {
     if (c.job !== null) employed++;
     else if (canWork(c)) unemployed++;
   }
+  // Região metropolitana: parte dos desempregados trabalha nas vizinhas.
+  const outside = commutersOut(state, rt);
+  unemployed -= outside;
+  employed += outside;
   const workforce = employed + unemployed;
   const jobs = commercialJobs + industrialJobs + ruralJobs + otherJobs;
-  const openJobs = jobs - employed;
+  const openJobs = jobs - (employed - outside); // quem trabalha fora não ocupa vaga daqui
 
   // Quanta gente quer vir morar aqui: vagas sobrando atraem, desemprego afasta,
   // imposto residencial alto afasta. A constante faz uma cidade vazia crescer.
@@ -67,6 +72,6 @@ export function computeDemand(state, rt) {
     // Fazendas: enquanto a cidade importa comida (ver food.js).
     rural: ruralDemand(state, rt) + taxDemandShift(state, 'rural') + mod(rt, 'demand.rural', 0),
   };
-  rt.stats = { population, housing, employed, unemployed, workforce, jobs, openJobs: Math.max(0, openJobs) };
+  rt.stats = { population, housing, employed, unemployed, outside, workforce, jobs, openJobs: Math.max(0, openJobs) };
   return rt.demand;
 }

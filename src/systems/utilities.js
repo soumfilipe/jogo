@@ -32,7 +32,8 @@ export const RESOURCES = ['power', 'water'];
  * aplica os modificadores da pesquisa (ex.: iluminação LED).
  */
 export function consumption(info, people = info.residents || info.jobs, rt = null) {
-  if (info.utility || !info.zone) return { power: 0, water: 0 };
+  // Prédios do jogador não consomem (menos o conjunto habitacional, que é casa).
+  if ((info.utility && !info.utility.housing) || !info.zone) return { power: 0, water: 0 };
   const per = CONSUMPTION[info.zone];
   const power = rt ? per.power * mod(rt, `consumption.${ZONE_KEY[info.zone]}`) : per.power;
   return { power: Math.ceil(people * power), water: Math.ceil(people * per.water) };
@@ -64,7 +65,7 @@ export function computeUtilities(state, rt) {
   for (const b of state.buildings) {
     const info = BUILDINGS[b.type];
     const net = netOf(b);
-    if (info.utility) {
+    if (info.utility && !info.utility.housing) {
       if (!net) continue;
       for (const res of RESOURCES) {
         if (!info.utility[res]) continue;
@@ -153,7 +154,7 @@ export function reserve(state, rt, access, need) {
 /** Prédio com energia e água (serviços públicos e fazendas funcionam sempre). */
 export function isServed(rt, b) {
   const info = BUILDINGS[b.type];
-  if (info.utility || info.zone === ZONE.RURAL) return true;
+  if ((info.utility && !info.utility.housing) || info.zone === ZONE.RURAL) return true;
   const s = rt.service?.get(b.id);
   return Boolean(s && s.power && s.water);
 }
@@ -169,7 +170,7 @@ export function applyUtilityEffects(state, rt) {
   const leaveShare = UNSERVED_LEAVE_SHARE * mod(rt, 'unservedLeave');
   for (const b of [...state.buildings]) {
     const info = BUILDINGS[b.type];
-    if (info.utility) continue;
+    if (info.utility && !info.utility.housing) continue;
 
     if (b.abandoned !== undefined) {
       if (tick - b.abandoned >= collapseTicks) removeBuilding(state, rt, b.id);
@@ -254,7 +255,7 @@ function fillMaps(state, rt, nets, imported) {
     for (const b of state.buildings) {
       const info = BUILDINGS[b.type];
       let v;
-      if (info.utility) v = info.utility[res] ? 1 : NaN;
+      if (info.utility && !info.utility.housing) v = info.utility[res] ? 1 : NaN;
       else if (b.abandoned !== undefined) v = 0;
       else v = rt.service.get(b.id)?.[res] ? 1 : 0;
       for (const t of footprint(state, b)) map[t] = v;
