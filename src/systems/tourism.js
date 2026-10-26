@@ -18,7 +18,7 @@
 //     commute?: true para quem vem trabalhar de fora ou vai trabalhar fora (ver metro.js),
 //     state: 'indo' | 'visitando' | 'voltando', x, y, path, step }
 
-import { BUILDINGS, CULTURE, METRO, SPORTS, TOURISM, ZONE } from '../world/catalog.js';
+import { BUILDINGS, CULTURE, METRO, SPORTS, TOURISM } from '../world/catalog.js';
 import { CITIZEN_SPEED } from '../world/catalog.js';
 import { MINUTES_PER_DAY, calendar } from '../core/time.js';
 import { randomInt } from '../core/rng.js';
@@ -162,7 +162,7 @@ export function planDay(state, rt) {
   state.tourism.today = { tourists: outside, fans: visits.reduce((s, v) => s + v.fans, 0) };
 
   const scale = wanted > TOURISM.maxVisitors ? TOURISM.maxVisitors / wanted : 1;
-  const homes = state.buildings.filter((b) => BUILDINGS[b.type].zone === ZONE.RESIDENTIAL && rt.access.get(b.id) >= 0);
+  const homes = state.buildings.filter((b) => BUILDINGS[b.type].residents && rt.access.get(b.id) >= 0);
   const plan = [];
   for (const v of visits) {
     const [a0, a1] = v.game ? TOURISM.gameArrive : TOURISM.arrive;

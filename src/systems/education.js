@@ -53,7 +53,8 @@ export function isFullTimeStudent(citizen) {
 /** Escolaridade mínima para trabalhar num tipo de prédio. */
 export function minEduFor(rt, type) {
   const info = BUILDINGS[type];
-  const key = ZONE_KEY[info.zone];
+  // O térreo do prédio misto emprega como o comércio.
+  const key = info.shop ? 'commercial' : ZONE_KEY[info.zone];
   let need;
   if (info.utility) need = EDUCATION.jobs.buildings[type] ?? EDU.NONE;
   else need = (EDUCATION.jobs[key]?.[info.level] ?? EDU.NONE)
@@ -230,7 +231,7 @@ function fillSchoolMap(state, rt, schools, free) {
   map.fill(NaN);
   const fundamental = schools.filter((s) => schoolStage(s.type) === 'fundamental');
   for (let t = 0; t < zone.length; t++) {
-    if (zone[t] !== ZONE.RESIDENTIAL) continue;
+    if (zone[t] !== ZONE.RESIDENTIAL && zone[t] !== ZONE.MIXED) continue;
     let v = 0;
     for (const s of fundamental) {
       if (!near(state, s, t, radiusOf(rt, s.type))) continue;

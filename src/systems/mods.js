@@ -32,6 +32,8 @@ export const ZONE_KEY = {
   [ZONE.COMMERCIAL]: 'commercial',
   [ZONE.INDUSTRIAL]: 'industrial',
   [ZONE.RURAL]: 'rural',
+  // A zona mista cresce como a residencial: mesmas pesquisas de nível e demanda.
+  [ZONE.MIXED]: 'residential',
 };
 
 export function computeMods(state, rt) {

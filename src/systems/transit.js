@@ -9,10 +9,23 @@
 // A cobertura não depende de funcionários (só de onde estão as estações),
 // para que a escolha do modo seja sempre a mesma depois de carregar um save.
 
-import { BUILDINGS, TRAFFIC } from '../world/catalog.js';
+import { BUILDINGS, MIXED, TRAFFIC } from '../world/catalog.js';
 import { mod } from './mods.js';
 
-export const TRANSIT_MODES = Object.keys(TRAFFIC.modes);
+// O modo "a pé" não tem estação (ver walksToWork).
+export const TRANSIT_MODES = Object.keys(TRAFFIC.modes).filter((m) => !TRAFFIC.modes[m].walk);
+
+/**
+ * Uso misto: mora num prédio misto e trabalha no térreo de um prédio misto
+ * perto (a até MIXED.walkRadius tiles)? Então vai a pé, sem carro. Vale nos
+ * dois sentidos da viagem.
+ */
+export function walksToWork(state, rt, home, work) {
+  if (mod(rt, 'mixedWalk', 0) <= 0 || !BUILDINGS[home.type].shop || !BUILDINGS[work.type].shop) return false;
+  const width = state.map.width;
+  const d = Math.abs((home.tile % width) - (work.tile % width)) + Math.abs(Math.floor(home.tile / width) - Math.floor(work.tile / width));
+  return d <= MIXED.walkRadius;
+}
 
 /** Raio de uma estação, com os modificadores (ex.: GPS nos ônibus). */
 export function transitRadius(rt, type) {
@@ -55,5 +68,6 @@ export function chooseMode(rt, from, to) {
 
 /** Passagem de uma viagem no modo (soma em state.economy.fares). */
 export function payFare(state, mode) {
+  if (!TRAFFIC.modes[mode].fare) return;
   state.economy.fares = (state.economy.fares ?? 0) + TRAFFIC.modes[mode].fare;
 }

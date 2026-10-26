@@ -25,7 +25,8 @@ import { effectiveWorkers, overloadedParents, productivity } from './childcare.j
 import { sportsSubsidy } from './sports.js';
 import { commutersIn, commutersOut, metroActive } from './metro.js';
 
-const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
+// O térreo do prédio misto paga como comércio (os moradores, no residencial).
+const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural', [ZONE.MIXED]: 'commercial' };
 
 export function monthlyBudget(state, rt) {
   const taxes = state.economy.taxes;

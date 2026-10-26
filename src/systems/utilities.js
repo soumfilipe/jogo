@@ -35,8 +35,15 @@ export function consumption(info, people = info.residents || info.jobs, rt = nul
   // Prédios do jogador não consomem (menos o conjunto habitacional, que é casa).
   if ((info.utility && !info.utility.housing) || !info.zone) return { power: 0, water: 0 };
   const per = CONSUMPTION[info.zone];
-  const power = rt ? per.power * mod(rt, `consumption.${ZONE_KEY[info.zone]}`) : per.power;
-  return { power: Math.ceil(people * power), water: Math.ceil(people * per.water) };
+  let power = people * (rt ? per.power * mod(rt, `consumption.${ZONE_KEY[info.zone]}`) : per.power);
+  let water = people * per.water;
+  // Prédio misto: o térreo consome como comércio.
+  if (info.shop) {
+    const shop = CONSUMPTION[ZONE.COMMERCIAL];
+    power += info.shop * (rt ? shop.power * mod(rt, 'consumption.commercial') : shop.power);
+    water += info.shop * shop.water;
+  }
+  return { power: Math.ceil(power), water: Math.ceil(water) };
 }
 
 /**

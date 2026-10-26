@@ -83,9 +83,10 @@ function renderBuilding(el, b, state, rt) {
       <dt>${info.residents ? 'Moradores' : 'Funcionários'}</dt><dd>${people.length} / ${capacity}</dd>
       ${info.residents ? `<dt>Crianças</dt><dd>${people.filter((c) => c.age < 18).length}</dd>`
         : `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>`}
+      ${info.shop ? `<dt>Comércio no térreo</dt><dd>${workers.length} / ${info.shop} vagas (estudo: ${EDU_NAMES[minEduFor(rt, b.type)].toLowerCase()})</dd>` : ''}
       ${wellbeingRows(rt, b)}
       ${info.residents ? parentsRow(state, rt, residents, b) : ''}
-      ${housing ? '' : `<dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>`}
+      ${housing ? '' : `<dt>Andares</dt><dd>${buildingFloors(b)} (${info.shop ? `térreo de lojas e ${info.perFloor} moradores por andar` : `${info.perFloor} por andar`})</dd>`}
       ${info.food ? `<dt>Produção</dt><dd>${Math.round(farmOutput(state, rt, b))} de ${Math.round(farmOutput(state, rt, b, true))} alimentos/mês</dd>` : ''}
       ${info.residents ? `<dt>Alimentos</dt><dd>${foodText(rt.coverage?.alimentos?.[b.tile] ?? 0)}</dd>` : ''}
       ${!housing && info.zone !== ZONE.INDUSTRIAL && info.zone !== ZONE.RURAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
@@ -100,6 +101,7 @@ function renderBuilding(el, b, state, rt) {
     </dl>
     <p class="muted">${next}</p>
     ${usesCompanies(info) ? companies(b, rt) : ''}
+    ${info.shop && workers.length ? `<p class="muted">No térreo: ${workers.map((c) => `<button class="link" data-citizen="${c.id}">${esc(c.name)}</button>`).join(', ')}</p>` : ''}
     <ul>${people.map((c) => `
       <li><button class="link" data-citizen="${c.id}">${esc(c.name)}</button>
           <small>${esc(activity(c))}</small></li>`).join('')}
@@ -107,7 +109,7 @@ function renderBuilding(el, b, state, rt) {
 }
 
 const NO = '<b style="color:#ff8a80">Não</b>';
-const MODE_TEXT = { onibus: 'de ônibus', brt: 'de BRT', vlt: 'de VLT', metro: 'de metrô' };
+const MODE_TEXT = { onibus: 'de ônibus', brt: 'de BRT', vlt: 'de VLT', metro: 'de metrô', pe: 'a pé' };
 
 // Carga: a indústria escoa por um terminal; o comércio pode ser abastecido.
 function freightRow(rt, b) {

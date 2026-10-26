@@ -28,6 +28,8 @@ export function computeDemand(state, rt) {
     const info = BUILDINGS[b.type];
     // Comércio e indústria: só contam as vagas das empresas (andar vago não emprega).
     const people = usesCompanies(info) ? leasedJobs(rt, b) : capacityOf(b);
+    // Térreo do prédio misto: vagas do comércio.
+    if (info.shop) commercialJobs += info.shop;
     if (info.residents) housing += people;
     else if (info.zone === ZONE.COMMERCIAL) commercialJobs += people;
     else if (info.zone === ZONE.INDUSTRIAL) industrialJobs += people;

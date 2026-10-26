@@ -911,7 +911,7 @@ const MECHANICS = {
   estatistica: ['Mapa', 'crescimento', 'Previsão da demanda RCI para 3 meses e os mapas de escolaridade e de desemprego.'],
   banco_desenvolvimento: ['Modificador', 'economia', 'Novo empréstimo de $250 mil em 60 parcelas (ECONOMY.loanOptions).'],
   plano_piloto: ['Ferramenta', 'crescimento economia', 'Bairro planejado (menu Zonas): ruas e zonas de um bairro inteiro de uma vez, 30% mais barato.'],
-  uso_misto: ['Zona', 'crescimento', 'Nova zona mista: moradia e comércio no mesmo prédio.'],
+  uso_misto: ['Modificador', 'crescimento cidadaos', 'Bairros mistos planejados: quem mora num prédio misto e trabalha no térreo de outro perto (6 tiles) vai a pé, sem carro, e o terreno em volta dos prédios mistos valoriza 5%.'],
   regiao_metropolitana: ['Modificador', 'crescimento cidadaos', 'Com estrada saindo do mapa: gente de fora ocupa vagas abertas, desempregados trabalham nas vizinhas e o comércio rende 10% mais.'],
   incentivo_pd: ['Política', 'politicas pesquisa economia', 'Lei: Comércio e indústria pagam 10% menos imposto e todos os escritórios fazem pesquisa.'],
   microcredito: ['Política', 'politicas crescimento', 'Lei: Pequenos negócios: mais demanda comercial.'],
@@ -1108,6 +1108,7 @@ export const EFFECTS = {
   plano_piloto: [{ mod: 'district', add: 1 }],
   // Região metropolitana: trabalhadores e clientes pela borda (ver systems/metro.js).
   regiao_metropolitana: [{ mod: 'metro', add: 1 }],
+  uso_misto: [{ mod: 'mixedWalk', add: 1 }, { mod: 'mixedLand', add: 0.05 }],
   impressao_3d: [{ mod: 'cost.conjunto_habitacional', mul: 0.6 }],
   baterias_rede: [{ unlock: 'bateria_rede' }],
   combate_epidemias: [{ mod: 'epidemicChance', mul: 0.5 }],

@@ -20,7 +20,7 @@
 // Tudo é derivado do estado (rt.wellbeing), menos a epidemia, que tem data
 // para acabar (state.health.epidemicUntil).
 
-import { BUILDINGS, CHILDCARE, ECONOMY, EDU, TOURISM, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
+import { BUILDINGS, CHILDCARE, ECONOMY, EDU, TOURISM, WELLBEING, capacityOf } from '../world/catalog.js';
 import { removeCitizen } from '../world/runtime.js';
 import { canWork } from '../agents/citizens.js';
 import { chance } from '../core/rng.js';
@@ -211,7 +211,7 @@ function fillMaps(state, rt) {
     // Censo: escolaridade média (0 a 1) e parte dos adultos empregados da casa.
     let edu = NaN;
     let jobs = NaN;
-    if (info.zone === ZONE.RESIDENTIAL) {
+    if (info.residents) {
       let n = 0;
       let sum = 0;
       let workers = 0;
@@ -232,7 +232,7 @@ function fillMaps(state, rt) {
         const t = b.tile + dy * width + dx;
         // O mapa de crime é "quanto mais verde, melhor": guarda 1 − crime.
         rt.crimeMap[t] = 1 - w.crime;
-        if (info.zone === ZONE.RESIDENTIAL) {
+        if (info.residents) {
           rt.healthMap[t] = w.health;
           rt.satisfactionMap[t] = w.satisfaction;
           rt.foodMap[t] = Math.min(1, rt.coverage?.alimentos?.[b.tile] ?? 0);

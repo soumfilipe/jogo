@@ -20,7 +20,7 @@ const BUS_LENGTH = 0.5;
 const PERSON = 0.07;
 
 // Cor dos veículos de cada modo de transporte público.
-export const MODE_COLORS = { onibus: '#e8b931', brt: '#c0392b', vlt: '#16a085' };
+export const MODE_COLORS = { onibus: '#e8b931', brt: '#c0392b', vlt: '#16a085', pe: '#f2e6d0' };
 
 // Turistas e torcedores (em dia de jogo).
 export const VISITOR_COLORS = { tourist: '#1abc9c', fan: '#e05a47', event: '#9b59b6', match: '#2ecc71', race: '#e67e22', commute: '#8fa3b8' };
@@ -64,8 +64,8 @@ export function moverPose(state, c) {
   dx /= norm;
   dy /= norm;
   // Com y crescendo "para baixo", a direita de (dx, dy) é (-dy, dx).
-  // No calçadão a pessoa anda a pé: um pontinho, mais perto do meio.
-  if (ROAD_TYPES[road[ty * width + tx]]?.pedestrian) {
+  // No calçadão (ou indo a pé ao trabalho) a pessoa é um pontinho, mais perto do meio.
+  if (c.mode === 'pe' || ROAD_TYPES[road[ty * width + tx]]?.pedestrian) {
     return { x: c.x - dy * 0.1, y: c.y + dx * 0.1, dx, dy, length: PERSON, width: PERSON, depth: tx + ty };
   }
   const length = c.mode ? BUS_LENGTH : CAR_LENGTH;

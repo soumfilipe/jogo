@@ -379,6 +379,31 @@ const GENERATORS = {
 const CROPS = ['#c9b456', '#9cbf5a', '#6f9a3f', '#d9c27a', '#8fae4a', '#b58a4a', '#7fa55a', '#c4a24a'];
 const BARNS = [wall('#a5402d', '#86321f'), wall('#c9b79c', '#ab9a80'), wall('#e6e2da', '#c9c4ba'), wall('#8a5a3a', '#6f472e')];
 
+// Prédio misto: térreo de vitrine com toldo (o comércio de bairro) e os
+// apartamentos em cima, com as cores do residencial. `n` conta o térreo.
+GENERATORS[ZONE.MIXED] = (info, r, n) => {
+  const w = r.pick(RES_WALLS);
+  const i = r.range(0.08, 0.16);
+  const parts = [];
+  parts.push(storeys([i * 0.6, i * 0.6, 1 - i * 0.6, 1 - i * 0.6], 0, 1, SHOP_FLOOR, r.chance(0.5) ? w : r.pick(COM_WALLS), {
+    windows: { cols: 3, style: 'shop' },
+    bands: [{ at: SHOP_FLOOR - 0.06, thick: 0.08, color: r.pick(ACCENTS) }],
+    sign: r.chance(0.6) ? { color: r.pick(ACCENTS) } : null,
+  }));
+  const up = Math.max(1, n - 1);
+  const m = info.level === 3 ? r.range(0.14, 0.22) : i;
+  const balcColor = info.level >= 2 && r.chance(0.5) ? mixHex(w.left, '#ffffff', 0.55) : null;
+  const roof = info.level === 1 || (info.level === 2 && r.chance(0.5)) ? pitchedRoof(r, r.pick(ROOFS)) : null;
+  const homes = storeys([m, m, 1 - m, 1 - m], SHOP_FLOOR, up, RES_FLOOR, w, {
+    roof,
+    windows: { cols: info.level === 1 ? 2 : 3, style: 'grid' },
+    bands: balcColor ? balconies(up, RES_FLOOR, balcColor) : [],
+  });
+  parts.push(homes);
+  if (!roof) parts.push(...rooftop(r, homes, ['tank', 'ac', 'garden', 'antenna', 'solar', 'none']));
+  return parts;
+};
+
 GENERATORS[ZONE.RURAL] = (info, r) => {
   const S = info.size;
   const parts = [{ kind: 'slab', box: [0.03, 0.03, S - 0.03, S - 0.03], color: r.pick(['#8a7a4a', '#7c6f45', '#93834f']), lift: 0 }];

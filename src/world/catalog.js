@@ -2,7 +2,7 @@
 
 export const TERRAIN = { GRASS: 0, WATER: 1, FOREST: 2, SAND: 3 };
 
-export const ZONE = { NONE: 0, RESIDENTIAL: 1, COMMERCIAL: 2, INDUSTRIAL: 3, RURAL: 4 };
+export const ZONE = { NONE: 0, RESIDENTIAL: 1, COMMERCIAL: 2, INDUSTRIAL: 3, RURAL: 4, MIXED: 5 };
 
 // Densidade de uma zona residencial ou comercial, escolhida pelo jogador ao
 // zonear (state.map.density, por tile). Limita até onde os prédios crescem:
@@ -22,6 +22,8 @@ export const ZONE_INFO = {
   [ZONE.COMMERCIAL]: { name: 'Comercial', color: '#4f8ff7', key: 'c' },
   [ZONE.INDUSTRIAL]: { name: 'Industrial', color: '#e8b931', key: 'i' },
   [ZONE.RURAL]: { name: 'Rural', color: '#a3843f', key: 'f' },
+  // Mista: apartamentos com comércio no térreo (sem tecla: o teclado está cheio).
+  [ZONE.MIXED]: { name: 'Mista', color: '#3fb5a3' },
 };
 
 // Prédios que crescem sozinhos nas zonas.
@@ -31,6 +33,11 @@ export const ZONE_INFO = {
 //   jobs:      quantas vagas de emprego
 //   perFloor:  quantas pessoas cabem num andar; o número de andares sai da
 //              capacidade, 1 pessoa = 1 cidadão (ver floorsOf)
+//   shop:      vagas do comércio no térreo (zona mista): o prédio tem
+//              moradores em cima e esse térreo, sem empresas, que conta como
+//              comércio no imposto e na demanda. O prédio misto cresce com a
+//              demanda residencial; as vagas do térreo ocupam parte da
+//              comercial (a zona comercial cresce menos)
 //   tall:      cresce andar por andar depois de pronto, até o limite da
 //              densidade da zona (residents/jobs são a capacidade inicial;
 //              cada andar a mais soma perFloor, ver capacityOf). A aparência
@@ -52,6 +59,17 @@ export const BUILDINGS = {
   },
   condominio: {
     name: 'Condomínio', zone: ZONE.RESIDENTIAL, level: 3, size: 2, residents: 48, jobs: 0, perFloor: 8, tall: true,
+  },
+
+  // --- Misto: apartamentos em cima, comércio no térreo -----------------------
+  misto_sobrado: {
+    name: 'Sobrado com loja', zone: ZONE.MIXED, level: 1, size: 1, residents: 4, jobs: 0, perFloor: 4, shop: 2,
+  },
+  misto_predio: {
+    name: 'Prédio com lojas', zone: ZONE.MIXED, level: 2, size: 1, residents: 8, jobs: 0, perFloor: 4, shop: 4,
+  },
+  misto_torre: {
+    name: 'Edifício misto', zone: ZONE.MIXED, level: 3, size: 1, residents: 16, jobs: 0, perFloor: 4, shop: 8, tall: true,
   },
 
   // --- Comercial -------------------------------------------------------------
@@ -439,7 +457,8 @@ export const BUILDINGS = {
  */
 export function floorsOf(info) {
   if (!info.perFloor) return 0;
-  return Math.ceil((info.residents || info.jobs) / info.perFloor);
+  // O térreo comercial do prédio misto é um andar a mais, sem moradores.
+  return Math.ceil((info.residents || info.jobs) / info.perFloor) + (info.shop ? 1 : 0);
 }
 
 /** Andares de um prédio já construído (os do tipo, mais os que cresceu). */
@@ -488,7 +507,14 @@ export const CONSUMPTION = {
   [ZONE.INDUSTRIAL]: { power: 2.2, water: 1.4 },
   // Fazendas ficam fora da rede (ver isServed).
   [ZONE.RURAL]: { power: 0, water: 0 },
+  // Mista: os moradores consomem como residencial (o térreo soma o comercial).
+  [ZONE.MIXED]: { power: 1, water: 1.2 },
 };
+
+// Uso misto (pesquisa `uso_misto`): quem mora num prédio misto e trabalha no
+// térreo de outro a até walkRadius tiles vai a pé; o terreno a até landRadius
+// tiles de um prédio misto ganha o bônus do mod `mixedLand`.
+export const MIXED = { walkRadius: 6, landRadius: 2 };
 
 // Prédio sem energia ou água: a cada dia perde esta fração dos moradores ou
 // funcionários; vazio por ABANDON_AFTER_DAYS dias vira abandonado, e
@@ -515,6 +541,7 @@ export const LAND_VALUE_FOR_LEVEL = {
   [ZONE.COMMERCIAL]: { 2: 0.45, 3: 0.6 },
   [ZONE.INDUSTRIAL]: { 2: 0, 3: 0 },
   [ZONE.RURAL]: { 2: 0, 3: 0 },
+  [ZONE.MIXED]: { 2: 0.45, 3: 0.6 },
 };
 
 // Dias mínimos entre uma mudança de nível e a próxima.
@@ -555,6 +582,8 @@ export const TRAFFIC = {
     brt: { name: 'BRT', speed: 1.3, ignoresTraffic: true, fare: 0.05 },
     vlt: { name: 'VLT', speed: 1.4, ignoresTraffic: true, fare: 0.05 },
     metro: { name: 'Metrô', speed: 2, ignoresTraffic: true, fare: 0.06 },
+    // A pé (uso misto): não é transporte público, não ocupa a rua nem paga.
+    pe: { name: 'A pé', speed: 0.5, ignoresTraffic: true, fare: 0, walk: true },
   },
   // Poluição de um carro parado num tile (somada à da indústria no mapa).
   carPollution: 0.033,
