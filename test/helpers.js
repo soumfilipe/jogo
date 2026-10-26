@@ -11,6 +11,7 @@ import { prepare } from '../src/systems/simulation.js';
 export function testCity({ size = 48, seed = 1234, utilities = true } = {}) {
   const state = createWorld({ name: 'Teste', width: size, height: size, seed });
   state.map.terrain.fill(TERRAIN.GRASS);
+  state.map.elevation.fill(0); // plana: os testes não tratam do relevo
   if (utilities) state.utilities.imported = { power: true, water: true };
   state.economy.money = 1_000_000;
   const rt = prepare(state);

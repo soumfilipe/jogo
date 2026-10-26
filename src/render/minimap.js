@@ -2,7 +2,8 @@
 // ângulo da vista isométrica. Mostra o retângulo da câmera e permite clicar
 // para ir até um ponto.
 
-import { TERRAIN, ZONE_INFO } from '../world/catalog.js';
+import { RELIEF, TERRAIN, ZONE_INFO } from '../world/catalog.js';
+import { tileHeight } from '../world/relief.js';
 import { screenToWorld } from './camera.js';
 import { designFor } from './designs.js';
 
@@ -71,7 +72,7 @@ export class Minimap {
   }
 
   #paintSource(state, rt) {
-    const { width, height, terrain, road, zone } = state.map;
+    const { width, height, terrain, road, zone, elevation } = state.map;
     this.source.width = width;
     this.source.height = height;
     const sctx = this.source.getContext('2d');
@@ -79,6 +80,11 @@ export class Minimap {
     const px = image.data;
     for (let i = 0; i < width * height; i++) {
       let rgb = TERRAIN_RGB[terrain[i]];
+      // Relevo: mais claro no alto.
+      if (elevation && terrain[i] !== TERRAIN.WATER) {
+        const k = 0.88 + (0.3 * tileHeight(state.map, i)) / RELIEF.maxLevel;
+        rgb = rgb.map((v) => Math.min(255, v * k));
+      }
       if (road[i]) rgb = ROAD_RGB;
       else if (rt.buildingAt[i]) rgb = hexToRgb(designFor(rt.buildingById.get(rt.buildingAt[i])).color);
       else if (zone[i]) rgb = hexToRgb(ZONE_INFO[zone[i]].color).map((v, k) => (v + TERRAIN_RGB[0][k]) / 2);

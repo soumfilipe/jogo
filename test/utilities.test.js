@@ -48,6 +48,7 @@ test('com energia e água a cidade cresce, e o consumo cabe na produção', () =
 test('regras para colocar serviços públicos', () => {
   const state = createWorld({ width: 20, height: 20, seed: 4 });
   state.map.terrain.fill(TERRAIN.GRASS);
+  state.map.elevation.fill(0);
   const rt = prepare(state);
   const w = 20;
   applyCommand(state, rt, { type: 'road', tiles: lineTiles(w, 0, 5, 19, 5) });

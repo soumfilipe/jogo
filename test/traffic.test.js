@@ -22,6 +22,7 @@ const W = 60;
 function town() {
   const state = createWorld({ width: W, height: W, seed: 5 });
   state.map.terrain.fill(TERRAIN.GRASS);
+  state.map.elevation.fill(0);
   state.utilities.imported = { power: true, water: true };
   state.economy.money = 10_000_000;
   const rt = prepare(state);

@@ -6,6 +6,7 @@
 import { hash2 } from '../core/rng.js';
 import { worldToScreen } from './camera.js';
 import { ROAD_TYPES } from '../world/catalog.js';
+import { heightAt } from '../world/relief.js';
 
 export const CAR_COLORS = [
   '#d64541', '#e8eaed', '#b8bcc4', '#3b3f46', '#2f6fd1', '#f2c230',
@@ -66,24 +67,24 @@ export function moverPose(state, c) {
   // Com y crescendo "para baixo", a direita de (dx, dy) é (-dy, dx).
   // No calçadão (ou indo a pé ao trabalho) a pessoa é um pontinho, mais perto do meio.
   if (c.mode === 'pe' || ROAD_TYPES[road[ty * width + tx]]?.pedestrian) {
-    return { x: c.x - dy * 0.1, y: c.y + dx * 0.1, dx, dy, length: PERSON, width: PERSON, depth: tx + ty };
+    return { x: c.x - dy * 0.1, y: c.y + dx * 0.1, h: heightAt(state.map, c.x, c.y), dx, dy, length: PERSON, width: PERSON, depth: tx + ty };
   }
   const length = c.mode ? BUS_LENGTH : CAR_LENGTH;
-  return { x: c.x - dy * LANE_OFFSET, y: c.y + dx * LANE_OFFSET, dx, dy, length, depth: tx + ty };
+  return { x: c.x - dy * LANE_OFFSET, y: c.y + dx * LANE_OFFSET, h: heightAt(state.map, c.x, c.y), dx, dy, length, depth: tx + ty };
 }
 
 /** Adiciona ao `path` o carrinho (um retângulo no chão, alinhado à rua). */
 export function addCar(path, cam, pose) {
-  const { x, y, dx, dy, length = CAR_LENGTH, width = CAR_WIDTH } = pose;
+  const { x, y, h = 0, dx, dy, length = CAR_LENGTH, width = CAR_WIDTH } = pose;
   const lx = dx * length / 2;
   const ly = dy * length / 2;
   const wx = -dy * width / 2;
   const wy = dx * width / 2;
   const corners = [
-    worldToScreen(cam, x + lx + wx, y + ly + wy),
-    worldToScreen(cam, x + lx - wx, y + ly - wy),
-    worldToScreen(cam, x - lx - wx, y - ly - wy),
-    worldToScreen(cam, x - lx + wx, y - ly + wy),
+    worldToScreen(cam, x + lx + wx, y + ly + wy, h),
+    worldToScreen(cam, x + lx - wx, y + ly - wy, h),
+    worldToScreen(cam, x - lx - wx, y - ly - wy, h),
+    worldToScreen(cam, x - lx + wx, y - ly + wy, h),
   ];
   // Levanta um pouco do chão para parecer ter volume.
   const lift = 2 * cam.zoom;

@@ -3,7 +3,8 @@
 // coloca as partes de trás para frente e de baixo para cima).
 
 import { BUILDINGS } from '../world/catalog.js';
-import { TILE_H, TILE_W } from './iso.js';
+import { LEVEL_PX, TILE_H, TILE_W } from './iso.js';
+import { lotBase } from '../world/relief.js';
 import { worldToScreen } from './camera.js';
 import { designFor, mixHex } from './designs.js';
 
@@ -20,23 +21,38 @@ export const MAX_FLOORS = 6;
  * Geometria do prédio na tela: as partes projetadas, o centro de cada janela
  * (na ordem fixa usada para sortear as luzes) e os contornos das partes.
  */
-export function buildingGeometry(cam, x, y, b) {
+export function buildingGeometry(cam, x, y, b, map = null) {
   const info = BUILDINGS[b.type];
   const design = designFor(b);
   const z = cam.zoom;
+  // Relevo: o prédio fica na altura média do lote (em "andares" de TILE_H).
+  const [low, top] = map ? lotBase(map, b.tile, info.size) : [0, 0];
+  const base = (top * LEVEL_PX) / TILE_H;
   const P = (wx, wy, floors) => {
     const [sx, sy] = worldToScreen(cam, x + wx, y + wy);
-    return [sx, sy - floors * TILE_H * z];
+    return [sx, sy - (floors + base) * TILE_H * z];
   };
   const parts = design.parts.map((part) => project(part, P, z));
+  // Lote inclinado: fundação de concreto do canto mais baixo até a base.
+  if (low < top) parts.unshift(project(foundation(info.size, ((top - low) * LEVEL_PX) / TILE_H), P, z));
   const windows = [];
   for (const p of parts) if (p.windows) windows.push(...p.windows.centers);
   return { info, design, parts, windows, z };
 }
 
+/** Muro de arrimo sob o prédio em terreno inclinado, com `depth` andares de altura. */
+function foundation(size, depth) {
+  return {
+    kind: 'block', box: [0, 0, size, size], lift: -depth, h: depth,
+    wall: FOUNDATION, top: FOUNDATION_TOP, roof: null, floors: null, windows: null, bands: [], doors: null, sign: null,
+  };
+}
+const FOUNDATION = { left: '#a8a296', right: '#8d877c' };
+const FOUNDATION_TOP = '#b9b3a6';
+
 /** Desenha o prédio `b` cujo canto superior está no tile (x, y). */
-export function drawBuilding(ctx, cam, x, y, b) {
-  const g = buildingGeometry(cam, x, y, b);
+export function drawBuilding(ctx, cam, x, y, b, map = null) {
+  const g = buildingGeometry(cam, x, y, b, map);
   for (const p of g.parts) DRAW[p.kind](ctx, p, g.z);
   return g;
 }

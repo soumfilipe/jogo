@@ -9,13 +9,14 @@
 //
 // Para ficar rápido, tiles da mesma cor são agrupados num único Path2D.
 
-import { BUILDINGS, DENSITY, FOREST, ROAD_TYPES, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
+import { BUILDINGS, DENSITY, FOREST, RELIEF, ROAD_TYPES, TERRAIN, ZONE, ZONE_INFO, capacityOf } from '../world/catalog.js';
+import { heightAt } from '../world/relief.js';
 import { hash2 } from '../core/rng.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { frontTile } from '../world/runtime.js';
 import { screenToWorld, visibleRange, worldToScreen } from './camera.js';
 import { MAX_FLOORS, addSilhouette, drawBuilding, windowSize } from './buildings.js';
-import { TILE_H, TILE_W } from './iso.js';
+import { LEVEL_PX, TILE_H, TILE_W } from './iso.js';
 import { addCar, carColor, moverPose, visitorColor } from './movers.js';
 import { LIGHT_COLORS, darkness, isLit, windowSchedules } from './lights.js';
 import { TRUNK, treesFor, waterDepth } from './nature.js';
@@ -58,6 +59,9 @@ const WAVE_GROUPS = 4;
 // Chão da mata, de rala a fechada.
 const FOREST_GROUNDS = ['#6aa452', '#609b4b', '#578f45', '#4e843f'];
 const SAND = '#d9c98f';
+// Barranco na borda do mapa (lado esquerdo e direito) e até onde ele desce.
+const EDGE_COLORS = ['#8a6a48', '#6f5439'];
+const EDGE_DEPTH = -3;
 // Chão dos parques de conservação (mata protegida).
 const PARK_GROUND = '#3f8a52';
 // Rua, avenida e via expressa (ver ROAD_TYPES): quanto mais larga, mais
@@ -113,6 +117,9 @@ export const MAP_MODES = {
     legend: { low: 'Sem escolaridade', high: 'Pós-graduação', note: 'Escolaridade média dos moradores de cada casa.' } },
   desemprego: { name: 'Desemprego', layer: 'jobsMap', tech: 'estatistica', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
     legend: { low: 'Muito desemprego', high: 'Todos empregados', note: 'Adultos que podem trabalhar e estão empregados, por casa.' } },
+  // Relevo: altura do chão; as encostas íngremes (sem rua nem prédio) em vermelho.
+  relevo: { name: 'Relevo', layer: 'reliefMap', steep: '#c0392b', from: '#3f7f3b', mid: '#c9b458', to: '#f4efe6',
+    legend: { low: 'Baixada', high: 'Alto do morro', note: 'Em vermelho, encostas íngremes demais para rua e prédio (aplaine com a terraplanagem).' } },
   // Trânsito: só as ruas mudam de cor (verde livre, vermelho parado).
   transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
     legend: { low: 'Parado', high: 'Livre', note: 'Só as ruas mudam de cor.' } },
@@ -350,7 +357,7 @@ export class Renderer {
       const r = {
         // Em pixels inteiros: o recorte não deixa emendas visíveis.
         x0: Math.max(0, Math.floor(left - DIRTY_PAD)),
-        y0: Math.max(0, Math.floor(top - MAX_FLOORS * TILE_H * z - DIRTY_PAD)),
+        y0: Math.max(0, Math.floor(top - (MAX_FLOORS * TILE_H + RELIEF.maxLevel * LEVEL_PX) * z - DIRTY_PAD)),
         x1: Math.min(cam.viewW, Math.ceil(right + DIRTY_PAD)),
         y1: Math.min(cam.viewH, Math.ceil(bottom + DIRTY_PAD)),
       };
@@ -475,6 +482,9 @@ export class Renderer {
     const glints = [];
     // Pequena sobreposição evita frestas entre losangos vizinhos.
     const pad = 0.5;
+    const elev = state.map.elevation;
+    const EW = width + 1;
+    const edges = { left: [], right: [] };
 
     const ground = (x, y) => {
       const tile = y * width + x;
@@ -483,7 +493,8 @@ export class Renderer {
       if (traffic !== undefined && !Number.isNaN(traffic)) color = mode.colors[Math.round(traffic * MAP_STEPS)];
       else if (road[tile]) color = ROAD_COLORS[road[tile]];
       else if (mode && !mode.roads && (mode.water || terrain[tile] !== TERRAIN.WATER) && !Number.isNaN(rt[mode.layer][tile])) {
-        color = mode.colors[Math.round(rt[mode.layer][tile] * MAP_STEPS)];
+        const v = rt[mode.layer][tile];
+        color = v < 0 && mode.steep ? mode.steep : mode.colors[Math.round(v * MAP_STEPS)];
       }
       else if (zone[tile] && !rt.buildingAt[tile]) color = ZONE_TINT[zone[tile]][state.map.density[tile]];
       else if (terrain[tile] === TERRAIN.WATER) {
@@ -495,15 +506,45 @@ export class Renderer {
       }
       else color = GRASS[Math.floor(hash2(x, y, 1) * GRASS.length)];
 
+      // Relevo: os 4 cantos na altura deles; a luz vem do alto à esquerda,
+      // então a encosta virada para lá clareia e a do outro lado escurece.
+      const ci = y * EW + x;
+      const hT = elev ? elev[ci] : 0;
+      const hR = elev ? elev[ci + 1] : 0;
+      const hB = elev ? elev[ci + EW + 1] : 0;
+      const hL = elev ? elev[ci + EW] : 0;
+      if (elev && terrain[tile] !== TERRAIN.WATER) {
+        // Inclinação suavizada em 3 tiles (sem o xadrez dos degraus) e um
+        // pouco mais claro no alto.
+        const e = (cx, cy) => elev[Math.min(height, Math.max(0, cy)) * EW + Math.min(width, Math.max(0, cx))];
+        const gx = (e(x + 2, y) + e(x + 2, y + 1) - e(x - 1, y) - e(x - 1, y + 1)) / 6;
+        const gy = (e(x, y + 2) + e(x + 1, y + 2) - e(x, y - 1) - e(x + 1, y - 1)) / 6;
+        const s = Math.round((gx * 1.4 - gy * 0.6) * 1.2 + (hT + hB) / 2 / RELIEF.maxLevel * 2);
+        if (s) color = shadeColor(color, Math.max(-6, Math.min(6, s)));
+      }
       let path = paths.get(color);
       if (!path) paths.set(color, (path = new Path2D()));
-      const [tx, ty] = worldToScreen(cam, x, y);
-      const hw = 32 * z + pad;
-      const hh = 16 * z + pad / 2;
+      // Os outros cantos saem do de cima (sem criar arrays: são dezenas de milhares de tiles).
+      const [tx, ty] = worldToScreen(cam, x, y, hT);
+      const up = LEVEL_PX * z;
+      const rx = tx + 32 * z;
+      const ry = ty + 16 * z - (hR - hT) * up;
+      const bx = tx;
+      const by = ty + 32 * z - (hB - hT) * up;
+      const lx = tx - 32 * z;
+      const ly = ty + 16 * z - (hL - hT) * up;
       path.moveTo(tx, ty - pad / 2);
-      path.lineTo(tx + hw, ty + hh);
-      path.lineTo(tx, ty + 2 * hh);
-      path.lineTo(tx - hw, ty + hh);
+      path.lineTo(rx + pad, ry);
+      path.lineTo(bx, by + pad / 2);
+      path.lineTo(lx - pad, ly);
+      // Borda do mapa: um barranco de terra até abaixo do nível da água.
+      if (elev && (x === width - 1 || y === height - 1)) {
+        const [r0x, r0y] = worldToScreen(cam, x + 1, y, EDGE_DEPTH);
+        const [b0x, b0y] = worldToScreen(cam, x + 1, y + 1, EDGE_DEPTH);
+        const [l0x, l0y] = worldToScreen(cam, x, y + 1, EDGE_DEPTH);
+        if (x === width - 1) edges.right.push([rx, ry, bx, by, b0x, b0y, r0x, r0y]);
+        if (y === height - 1) edges.left.push([lx, ly, bx, by, b0x, b0y, l0x, l0y]);
+      }
       // Sem closePath: com dezenas de milhares de losangos no mesmo caminho,
       // closePath fica lento no Chromium; o fill fecha cada contorno sozinho.
 
@@ -538,10 +579,12 @@ export class Renderer {
     let groundTiles;
     let objectTiles;
     if (partial) {
-      groundTiles = tilesUnder(cam, rects, width, height, 0, 0);
+      // Com relevo, tiles mais abaixo sobem até RELIEF.maxLevel níveis na tela.
+      const rise = RELIEF.maxLevel * LEVEL_PX * z;
+      groundTiles = tilesUnder(cam, rects, width, height, rise, 0);
       // Prédios altos de tiles mais abaixo e prédios 2x2 ao lado também
       // podem encostar nos retângulos.
-      objectTiles = [...tilesUnder(cam, rects, width, height, MAX_FLOORS * TILE_H * z, TILE_W * z)]
+      objectTiles = [...tilesUnder(cam, rects, width, height, MAX_FLOORS * TILE_H * z + rise, TILE_W * z)]
         .sort((a, b) => diag(a, width) - diag(b, width) || a - b);
       for (const tile of groundTiles) ground(tile % width, Math.floor(tile / width));
     } else {
@@ -562,6 +605,16 @@ export class Renderer {
     for (const [color, path] of [...paths].sort((p, q) => (p[0] < q[0] ? -1 : 1))) {
       ctx.fillStyle = color;
       ctx.fill(path);
+    }
+    for (const [side, color] of [['left', EDGE_COLORS[0]], ['right', EDGE_COLORS[1]]]) {
+      if (!edges[side].length) continue;
+      const wall = new Path2D();
+      for (const q of edges[side]) {
+        wall.moveTo(q[0], q[1]);
+        for (let k = 2; k < 8; k += 2) wall.lineTo(q[k], q[k + 1]);
+      }
+      ctx.fillStyle = color;
+      ctx.fill(wall);
     }
     ctx.strokeStyle = FOAM;
     ctx.lineWidth = Math.max(1, 2 * z);
@@ -594,7 +647,7 @@ export class Renderer {
       if (id) {
         const b = rt.buildingById.get(id);
         if (tile !== frontTile(state, b)) continue;
-        const g = drawBuilding(ctx, cam, b.tile % width, Math.floor(b.tile / width), b);
+        const g = drawBuilding(ctx, cam, b.tile % width, Math.floor(b.tile / width), b, state.map);
         const outline = new Path2D();
         addSilhouette(outline, g);
         // Guardado para as luzes e para esconder os carros atrás do prédio.
@@ -616,7 +669,7 @@ export class Renderer {
           trees = new TreeBatch();
           treesDiag = d;
         }
-        for (const tree of list) trees.add(cam, x, y, tree);
+        for (const tree of list) trees.add(cam, x, y, tree, state.map);
       }
     }
     if (trees) trees.flush(ctx);
@@ -674,14 +727,14 @@ export class Renderer {
   #drawTiles(ctx, state, cam, tiles, color) {
     const width = state.map.width;
     const path = new Path2D();
-    for (const tile of tiles) diamond(path, cam, tile % width, Math.floor(tile / width), 0);
+    for (const tile of tiles) diamond(path, cam, tile % width, Math.floor(tile / width), 0, 1, state.map);
     ctx.fillStyle = color;
     ctx.fill(path);
   }
 
   #outlineTile(ctx, state, cam, tile, color, lineWidth, size = 1) {
     const path = new Path2D();
-    diamond(path, cam, tile % state.map.width, Math.floor(tile / state.map.width), 0, size);
+    diamond(path, cam, tile % state.map.width, Math.floor(tile / state.map.width), 0, size, state.map);
     path.closePath(); // contorno: o traço precisa do lado final
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
@@ -831,11 +884,12 @@ function tilesUnder(cam, rects, width, height, below, side) {
   return tiles;
 }
 
-function diamond(path, cam, x, y, inset, size = 1) {
-  const [tx, ty] = worldToScreen(cam, x + inset, y + inset);
-  const [rx, ry] = worldToScreen(cam, x + size - inset, y + inset);
-  const [bx, by] = worldToScreen(cam, x + size - inset, y + size - inset);
-  const [lx, ly] = worldToScreen(cam, x + inset, y + size - inset);
+function diamond(path, cam, x, y, inset, size = 1, map = null) {
+  const at = (wx, wy) => worldToScreen(cam, wx, wy, map ? heightAt(map, wx, wy) : 0);
+  const [tx, ty] = at(x + inset, y + inset);
+  const [rx, ry] = at(x + size - inset, y + inset);
+  const [bx, by] = at(x + size - inset, y + size - inset);
+  const [lx, ly] = at(x + inset, y + size - inset);
   path.moveTo(tx, ty);
   path.lineTo(rx, ry);
   path.lineTo(bx, by);
@@ -845,14 +899,17 @@ function diamond(path, cam, x, y, inset, size = 1) {
 // Faixa tracejada no meio da estrada, ligando aos vizinhos que também são estrada.
 function addRoadMarkings(path, state, cam, x, y) {
   const { width, height, road } = state.map;
-  const [cx, cy] = worldToScreen(cam, x + 0.5, y + 0.5);
+  const [cx, cy] = worldToScreen(cam, x + 0.5, y + 0.5, heightAt(state.map, x + 0.5, y + 0.5));
   const neighbors = [[1, 0], [0, 1]];
   for (const [dx, dy] of neighbors) {
     const nx = x + dx;
     const ny = y + dy;
     if (nx >= width || ny >= height || !road[ny * width + nx]) continue;
-    const [ex, ey] = worldToScreen(cam, nx + 0.5, ny + 0.5);
+    // Passa pelo meio da borda entre os dois tiles (segue o declive).
+    const [mx, my] = worldToScreen(cam, x + 0.5 + dx / 2, y + 0.5 + dy / 2, heightAt(state.map, x + 0.5 + dx / 2, y + 0.5 + dy / 2));
+    const [ex, ey] = worldToScreen(cam, nx + 0.5, ny + 0.5, heightAt(state.map, nx + 0.5, ny + 0.5));
     path.moveTo(cx, cy);
+    path.lineTo(mx, my);
     path.lineTo(ex, ey);
   }
 }
@@ -999,8 +1056,8 @@ class TreeBatch {
     this.any = false;
   }
 
-  add(cam, x, y, tree) {
-    const [cx, cy] = worldToScreen(cam, x + tree.u, y + tree.v);
+  add(cam, x, y, tree, map) {
+    const [cx, cy] = worldToScreen(cam, x + tree.u, y + tree.v, heightAt(map, x + tree.u, y + tree.v));
     const z = cam.zoom * tree.size;
     let path = this.byColor.get(tree.color);
     if (!path) this.byColor.set(tree.color, (path = { body: new Path2D(), light: new Path2D(), base: tree.color }));
@@ -1042,6 +1099,26 @@ class TreeBatch {
       ctx.fill(light);
     }
   }
+}
+
+// Cor do chão clareada (s > 0) ou escurecida (s < 0) pela inclinação.
+const SHADE_STEP = 0.05;
+const shadeCache = new Map(); // cor -> [cores de s = -8 a 8]
+function shadeColor(color, s) {
+  if (s === 0) return color;
+  let row = shadeCache.get(color);
+  if (!row) shadeCache.set(color, (row = []));
+  let out = row[s + 8];
+  if (!out) {
+    const rgb = color.startsWith('#')
+      ? [16, 8, 0].map((k) => (parseInt(color.slice(1), 16) >> k) & 255)
+      : color.match(/\d+/g).slice(0, 3).map(Number);
+    const target = s > 0 ? 255 : 0;
+    const t = Math.abs(s) * SHADE_STEP;
+    out = `rgb(${rgb.map((v) => Math.round(v + (target - v) * t)).join(', ')})`;
+    row[s + 8] = out;
+  }
+  return out;
 }
 
 function mix(a, b, t) {

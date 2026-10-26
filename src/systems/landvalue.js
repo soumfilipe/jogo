@@ -6,7 +6,8 @@
 // e movimento (prédios em volta), e cai com a poluição das indústrias e dos
 // carros e com o barulho de avenidas e vias expressas.
 
-import { BUILDINGS, MIXED, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
+import { BUILDINGS, MIXED, RELIEF, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
+import { isSteep, tileHeight } from '../world/relief.js';
 import { mod, utilityPollution } from './mods.js';
 import { countOccupancy } from './traffic.js';
 import { computeWaste } from './waste.js';
@@ -35,6 +36,7 @@ export function computeLandValue(state, rt) {
   const activity = new Float32Array(n);
   const industry = new Float32Array(n);
   const mixed = new Float32Array(n);
+  const view = new Float32Array(n);
 
   // Rio poluído pelo esgoto vale menos como paisagem (e aparece no mapa de poluição).
   const river = computeSanitation(state, rt).river;
@@ -110,6 +112,16 @@ export function computeLandValue(state, rt) {
   const mixedSum = bonusMixed ? boxSum(mixed, width, height, MIXED.landRadius) : null;
 
   const { landValue, pollution } = rt;
+  // Mapa de relevo: altura de 0 a 1 (−1 nas encostas íngremes; NaN na água).
+  if (!rt.reliefMap || rt.reliefMap.length !== n) rt.reliefMap = new Float32Array(n);
+  const relief = rt.reliefMap;
+  for (let i = 0; i < n; i++) {
+    const water = terrain[i] === TERRAIN.WATER;
+    const h = water ? 0 : tileHeight(state.map, i);
+    relief[i] = water ? NaN : isSteep(state.map, i) ? -1 : h / RELIEF.maxLevel;
+    // Vista do alto valoriza.
+    view[i] = RELIEF.viewBonus * Math.min(1, Math.max(0, (h - RELIEF.viewFrom) / 16));
+  }
   for (let i = 0; i < n; i++) {
     const p = Math.min(1, pollutionSum[i] / POLLUTION_FULL);
     pollution[i] = terrain[i] === TERRAIN.WATER ? Math.max(p, river) : p;
@@ -122,7 +134,8 @@ export function computeLandValue(state, rt) {
       + bonusAll
       + signal[i]
       + (zone[i] === ZONE.COMMERCIAL ? bonusCommercial : 0)
-      + (mixedSum && mixedSum[i] > 0 ? bonusMixed : 0);
+      + (mixedSum && mixedSum[i] > 0 ? bonusMixed : 0)
+      + view[i];
     landValue[i] = Math.min(1, Math.max(0, value));
   }
 }
