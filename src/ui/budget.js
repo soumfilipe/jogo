@@ -6,6 +6,7 @@ import { ECONOMY, TAX_ZONES } from '../world/catalog.js';
 import { loanOffers, loanPayment, loanRate, monthlyBudget } from '../systems/economy.js';
 import { POLICIES, policyCost, policyUnlocked } from '../systems/policies.js';
 import { calendar } from '../core/time.js';
+import { mod } from '../systems/mods.js';
 
 const ZONE_NAMES = { residential: 'Residencial', commercial: 'Comercial', industrial: 'Industrial', rural: 'Rural' };
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -71,6 +72,8 @@ export class BudgetPanel {
       <div class="chart" data-chart></div>
 
       <h4>Empréstimos</h4>
+      <label class="small" data-ppp-row hidden><input type="checkbox" data-ppp> Financiar obras públicas por PPP
+        <span class="muted">(sem pagar à vista: parcelas por 10 anos)</span></label>
       <ul class="loans" data-loans></ul>
       <div class="loan-offers" data-offers></div>
 
@@ -86,6 +89,7 @@ export class BudgetPanel {
     this.el.addEventListener('change', (e) => {
       const id = e.target.dataset.policy;
       if (id) this.#run({ type: 'policy', id, on: e.target.checked });
+      else if ('ppp' in e.target.dataset) this.#run({ type: 'ppp', on: e.target.checked });
     });
     this.el.addEventListener('click', (e) => {
       const target = e.target.closest('button');
@@ -175,9 +179,9 @@ export class BudgetPanel {
     const loans = q('[data-loans]');
     loans.innerHTML = economy.loans.length
       ? economy.loans.map((l) => `
-        <li><span>${money(l.amount)} · saldo ${money(l.balance)}<br>
+        <li><span>${l.kind === 'ppp' ? `PPP: ${l.building} · ` : ''}${money(l.amount)} · saldo ${money(l.balance)}<br>
           <small>${money(l.payment)}/mês · faltam ${l.monthsLeft} ${l.monthsLeft === 1 ? 'mês' : 'meses'}</small></span>
-          <button data-repay="${l.id}">Quitar</button></li>`).join('')
+          ${l.kind === 'ppp' ? '<small class="muted" title="O contrato de PPP é pago até o fim.">10 anos</small>' : `<button data-repay="${l.id}">Quitar</button>`}</li>`).join('')
       : '<li class="muted">Nenhum empréstimo.</li>';
     // Valores e juros oferecidos mudam com a pesquisa.
     const rate = loanRate(rt);
@@ -190,7 +194,10 @@ export class BudgetPanel {
           + ${money(amount)}<small>${money(loanPayment(amount, rate, months))}/mês</small>
         </button>`).join('');
     }
-    for (const b of this.el.querySelectorAll('[data-loan]')) b.disabled = economy.loans.length >= ECONOMY.maxLoans;
+    for (const b of this.el.querySelectorAll('[data-loan]')) b.disabled = economy.loans.filter((l) => l.kind !== 'ppp').length >= ECONOMY.maxLoans;
+    // PPP: a opção aparece com a pesquisa.
+    q('[data-ppp-row]').hidden = mod(rt, 'ppp', 0) <= 0;
+    q('[data-ppp]').checked = Boolean(economy.ppp);
 
     const key = `${economy.history.length}:${economy.history.at(-1)?.tick}`;
     if (key !== this.historyKey) {

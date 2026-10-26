@@ -8,6 +8,7 @@ import {
   TOOL_TECH, applyCommand, costs, lineTiles, planCommand, rectTiles, roadCost, roadUnlocked,
 } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
+import { forecastText } from './systems/census.js';
 import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
 import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
@@ -59,6 +60,7 @@ const TOOLS = [
   ...[
     ['usina_carvao', 'Carvão', '#5f5d58', 'utility'], ['usina_gas', 'Gás', '#8d949b', 'utility'],
     ['hidreletrica', 'Hidrelétrica', '#4a88b4', 'utility'], ['usina_eolica', 'Eólica', '#dfe2e5', 'utility'],
+    ['usina_nuclear', 'Nuclear', '#d9dde2', 'utility'], ['bateria_rede', 'Baterias', '#3d8f5a', 'utility'],
     ['usina_solar', 'Solar', '#3d5c9e', 'utility'], ['usina_hidrogenio', 'Hidrogênio', '#16a085', 'utility'],
     ['bomba_agua', 'Bomba', '#4f97c4', 'utility'], ['poco', 'Poço', '#9fc3e0', 'utility'],
     ['instituto_pesquisa', 'Instituto', '#e9edf2', 'research'], ['parque_tecnologico', 'Parque tec.', '#7fa6d6', 'research'],
@@ -115,7 +117,7 @@ const MENUS = [
 const MAP_MENU = [
   ['Infraestrutura', ['energia', 'agua', 'lixo', 'transito']],
   ['Serviços', ['escolas', 'saude', 'crime', 'alimentos']],
-  ['Cidade', ['valor', 'poluicao', 'satisfacao']],
+  ['Cidade', ['valor', 'poluicao', 'satisfacao', 'escolaridade', 'desemprego']],
 ];
 // Ícone de cada ferramenta (src/ui/icons.js): o do prédio, da zona ou o id.
 const ZONE_ICON = { [ZONE.RESIDENTIAL]: 'residencial', [ZONE.COMMERCIAL]: 'comercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
@@ -298,6 +300,8 @@ function renderHud() {
     + `${s.employed.toLocaleString('pt-BR')} empregados, ${s.openJobs.toLocaleString('pt-BR')} vagas abertas`;
   employment.parentElement.classList.toggle('short', jobless > NEWS.problems.desemprego);
   $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
+  // Com o censo, a dica do botão de demanda traz a previsão de 3 meses.
+  $('btn-zones').title = ['Demanda por zona (R, C, I e rural): para cima falta, para baixo sobra. Clique para zonear e escolher a densidade.', forecastText(rt)].filter(Boolean).join('\n');
   const demands = [['demand-r', rt.demand.residential], ['demand-c', rt.demand.commercial],
     ['demand-i', rt.demand.industrial], ['demand-f', rt.demand.rural]];
   for (const [id, value] of demands) {
@@ -689,6 +693,12 @@ function toggleMap(id) {
   setMap(mapMode === id ? null : id);
 }
 function setMap(id) {
+  // Mapas de dados do censo: só depois da pesquisa.
+  const tech = id && MAP_MODES[id]?.tech;
+  if (tech && !rt.techDone?.has(tech)) {
+    status(`O mapa ${MAP_MODES[id].name.toLowerCase()} precisa da tecnologia ${TECH_BY_ID.get(tech).name}.`);
+    return;
+  }
   mapMode = id;
   for (const b of document.querySelectorAll('[data-map]')) b.classList.toggle('active', (b.dataset.map || null) === mapMode);
   const wrap = document.querySelector('.menu[data-menu="mapas"]');

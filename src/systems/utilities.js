@@ -8,13 +8,21 @@
 // Tudo aqui é derivado do estado e fica no runtime (rt.service etc.), exceto
 // os efeitos diários (moradores indo embora, prédios abandonados), que mudam
 // o estado e por isso só rodam em horários fixos da simulação.
+//
+// Banco de baterias (utility.storage): guarda o excedente das usinas solares
+// e eólicas (utility.renewable) para a noite. Na rede, soma à oferta até o
+// armazenamento das baterias com funcionários e no máximo metade do que as
+// renováveis da rede produzem; sem renovável, não acrescenta nada.
 
 import {
   ABANDON_AFTER_DAYS, BUILDINGS, COLLAPSE_AFTER_DAYS, CONSUMPTION, UNSERVED_LEAVE_SHARE, ZONE, capacityOf,
 } from '../world/catalog.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { footprint, removeBuilding, removeCitizen, sendHome, setJob, touchMap } from '../world/runtime.js';
-import { mod, utilityOutput, ZONE_KEY } from './mods.js';
+import { jobsOf, mod, utilityOutput, ZONE_KEY } from './mods.js';
+
+// Parte da produção renovável que as baterias conseguem deslocar para a noite.
+const STORAGE_SHARE = 0.5;
 
 export const RESOURCES = ['power', 'water'];
 
@@ -33,7 +41,8 @@ export function consumption(info, people = info.residents || info.jobs, rt = nul
 /**
  * Recalcula a oferta de cada rede e quem está abastecido. Resultado no runtime:
  *   rt.service:  Map(id do prédio -> { power, water }) (true = abastecido)
- *   rt.utilityNets: Map(rede -> { power: {supply, used}, water: {supply, used} })
+ *   rt.utilityNets: Map(rede -> { power: {supply, used, renewable, storage,
+ *                   stored}, water: {supply, used} })
  *   rt.utilityTotals: somas de todas as redes, para o painel
  *   rt.powerMap / rt.waterMap: valor por tile para os mapas (NaN = nada)
  */
@@ -46,7 +55,7 @@ export function computeUtilities(state, rt) {
   };
   const entry = (net) => {
     let e = nets.get(net);
-    if (!e) nets.set(net, (e = { power: { supply: 0, used: 0 }, water: { supply: 0, used: 0 } }));
+    if (!e) nets.set(net, (e = { power: { supply: 0, used: 0, renewable: 0, storage: 0, stored: 0 }, water: { supply: 0, used: 0 } }));
     return e;
   };
 
@@ -59,13 +68,28 @@ export function computeUtilities(state, rt) {
       if (!net) continue;
       for (const res of RESOURCES) {
         if (!info.utility[res]) continue;
-        entry(net)[res].supply += utilityOutput(rt, b.type, res);
+        const out = utilityOutput(rt, b.type, res);
+        entry(net)[res].supply += out;
+        if (res === 'power' && info.utility.renewable) entry(net).power.renewable += out;
         sources[res].push(rt.access.get(b.id));
+      }
+      if (info.utility.storage) {
+        const jobs = jobsOf(rt, b.type);
+        const staffed = jobs ? Math.min(1, (rt.workers.get(b.id)?.size ?? 0) / jobs) : 1;
+        entry(net).power.storage += info.utility.storage * staffed;
+        sources.power.push(rt.access.get(b.id));
       }
     } else if (b.abandoned === undefined && info.zone !== ZONE.RURAL) {
       consumers.push({ b, net, need: consumption(info, capacityOf(b), rt) });
       if (net) entry(net);
     }
+  }
+
+  // Baterias: o excedente renovável guardado entra como oferta.
+  for (const e of nets.values()) {
+    const p = e.power;
+    p.stored = Math.round(Math.min(p.storage, p.renewable * STORAGE_SHARE));
+    p.supply += p.stored;
   }
 
   const service = new Map();

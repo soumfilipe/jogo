@@ -115,7 +115,7 @@ export const BUILDINGS = {
   },
   usina_solar: {
     name: 'Usina solar', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 4,
-    utility: { power: 1200, water: 0, cost: 20_000, upkeep: 150, pollution: 0, area: 'energia' },
+    utility: { power: 1200, water: 0, cost: 20_000, upkeep: 150, pollution: 0, area: 'energia', renewable: true },
   },
   bomba_agua: {
     name: "Bomba d'água", zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 6,
@@ -135,7 +135,19 @@ export const BUILDINGS = {
   },
   usina_eolica: {
     name: 'Parque eólico', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 3,
-    utility: { power: 900, water: 0, cost: 14_000, upkeep: 120, pollution: 0, area: 'energia' },
+    utility: { power: 900, water: 0, cost: 14_000, upkeep: 120, pollution: 0, area: 'energia', renewable: true },
+  },
+  // Usina nuclear: muita energia sem fumaça; refrigeração com água e
+  // funcionários graduados (o risco de acidente vem com a etapa de desastres).
+  usina_nuclear: {
+    name: 'Usina nuclear', zone: ZONE.NONE, level: 0, size: 3, residents: 0, jobs: 60,
+    utility: { power: 9000, water: 0, cost: 150_000, upkeep: 2_500, pollution: 0, needsWater: true, area: 'energia' },
+  },
+  // Banco de baterias: guarda o excedente das usinas renováveis (renewable)
+  // da rede para a noite; sozinho não gera nada (ver systems/utilities.js).
+  bateria_rede: {
+    name: 'Banco de baterias', zone: ZONE.NONE, level: 0, size: 1, residents: 0, jobs: 4,
+    utility: { power: 0, water: 0, cost: 30_000, upkeep: 250, pollution: 0, area: 'energia', storage: 800 },
   },
   usina_hidrogenio: {
     name: 'Usina a hidrogênio', zone: ZONE.NONE, level: 0, size: 2, residents: 0, jobs: 12,
@@ -570,6 +582,13 @@ export const ECONOMY = {
   loanAnnualRate: 0.1,
   loanMonths: 24,
   maxLoans: 3,
+  // Parcerias público-privadas (com a pesquisa e a opção no orçamento): o
+  // prédio público sai sem pagar à vista e vira um contrato de pppMonths
+  // parcelas, com juros dos empréstimos + pppExtraRate; as parcelas de PPP
+  // somadas não passam de pppShare da receita do mês.
+  pppMonths: 120,
+  pppExtraRate: 0.02,
+  pppShare: 0.2,
   // Meses guardados no histórico do orçamento.
   historyMonths: 36,
 };
@@ -1078,7 +1097,7 @@ export const EDUCATION = {
       instituto_pesquisa: EDU.SUPERIOR, universidade: EDU.SUPERIOR, parque_tecnologico: EDU.SUPERIOR,
       biotecnologia: EDU.SUPERIOR, petroquimica: EDU.MEDIO, escola_media: EDU.SUPERIOR,
       escola: EDU.MEDIO, escola_tecnica: EDU.MEDIO, senai: EDU.MEDIO, creche: EDU.FUNDAMENTAL,
-      biblioteca: EDU.MEDIO,
+      biblioteca: EDU.MEDIO, usina_nuclear: EDU.SUPERIOR,
     },
   },
   // Escolaridade de quem chega de fora, por marco do mundo: chance de cada

@@ -152,6 +152,24 @@ faltam, está em [`docs/arvore-tecnologica.html`](docs/arvore-tecnologica.html)
   tecnologia de pós-graduação, mestres e doutores valem o dobro. A distribuição
   dos cursos da universidade fica no painel Pesquisa.
 
+### Tecnologias de saúde, gestão e energia (etapa 4e-a)
+
+- *Saúde pública sanitária*: epidemias 50% menos frequentes. *Vacinas de mRNA*:
+  epidemias acabam 3× mais rápido.
+- *Censo computadorizado*: libera os mapas de **escolaridade** (média dos
+  moradores de cada casa) e de **desemprego** (adultos empregados por casa) e a
+  **previsão da demanda** para 3 meses, na dica do botão R C I F. A previsão segue a
+  tendência dos últimos 30 dias e depois de carregar junta 7 dias antes de aparecer.
+- *Parcerias público-privadas*: opção no orçamento "Financiar obras públicas por PPP".
+  - Ligada, um prédio público sai sem pagar à vista e vira um contrato de 120 parcelas, com os juros dos empréstimos mais 2% ao ano.
+  - O contrato aparece em Empréstimos e não pode ser quitado antes.
+  - As parcelas de PPP somadas não passam de 20% da receita do mês.
+- *Baterias na rede* e *Energia nuclear*: veja a tabela de energia.
+- Ficam para a etapa futura de clima, geografia e desastres: *Defesa civil*,
+  *Alerta de desastres*, *Drenagem sustentável*, *Cidade-esponja*, *Contenção de
+  encostas*, *Brigada florestal*, *Ponte estaiada*, *Ciência do clima* e o
+  acidente nuclear.
+
 ## Saúde, segurança, satisfação e leis
 
 Regras em `src/systems/services.js`, `wellbeing.js`, `fire.js` e `policies.js`;
@@ -515,6 +533,8 @@ da rua em que estão encostados (`src/systems/utilities.js`).
 | Usina solar (2×2) | 1.200 de energia | $20.000 | $150/mês | limpa |
 | Bomba d'água | 2.500 de água | $6.000 | $200/mês | precisa encostar em rio ou lago |
 | Poço artesiano | 700 de água | $3.500 | $90/mês | funciona em qualquer lugar |
+| Usina nuclear (3×3) | 9.000 de energia | $150.000 | $2.500/mês | com *Energia nuclear*; sem fumaça, encosta em rio ou lago e exige graduados (o risco de acidente vem com a etapa de desastres) |
+| Banco de baterias | guarda até 800 | $30.000 | $250/mês | com *Baterias na rede*; acrescenta à rede até metade do que as usinas solares e eólicas produzem (o excedente do dia vai para a noite) |
 
 - Cada prédio consome por morador ou vaga: residencial 1 de energia e 1,2 de
   água; comercial 1,5 e 0,6; industrial 2,2 e 1,4 (`CONSUMPTION` no catálogo).

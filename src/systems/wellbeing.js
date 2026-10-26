@@ -20,7 +20,7 @@
 // Tudo é derivado do estado (rt.wellbeing), menos a epidemia, que tem data
 // para acabar (state.health.epidemicUntil).
 
-import { BUILDINGS, CHILDCARE, ECONOMY, TOURISM, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
+import { BUILDINGS, CHILDCARE, ECONOMY, EDU, TOURISM, WELLBEING, ZONE, capacityOf } from '../world/catalog.js';
 import { removeCitizen } from '../world/runtime.js';
 import { canWork } from '../agents/citizens.js';
 import { chance } from '../core/rng.js';
@@ -197,7 +197,7 @@ export function closeHealthMonth(state, rt) {
 // Saúde e satisfação só nas casas; crime em todas as zonas.
 function fillMaps(state, rt) {
   const n = state.map.width * state.map.height;
-  for (const key of ['healthMap', 'crimeMap', 'satisfactionMap', 'foodMap']) {
+  for (const key of ['healthMap', 'crimeMap', 'satisfactionMap', 'foodMap', 'eduMap', 'jobsMap']) {
     if (!rt[key] || rt[key].length !== n) rt[key] = new Float32Array(n);
     rt[key].fill(NaN);
   }
@@ -206,6 +206,25 @@ function fillMaps(state, rt) {
     const w = rt.wellbeing.get(b.id);
     if (!w) continue;
     const info = BUILDINGS[b.type];
+    // Censo: escolaridade média (0 a 1) e parte dos adultos empregados da casa.
+    let edu = NaN;
+    let jobs = NaN;
+    if (info.zone === ZONE.RESIDENTIAL) {
+      let n = 0;
+      let sum = 0;
+      let workers = 0;
+      let employed = 0;
+      for (const id of rt.residents.get(b.id) ?? []) {
+        const c = rt.citizenById.get(id);
+        if (!c) continue;
+        n++;
+        sum += c.edu ?? 0;
+        if (c.job !== null || c.athlete !== undefined) (workers++, employed++);
+        else if (canWork(c)) workers++;
+      }
+      if (n) edu = sum / n / EDU.POS;
+      if (workers) jobs = employed / workers;
+    }
     for (let dy = 0; dy < info.size; dy++) {
       for (let dx = 0; dx < info.size; dx++) {
         const t = b.tile + dy * width + dx;
@@ -215,6 +234,8 @@ function fillMaps(state, rt) {
           rt.healthMap[t] = w.health;
           rt.satisfactionMap[t] = w.satisfaction;
           rt.foodMap[t] = Math.min(1, rt.coverage?.alimentos?.[b.tile] ?? 0);
+          rt.eduMap[t] = edu;
+          rt.jobsMap[t] = jobs;
         }
       }
     }

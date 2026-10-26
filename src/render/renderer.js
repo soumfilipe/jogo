@@ -108,6 +108,11 @@ export const MAP_MODES = {
   // Lixo: prédios com coleta (verde) ou com lixo acumulando (vermelho).
   lixo: { name: 'Lixo', layer: 'wasteMap', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
     legend: { items: [[1, 'Lixo recolhido'], [0, 'Lixo acumulando']], note: 'Precisa de lixão ou aterro no raio.' } },
+  // Censo (pesquisa Censo computadorizado): escolaridade média e emprego dos moradores de cada casa.
+  escolaridade: { name: 'Escolaridade', layer: 'eduMap', tech: 'estatistica', from: '#d64541', mid: '#f1c40f', to: '#4f8ff7',
+    legend: { low: 'Sem escolaridade', high: 'Pós-graduação', note: 'Escolaridade média dos moradores de cada casa.' } },
+  desemprego: { name: 'Desemprego', layer: 'jobsMap', tech: 'estatistica', from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
+    legend: { low: 'Muito desemprego', high: 'Todos empregados', note: 'Adultos que podem trabalhar e estão empregados, por casa.' } },
   // Trânsito: só as ruas mudam de cor (verde livre, vermelho parado).
   transito: { name: 'Trânsito', layer: 'trafficMap', roads: true, from: '#d64541', mid: '#f1c40f', to: '#2ecc71',
     legend: { low: 'Parado', high: 'Livre', note: 'Só as ruas mudam de cor.' } },
