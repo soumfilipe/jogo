@@ -822,9 +822,9 @@ botão de provocar.
 
 | Desastre | Quando | O que faz | O que reduz |
 | --- | --- | --- | --- |
-| Enchente | chuva de 30 dias acima da do mês mais chuvoso do clima (×1,15), ou 60 mm num dia | alaga a terra baixa (até 2 níveis) a até 4 tiles da água por 2 a 5 dias; ruas alagadas fecham e as rotas desviam; prédios ficam danificados e alguns se perdem | *Drenagem sustentável* ×0,5; *Cidade-esponja* ×0,3; mata perto absorve |
-| Deslizamento | 40 mm num dia, ou a chuva de 30 dias da enchente | encosta íngreme ocupada cede: o prédio vira ruína, a rua some e a encosta baixa | *Contenção de encostas* ×0,2; mata na encosta segura |
-| Queimada | 20 dias sem chuva num dia de calor, ou 40 dias sem chuva | o fogo anda pela mata, hora a hora; a mata vira chão queimado (e rebrota), prédios encostados pegam fogo, a fumaça polui; a chuva apaga | *Brigada florestal* ×0,3; bombeiros no raio; parques de conservação |
+| Enchente | chuva de 30 dias acima da do mês mais chuvoso do clima (ou de 1,6× a média do ano), ou 60 mm num dia; no máximo uma a cada 20 dias | alaga a terra baixa (até 2 níveis) a até 4 tiles da água por 2 a 5 dias; ruas alagadas fecham e as rotas desviam; prédios ficam danificados e alguns se perdem | *Drenagem sustentável* ×0,5; *Cidade-esponja* ×0,3; mata perto absorve |
+| Deslizamento | 40 mm num dia, ou 15 mm num dia com a chuva de 30 dias da enchente | encosta íngreme ocupada cede: o prédio vira ruína, a rua some e a encosta baixa | *Contenção de encostas* ×0,2; mata na encosta segura |
+| Queimada | 20 dias sem chuva num dia de calor, ou 40 dias sem chuva; no máximo uma a cada 15 dias | o fogo anda pela mata, hora a hora; a mata vira chão queimado (e rebrota), prédios encostados pegam fogo, a fumaça polui; a chuva apaga | *Brigada florestal* ×0,3; bombeiros no raio; parques de conservação |
 
 - **Estragos:**
   - prédio **danificado**: não recebe moradores nem contrata até o reparo (12 dias);

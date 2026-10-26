@@ -619,10 +619,10 @@ export const WEATHER = { storm: 30, hot: 30, cold: 8, hotPower: 1.1, rainTourist
 //   repairDays / repairCost: tempo de reparo de um prédio danificado e o preço
 //                por nível × área (pago no fechamento do mês, em "Reconstrução")
 //   defense:     no raio da defesa civil, estragos × damage e reparos × repair
-//   flood:       rain = chuva de 30 dias acima da média do mês mais chuvoso do
-//                clima × rain, ou dayRain mm num dia; área de terra baixa (até
+//   flood:       rain = chuva de 30 dias acima da do mês mais chuvoso do clima
+//                (ou de 1,6× a média do ano, o que for maior) × rain, ou dayRain mm num dia; área de terra baixa (até
 //                maxHeight níveis) a até radius tiles da água, no máximo maxTiles
-//   landslide:   dayRain mm num dia, ou a chuva de 30 dias da enchente; chance
+//   landslide:   dayRain mm num dia, ou soakedRain mm com a chuva de 30 dias da enchente; chance
 //                por encosta íngreme ocupada; mata na encosta segura (forest)
 //   gap:         dias mínimos entre duas enchentes (ou duas queimadas)
 //   wildfire:    dias sem chuva (dry num dia de calor, ou dryAlone em qualquer
@@ -636,7 +636,7 @@ export const DISASTERS = {
   repairCost: 150,
   defense: { damage: 0.6, repair: 0.5 },
   flood: { rain: 1, dayRain: 60, chance: 0.12, gap: 20, maxHeight: 2, radius: 4, maxTiles: 500, days: [2, 5], damage: 0.5, lose: 0.05, scar: 20 },
-  landslide: { dayRain: 40, chance: 0.05, maxPerDay: 3, forest: 0.3, lower: 2 },
+  landslide: { dayRain: 40, soakedRain: 15, chance: 0.02, maxPerDay: 2, forest: 0.3, lower: 2 },
   wildfire: { dry: 20, dryAlone: 40, chance: 0.06, gap: 15, spread: 0.3, building: 0.12, maxHours: 72, park: 0.3, scar: 60, smoke: 3 },
 };
 

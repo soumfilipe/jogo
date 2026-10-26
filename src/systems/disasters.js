@@ -85,10 +85,11 @@ export function dailyDisasters(state, rt) {
   maybeWildfire(state, rt, level);
 }
 
-/** Chuva de 30 dias que já é demais para o clima (a do mês mais chuvoso × flood.rain). */
+/** Chuva de 30 dias que já é demais para o clima (a do mês mais chuvoso, ou 1,6× a média, × flood.rain). */
 export function floodThreshold(state) {
   const C = CLIMATES[state.weather?.climate ?? 'subtropical'];
-  return Math.max(...C.rain) * DISASTERS.flood.rain;
+  const avg = C.rain.reduce((s, v) => s + v, 0) / 12;
+  return Math.max(Math.max(...C.rain), avg * 1.6) * DISASTERS.flood.rain;
 }
 
 function repairBuildings(state, rt) {
@@ -262,7 +263,8 @@ function maybeFlood(state, rt, level) {
 function maybeLandslides(state, rt, level) {
   const L = DISASTERS.landslide;
   const w = state.weather;
-  if (w.today.mm < L.dayRain && rain30(state) <= floodThreshold(state)) return;
+  const soaked = rain30(state) > floodThreshold(state) && w.today.mm >= L.soakedRain;
+  if (w.today.mm < L.dayRain && !soaked) return;
   const map = state.map;
   const { width, height } = map;
   const risk = L.chance * level * mod(rt, 'landslide');
