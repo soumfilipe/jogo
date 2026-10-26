@@ -44,7 +44,9 @@ export function renderInspector(el, selection, state, rt, { following }) {
 
 function renderBuilding(el, b, state, rt) {
   const info = BUILDINGS[b.type];
-  if (info.utility) return renderUtility(el, b, state, rt);
+  // Conjunto habitacional: é do jogador, mas é casa (inspetor de casa).
+  const housing = info.utility?.housing;
+  if (info.utility && !housing) return renderUtility(el, b, state, rt);
   const residents = [...rt.residents.get(b.id)].map((id) => rt.citizenById.get(id));
   const workers = [...rt.workers.get(b.id)].map((id) => rt.citizenById.get(id));
   const people = info.residents ? residents : workers;
@@ -64,6 +66,8 @@ function renderBuilding(el, b, state, rt) {
     next = upgrade.blockers.length
       ? `Para o ${upgrade.label} falta: ${upgrade.blockers.map(esc).join('; ')}.`
       : `Pronto para o ${upgrade.label}.`;
+  } else if (housing) {
+    next = `Moradia pública: os moradores não pagam imposto residencial (aluguel social) e ficam mais satisfeitos. Manutenção de $${utilityUpkeep(rt, b.type).toLocaleString('pt-BR')}/mês.`;
   } else if (info.tall) {
     next = 'Altura máxima.';
   } else if (info.size > 1) {
@@ -74,17 +78,17 @@ function renderBuilding(el, b, state, rt) {
 
   el.innerHTML = `
     <h3>${esc(info.name)} #${b.id}</h3>
-    <p class="muted"><span class="stars" title="Nível ${info.level}">${stars}</span> · nível ${info.level}${info.size > 1 ? ` · ${info.size}×${info.size}` : ''}</p>
+    <p class="muted">${housing ? 'Habitação social' : `<span class="stars" title="Nível ${info.level}">${stars}</span> · nível ${info.level}`}${info.size > 1 ? ` · ${info.size}×${info.size}` : ''}</p>
     <dl>
       <dt>${info.residents ? 'Moradores' : 'Funcionários'}</dt><dd>${people.length} / ${capacity}</dd>
       ${info.residents ? `<dt>Crianças</dt><dd>${people.filter((c) => c.age < 18).length}</dd>`
         : `<dt>Estudo exigido</dt><dd>${EDU_NAMES[minEduFor(rt, b.type)]}</dd>`}
       ${wellbeingRows(rt, b)}
       ${info.residents ? parentsRow(state, rt, residents, b) : ''}
-      <dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>
+      ${housing ? '' : `<dt>Andares</dt><dd>${buildingFloors(b)} (${info.perFloor} por andar)</dd>`}
       ${info.food ? `<dt>Produção</dt><dd>${Math.round(farmOutput(state, rt, b))} de ${Math.round(farmOutput(state, rt, b, true))} alimentos/mês</dd>` : ''}
       ${info.residents ? `<dt>Alimentos</dt><dd>${foodText(rt.coverage?.alimentos?.[b.tile] ?? 0)}</dd>` : ''}
-      ${info.zone !== ZONE.INDUSTRIAL && info.zone !== ZONE.RURAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
+      ${!housing && info.zone !== ZONE.INDUSTRIAL && info.zone !== ZONE.RURAL ? `<dt>Densidade</dt><dd>${DENSITY_INFO[state.map.density[b.tile]].name}</dd>` : ''}
       <dt>Valor do terreno</dt><dd>${pct(rt.landValue[b.tile])}</dd>
       <dt>Poluição</dt><dd>${pct(rt.pollution[b.tile])}</dd>
       <dt>Acesso a estrada</dt><dd>${access ? 'Sim' : NO}</dd>

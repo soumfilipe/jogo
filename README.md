@@ -170,6 +170,23 @@ faltam, está em [`docs/arvore-tecnologica.html`](docs/arvore-tecnologica.html)
   encostas*, *Brigada florestal*, *Ponte estaiada*, *Ciência do clima* e o
   acidente nuclear.
 
+### Moradia e cidade (etapa 4e-b)
+
+- *Habitação social*: **conjunto habitacional** (2×2, menu Serviços).
+  - 120 moradores, $40 mil e $600/mês de manutenção.
+  - Quem mora lá não paga imposto residencial (aluguel social) e fica um pouco mais satisfeito.
+  - Não cresce nem sobe de nível.
+  - A *Construção por impressão 3D* deixa o conjunto 40% mais barato.
+- *Cidade planejada*: ferramenta **Bairro planejado** (menu Zonas).
+  - Arrastar um retângulo de pelo menos 6×6 desenha ruas no contorno e a cada 5 tiles, com faixas de zona residencial, residencial e comercial (densidade média).
+  - Custa 70% do que custariam as ruas e as zonas uma a uma.
+  - Não passa por cima de prédios, água ou parques.
+- *Região metropolitana*: com estrada saindo do mapa (`src/systems/metro.js`):
+  - gente de fora ocupa até metade das vagas abertas do comércio e da indústria (até 200 + 10% da população) e paga imposto como funcionário;
+  - metade dos desempregados trabalha nas cidades vizinhas e sai da taxa de desemprego (a dica do topo mostra quantos);
+  - o comércio rende 10% mais com os clientes de fora;
+  - uma amostra desses carros (cinza-azulados) entra e sai pela borda de manhã e no fim da tarde.
+
 ## Saúde, segurança, satisfação e leis
 
 Regras em `src/systems/services.js`, `wellbeing.js`, `fire.js` e `policies.js`;

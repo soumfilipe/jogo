@@ -49,6 +49,8 @@ const TOOLS = [
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color, group: 'zone',
   })),
+  // Cidade planejada: arrastar um retângulo desenha ruas e zonas de um bairro inteiro.
+  { id: 'bairro', name: 'Bairro planejado', label: 'Bairro', shape: 'rect', tech: TOOL_TECH.bairro, color: 'rgba(95,191,90,0.35)', swatch: '#7fa36b', group: 'zone' },
   { id: 'bulldoze', name: 'Demolir', key: 'b', shape: 'rect', color: 'rgba(255,80,60,0.45)', swatch: '#d9534f' },
   // Ferramentas que vêm da pesquisa (ficam escondidas até liberar).
   { id: 'parque', name: 'Parque de conservação', label: 'Conservação', shape: 'rect', tech: TOOL_TECH.parque, color: 'rgba(63,138,82,0.55)', swatch: '#3f8a52', group: 'tourism' },
@@ -75,7 +77,7 @@ const TOOLS = [
     ['posto_saude', 'Vacinação', '#4f8ff7', 'services'], ['caps', 'CAPS', '#8e44ad', 'services'],
     ['delegacia', 'Delegacia', '#2c3e50', 'services'], ['guarda_municipal', 'Guarda', '#16a085', 'services'],
     ['central_cameras', 'Câmeras', '#5b7fa8', 'services'], ['quartel_bombeiros', 'Bombeiros', '#c0392b', 'services'],
-    ['base_samu', 'SAMU', '#e05a47', 'services'],
+    ['base_samu', 'SAMU', '#e05a47', 'services'], ['conjunto_habitacional', 'Habitação', '#d9b38c', 'services'],
     ['mercado_municipal', 'Mercado', '#e9d48a', 'food'], ['restaurante_popular', 'Restaurante', '#d9822b', 'food'],
     ['ceasa', 'Ceasa', '#3d8f5a', 'food'],
     ['museu', 'Museu', '#f0e6d2', 'tourism'], ['campo_futebol', 'Campo', '#4f9a48', 'tourism'],
@@ -297,7 +299,8 @@ function renderHud() {
   const employment = $('employment');
   employment.textContent = `${(Math.round(jobless * 1000) / 10).toLocaleString('pt-BR')}%`;
   employment.parentElement.title = `Desemprego ${employment.textContent}: ${s.unemployed.toLocaleString('pt-BR')} procurando trabalho, `
-    + `${s.employed.toLocaleString('pt-BR')} empregados, ${s.openJobs.toLocaleString('pt-BR')} vagas abertas`;
+    + `${s.employed.toLocaleString('pt-BR')} empregados, ${s.openJobs.toLocaleString('pt-BR')} vagas abertas`
+    + (s.outside ? ` (${s.outside.toLocaleString('pt-BR')} trabalham em cidades vizinhas)` : '');
   employment.parentElement.classList.toggle('short', jobless > NEWS.problems.desemprego);
   $('money').textContent = `$${state.economy.money.toLocaleString('pt-BR')}`;
   // Com o censo, a dica do botão de demanda traz a previsão de 3 meses.
@@ -823,6 +826,7 @@ function toolCommand() {
   if (tool.id === 'corrida') return { type: 'race', from: start.y * width + start.x, to: hover.y * width + hover.x };
   if (tool.road) return { type: 'road', road: tool.road, tiles };
   if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
+  if (tool.id === 'bairro') return { type: 'district', tiles };
   if (tool.id === 'parque') return { type: 'park', tiles };
   return usesDensity(tool) ? { type: 'zone', zone: tool.zone, density, tiles } : { type: 'zone', zone: tool.zone, tiles };
 }
@@ -843,6 +847,11 @@ function currentPreview() {
     tooltip.textContent = plan.reason || `${tool.name} · $${plan.cost.toLocaleString('pt-BR')}`;
     tooltip.style.color = plan.reason ? '#ff8a80' : '';
     return { tiles: plan.tiles, color: plan.reason ? 'rgba(255,80,60,0.5)' : 'rgba(80,220,120,0.5)' };
+  }
+  if (cmd.type === 'district') {
+    tooltip.textContent = plan.reason || `Bairro planejado · ${plan.roads.length} ruas · $${plan.cost.toLocaleString('pt-BR')} (30% mais barato)`;
+    tooltip.style.color = plan.reason || plan.cost > state.economy.money ? '#ff8a80' : '';
+    return { tiles: plan.reason ? [] : plan.roads, color: 'rgba(255,255,255,0.5)' };
   }
   if (cmd.type === 'race') {
     tooltip.textContent = plan.reason || `Corrida de rua · ${(plan.tiles.length * 0.1).toLocaleString('pt-BR')} km · $${plan.cost.toLocaleString('pt-BR')}`;

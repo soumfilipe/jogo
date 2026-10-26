@@ -7,6 +7,7 @@
 //   { type: 'road',     tiles, road }     (road: tipo de rua de ROAD_TYPES, padrão 1;
 //                                         sobre uma rua de tipo menor, melhora ela)
 //   { type: 'zone',     tiles, zone, density? }
+//   { type: 'district', tiles }          (bairro planejado: ruas e zonas de uma vez, com a pesquisa)
 //                       (zone = ZONE.NONE remove a zona; density padrão: média.
 //                        Mudar só a densidade vale também em lote construído)
 //   { type: 'bulldoze', tiles }
@@ -56,13 +57,14 @@ import { cancelRace, planRace, raceOptions, scheduleRace } from '../systems/race
 // Ferramentas que vêm da pesquisa (efeito { tool } em techs.js).
 export const TOOL_TECH = {
   avenida: 'via_expressa', expressa: 'via_expressa', calcadao: 'ciclovia_lazer', parque: 'parque_nacional', revitalizar: 'revitalizacao',
-  corrida: 'educacao_fisica',
+  corrida: 'educacao_fisica', bairro: 'plano_piloto',
 };
 
 export function planCommand(state, rt, cmd) {
   if (cmd.type === 'place') return planPlace(state, rt, cmd);
   if (cmd.type === 'revitalize') return planRevitalize(state, rt, cmd);
   if (cmd.type === 'race') return planRace(state, rt, cmd);
+  if (cmd.type === 'district') return planDistrict(state, rt, cmd).plan;
   const { road, zone, terrain, density } = state.map;
   const park = state.map.park;
   if (cmd.type === 'park' && !rt.techDone?.has(TOOL_TECH.parque)) {
@@ -122,6 +124,53 @@ export function planCommand(state, rt, cmd) {
   return { tiles, cost: Math.round(cost) };
 }
 
+// --- Bairro planejado (pesquisa Cidade planejada) ------------------------------
+// Ruas no contorno e a cada DISTRICT.step tiles; entre elas, faixas de zona
+// residencial, residencial e comercial (densidade média). 30% mais barato que
+// fazer as ruas e as zonas uma a uma.
+export const DISTRICT = { step: 5, min: 6, discount: 0.7, bands: [ZONE.RESIDENTIAL, ZONE.RESIDENTIAL, ZONE.COMMERCIAL] };
+
+/** Plano do bairro: as ruas, as zonas e o custo (com o desconto). */
+function planDistrict(state, rt, cmd) {
+  const { width } = state.map;
+  const fail = (reason) => ({ plan: { tiles: [], cost: 0, reason }, roads: [], zones: [] });
+  if (!rt.techDone?.has(TOOL_TECH.bairro)) return fail(`O bairro planejado precisa da tecnologia ${TECH_BY_ID.get(TOOL_TECH.bairro).name}.`);
+  const xs = cmd.tiles.map((t) => t % width);
+  const ys = cmd.tiles.map((t) => Math.floor(t / width));
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  if (x1 - x0 + 1 < DISTRICT.min || y1 - y0 + 1 < DISTRICT.min) return fail(`O bairro precisa de pelo menos ${DISTRICT.min}×${DISTRICT.min} tiles.`);
+  const line = (v, a, b) => v === a || v === b || (v - a) % DISTRICT.step === 0;
+  const roadTiles = [];
+  const zoneTiles = new Map(DISTRICT.bands.map((z) => [z, []]));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const t = y * width + x;
+      if (line(x, x0, x1) || line(y, y0, y1)) roadTiles.push(t);
+      else zoneTiles.get(DISTRICT.bands[Math.floor((y - y0) / DISTRICT.step) % DISTRICT.bands.length]).push(t);
+    }
+  }
+  const roads = planCommand(state, rt, { type: 'road', road: 1, tiles: roadTiles });
+  const zones = [...zoneTiles].map(([zone, tiles]) => ({ zone, ...planCommand(state, rt, { type: 'zone', zone, density: DENSITY.MEDIUM, tiles }) }));
+  const full = roads.cost + zones.reduce((s, z) => s + z.cost, 0);
+  const tiles = [...roads.tiles, ...zones.flatMap((z) => z.tiles)];
+  return {
+    plan: { tiles, cost: Math.round(full * DISTRICT.discount), reason: tiles.length ? null : 'Nada a fazer aqui.', roads: roads.tiles },
+    roads: roads.tiles, zones, full,
+  };
+}
+
+/** Constrói o bairro planejado (comando 'district'). */
+function buildDistrict(state, rt, cmd) {
+  const { plan, roads, zones, full } = planDistrict(state, rt, cmd);
+  if (plan.reason) return { ok: false, cost: 0, count: 0, reason: plan.reason };
+  if (plan.cost > state.economy.money) return { ok: false, cost: plan.cost, count: 0, reason: `Dinheiro insuficiente (custa $${plan.cost}).` };
+  // O desconto entra antes; ruas e zonas cobram o preço cheio de cada uma.
+  state.economy.money += full - plan.cost;
+  if (roads.length) applyCommand(state, rt, { type: 'road', road: 1, tiles: roads });
+  for (const z of zones) if (z.tiles.length) applyCommand(state, rt, { type: 'zone', zone: z.zone, density: DENSITY.MEDIUM, tiles: z.tiles });
+  return { ok: true, cost: plan.cost, count: plan.tiles.length };
+}
+
 /** Preço de um tile de rua do tipo `type` (com os modificadores de construção). */
 export function roadCost(rt, type) {
   return ROAD_TYPES[type].cost * mod(rt, 'buildCost');
@@ -172,6 +221,7 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'race') return scheduleRace(state, rt, cmd);
   if (cmd.type === 'cancelRace') return cancelRace(state, rt, cmd);
   if (cmd.type === 'raceOptions') return raceOptions(state, rt, cmd);
+  if (cmd.type === 'district') return buildDistrict(state, rt, cmd);
   if (cmd.type === 'policy') {
     const result = setPolicy(state, rt, cmd.id, cmd.on);
     if (result.ok) computeMods(state, rt);

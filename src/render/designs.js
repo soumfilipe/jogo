@@ -508,6 +508,16 @@ const UTILITY_GENERATORS = {
     return parts;
   },
 
+  conjunto_habitacional(r) {
+    const parts = [{ kind: 'slab', box: [0.04, 0.04, 1.96, 1.96], color: '#b5b0a6', lift: 0 }];
+    // Blocos iguais de quatro andares, com janelas em grade (conjunto da Casa Popular).
+    const w = r.pick([wall('#e8d5b5', '#cdb891'), wall('#d9c3a5', '#bfa684'), wall('#e3d0c0', '#c7b2a1')]);
+    for (const [x0, y0, x1, y1] of [[0.15, 0.15, 0.85, 0.85], [1.15, 0.15, 1.85, 0.85], [0.15, 1.15, 0.85, 1.85], [1.15, 1.15, 1.85, 1.85]]) {
+      parts.push(storeys([x0, y0, x1, y1], 0, 4, 0.3, w, { windows: { cols: 3, style: 'grid' }, doors: { count: 1, color: '#6f4e37' }, roof: { kind: 'hip', color: '#9a6b4f', rise: 0.25 } }));
+    }
+    return parts;
+  },
+
   usina_nuclear(r) {
     const parts = [{ kind: 'slab', box: [0.04, 0.04, 2.96, 2.96], color: '#9a9a8a', lift: 0 }];
     // Duas torres de resfriamento (cilindros largos) e o prédio do reator com cúpula.

@@ -95,7 +95,9 @@ export function computeWellbeing(state, rt) {
       - S.pollution * pollution
       - S.unemployment * unemployment
       - tax
-      + satisfactionAdd,
+      + satisfactionAdd
+      // Conjunto habitacional: sem aluguel.
+      + (info.utility?.housing?.satisfaction ?? 0),
     );
     const density = Math.min(1, capacityOf(b) / 64);
     const policeCover = (cov?.policia[t] ?? 0) * police * (community ? 0.7 + 0.6 * content : 1);

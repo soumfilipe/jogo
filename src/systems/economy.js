@@ -14,7 +14,8 @@
 // previsão); closeMonth() aplica no fim de cada mês, paga as parcelas e guarda
 // o mês no histórico.
 
-import { BUILDINGS, ECONOMY, TAX_ZONES, ZONE } from '../world/catalog.js';
+import { BUILDINGS, ECONOMY, METRO, TAX_ZONES, ZONE } from '../world/catalog.js';
+import { openJobs } from '../world/runtime.js';
 import { jobsOf, mod, utilityOutput, utilityUpkeep } from './mods.js';
 import { researchOutput } from './research.js';
 import { policiesCost } from './policies.js';
@@ -22,6 +23,7 @@ import { freightFactor } from './logistics.js';
 import { foodBalance } from './food.js';
 import { effectiveWorkers, overloadedParents, productivity } from './childcare.js';
 import { sportsSubsidy } from './sports.js';
+import { commutersIn, commutersOut, metroActive } from './metro.js';
 
 const ZONE_KEY = { [ZONE.COMMERCIAL]: 'commercial', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
 
@@ -31,8 +33,16 @@ export function monthlyBudget(state, rt) {
   const overloaded = overloadedParents(state, rt);
   let employed = 0;
   // Atletas dos clubes recebem salário do clube e pagam imposto como empregados.
-  for (const c of state.citizens) if (c.job !== null || c.athlete !== undefined) employed += productivity(overloaded, c.id);
+  // Quem mora num conjunto habitacional não paga (aluguel social).
+  for (const c of state.citizens) {
+    if (c.job === null && c.athlete === undefined) continue;
+    if (BUILDINGS[rt.buildingById.get(c.home)?.type]?.utility?.housing) continue;
+    employed += productivity(overloaded, c.id);
+  }
 
+  // Região metropolitana: quem trabalha nas vizinhas paga imposto aqui.
+  employed += commutersOut(state, rt);
+  const metro = commutersIn(state, rt);
   // Vagas ocupadas, já pesadas pelo modificador de imposto do nível do prédio.
   const jobsFilled = { commercial: 0, industrial: 0, rural: 0 };
   let utilities = 0;
@@ -51,7 +61,9 @@ export function monthlyBudget(state, rt) {
     }
     const key = ZONE_KEY[info.zone];
     if (key && b.abandoned === undefined) {
-      jobsFilled[key] += workers * mod(rt, `income.${key}.${info.level}`) * mod(rt, `income.${key}`) * freightFactor(rt, b);
+      // Trabalhadores de fora ocupam parte das vagas abertas do comércio e da indústria.
+      const outside = metro.ratio && key !== 'rural' ? openJobs(rt, b) * metro.ratio : 0;
+      jobsFilled[key] += (workers + outside) * mod(rt, `income.${key}.${info.level}`) * mod(rt, `income.${key}`) * freightFactor(rt, b);
     }
   }
 
@@ -62,7 +74,8 @@ export function monthlyBudget(state, rt) {
   const food = foodBalance(state, rt);
   const income = {
     residential: Math.round(employed * ECONOMY.incomePerWorker * taxes.residential * all),
-    commercial: Math.round(jobsFilled.commercial * ECONOMY.incomePerJob * taxes.commercial * all),
+    // Clientes de fora (região metropolitana) também compram no comércio.
+    commercial: Math.round(jobsFilled.commercial * ECONOMY.incomePerJob * taxes.commercial * all * (metroActive(state, rt) ? METRO.customers : 1)),
     industrial: Math.round(jobsFilled.industrial * ECONOMY.incomePerJob * taxes.industrial * all),
     rural: Math.round(jobsFilled.rural * ECONOMY.incomePerJob * (taxes.rural ?? ECONOMY.taxDefault) * all),
     statal: Math.round(statal),

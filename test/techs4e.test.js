@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUILDINGS, ECONOMY, EDU } from '../src/world/catalog.js';
+import { BUILDINGS, ECONOMY, EDU, ZONE } from '../src/world/catalog.js';
+import { setJob } from '../src/world/runtime.js';
+import { computeDemand } from '../src/systems/demand.js';
+import { commutersIn, commutersOut, metroActive } from '../src/systems/metro.js';
 import { TECH_BY_ID } from '../src/world/techs.js';
-import { applyCommand, rectTiles } from '../src/world/commands.js';
+import { applyCommand, planCommand, rectTiles } from '../src/world/commands.js';
 import { advance, prepare } from '../src/systems/simulation.js';
 import { completeTech } from '../src/systems/research.js';
 import { mod, utilityOutput } from '../src/systems/mods.js';
@@ -10,7 +13,7 @@ import { minEduFor } from '../src/systems/education.js';
 import { computeUtilities } from '../src/systems/utilities.js';
 import { computeCoverage } from '../src/systems/services.js';
 import { computeWellbeing } from '../src/systems/wellbeing.js';
-import { closeMonth, pppPayment } from '../src/systems/economy.js';
+import { closeMonth, monthlyBudget, pppPayment } from '../src/systems/economy.js';
 import { demandForecast, forecastText } from '../src/systems/census.js';
 import { canWork } from '../src/agents/citizens.js';
 import { TICKS_PER_DAY } from '../src/core/time.js';
@@ -135,4 +138,113 @@ test('nuclear: liberada pela pesquisa, 9.000 de energia, exige graduados e água
   assert.equal(minEduFor(rt, 'usina_nuclear'), EDU.SUPERIOR);
   assert.equal(BUILDINGS.usina_nuclear.utility.pollution, 0);
   assert.match(applyCommand(state, rt, { type: 'place', building: 'usina_nuclear', tile: at(2, 3) }).reason, /rio ou lago/);
+});
+
+// --- 4e-b: habitação social, impressão 3D, bairro planejado, região metropolitana ---
+
+test('as quatro tecnologias da 4e-b podem ser pesquisadas', () => {
+  for (const id of ['habitacao_social', 'impressao_3d', 'plano_piloto', 'regiao_metropolitana']) {
+    assert.equal(TECH_BY_ID.get(id).ready, true, id);
+  }
+});
+
+test('conjunto habitacional: recebe moradores, não cobra imposto residencial e deixa mais satisfeito', () => {
+  const { state, rt } = testCity({ seed: 6 });
+  advance(state, rt, TICKS_PER_DAY * 6);
+  applyCommand(state, rt, { type: 'bulldoze', tiles: rectTiles(S, 3, 3, 4, 4) });
+  assert.match(applyCommand(state, rt, { type: 'place', building: 'conjunto_habitacional', tile: at(3, 3) }).reason, /tecnologia/);
+  completeTech(state, rt, 'habitacao_social');
+  const money = state.economy.money;
+  assert.ok(applyCommand(state, rt, { type: 'place', building: 'conjunto_habitacional', tile: at(3, 3) }).ok);
+  assert.equal(money - state.economy.money, BUILDINGS.conjunto_habitacional.utility.cost);
+  const housing = state.buildings.find((b) => b.type === 'conjunto_habitacional');
+  advance(state, rt, TICKS_PER_DAY * 4);
+  const residents = [...rt.residents.get(housing.id)].map((id) => rt.citizenById.get(id));
+  assert.ok(residents.length > 0, 'gente se mudou para o conjunto');
+  assert.ok(rt.service.get(housing.id)?.power && rt.service.get(housing.id)?.water, 'com energia e água');
+
+  // Imposto residencial: os moradores do conjunto não contam.
+  const working = residents.filter((c) => c.job !== null);
+  const before = monthlyBudget(state, rt).income.residential;
+  for (const c of working) c.home = state.buildings.find((b) => rt.residents.get(b.id)?.size && b !== housing).id;
+  const after = monthlyBudget(state, rt).income.residential;
+  if (working.length) assert.ok(after > before, 'os mesmos trabalhadores fora do conjunto pagam imposto');
+  for (const c of working) c.home = housing.id;
+
+  computeCoverage(state, rt);
+  computeWellbeing(state, rt);
+  assert.ok(rt.wellbeing.get(housing.id).satisfaction > 0);
+
+  // Impressão 3D: 40% mais barato.
+  const full = BUILDINGS.conjunto_habitacional.utility.cost;
+  completeTech(state, rt, 'impressao_3d');
+  assert.ok(Math.abs(mod(rt, 'cost.conjunto_habitacional') - 0.6) < 1e-9);
+  assert.equal(planCommand(state, rt, { type: 'place', building: 'conjunto_habitacional', tile: at(20, 3) }).cost, Math.round(full * 0.6 * mod(rt, 'cost.utilities') * mod(rt, 'buildCost')));
+});
+
+test('bairro planejado: ruas a cada 5 tiles, faixas R, R e C, 30% mais barato', () => {
+  const { state, rt } = testCity({ utilities: false });
+  state.economy.money = 1_000_000;
+  // Área vazia à direita do mapa de teste? Usa um mapa só com grama.
+  const W = state.map.width;
+  state.map.road.fill(0);
+  state.map.zone.fill(0);
+  const rt2 = prepare(state);
+  const tiles = rectTiles(W, 5, 5, 20, 20);
+  assert.match(applyCommand(state, rt2, { type: 'district', tiles }).reason, /tecnologia/);
+  completeTech(state, rt2, 'plano_piloto');
+  assert.match(applyCommand(state, rt2, { type: 'district', tiles: rectTiles(W, 5, 5, 8, 8) }).reason, /6×6/);
+  const plan = planCommand(state, rt2, { type: 'district', tiles });
+  const money = state.economy.money;
+  assert.ok(applyCommand(state, rt2, { type: 'district', tiles }).ok);
+  assert.equal(money - state.economy.money, plan.cost);
+  // Ruas no contorno e a cada 5.
+  for (const [x, y] of [[5, 5], [20, 20], [10, 7], [7, 15], [15, 12]]) assert.ok(state.map.road[y * W + x], `rua em ${x},${y}`);
+  assert.equal(state.map.road[7 * W + 7], 0);
+  assert.equal(state.map.zone[7 * W + 7], ZONE.RESIDENTIAL);
+  assert.equal(state.map.zone[17 * W + 7], ZONE.COMMERCIAL);
+  // Custo: 70% do que custariam as ruas e as zonas separadas.
+  const { state: s2 } = testCity({ utilities: false });
+  s2.map.road.fill(0);
+  s2.map.zone.fill(0);
+  const r2 = prepare(s2);
+  completeTech(s2, r2, 'plano_piloto');
+  const roads = plan.roads;
+  const fullCost = planCommand(s2, r2, { type: 'road', road: 1, tiles: roads }).cost
+    + planCommand(s2, r2, { type: 'zone', zone: ZONE.RESIDENTIAL, tiles: tiles.filter((t) => !roads.includes(t)) }).cost;
+  assert.ok(Math.abs(plan.cost - Math.round(fullCost * 0.7)) <= 1, `${plan.cost} x ${fullCost}`);
+});
+
+test('região metropolitana: só com estrada para fora; gente de fora nas vagas e desempregados trabalhando nas vizinhas', () => {
+  const { state, rt } = testCity({ seed: 7 });
+  advance(state, rt, TICKS_PER_DAY * 8);
+  completeTech(state, rt, 'regiao_metropolitana');
+  computeDemand(state, rt);
+  assert.equal(metroActive(state, rt), false, 'sem estrada saindo do mapa');
+  const before = monthlyBudget(state, rt);
+  // Estrada até a borda (x = 0).
+  assert.ok(applyCommand(state, rt, { type: 'road', tiles: [at(0, 2)] }).ok);
+  assert.equal(metroActive(state, rt), true);
+  // Força desemprego e vagas abertas para ver os dois lados.
+  const jobless = state.citizens.filter((c) => c.job !== null).slice(0, 20);
+  for (const c of jobless) setJob(rt, c, null);
+  computeDemand(state, rt);
+  const out = commutersOut(state, rt);
+  assert.ok(out > 0);
+  assert.equal(rt.stats.outside, out);
+  const inside = commutersIn(state, rt);
+  assert.ok(inside.total > 0 && inside.ratio > 0 && inside.ratio <= 0.5);
+  const after = monthlyBudget(state, rt);
+  assert.ok(after.income.commercial + after.income.industrial > 0);
+  assert.ok(after.income.residential > 0);
+  assert.ok(before.income.total > 0);
+
+  // Carros de quem vem e vai: aparecem de manhã.
+  advance(state, rt, TICKS_PER_DAY - (state.time.tick % TICKS_PER_DAY) + 8 * 60);
+  assert.ok(state.visitors.some((v) => v.commute), 'carros da região metropolitana');
+  const { state: copy } = readSave(JSON.stringify(createSave(state, { id: 'metro' })));
+  const rc = prepare(copy);
+  advance(state, rt, 600);
+  advance(copy, rc, 600);
+  assert.deepEqual(copy.visitors, state.visitors);
 });
