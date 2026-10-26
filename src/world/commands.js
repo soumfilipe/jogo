@@ -9,6 +9,7 @@
 //   { type: 'zone',     tiles, zone, density? }
 //   { type: 'district', tiles }          (bairro planejado: ruas e zonas de uma vez, com a pesquisa)
 //   { type: 'terrain', tiles, mode }     (terraplanagem: raise | lower | level; ver terraform.js)
+//   { type: 'disasters', level }         (desastres: off | rare | normal; ver systems/disasters.js)
 //                       (zone = ZONE.NONE remove a zona; density padrão: média.
 //                        Mudar só a densidade vale também em lote construído)
 //   { type: 'bulldoze', tiles }
@@ -42,6 +43,7 @@ import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } fr
 import { canBuildOn, isBuildable } from './world.js';
 import { slopeOf } from './relief.js';
 import { applyTerrain, planTerrain } from './terraform.js';
+import { setDisasterLevel } from '../systems/disasters.js';
 import { computeLandValue } from '../systems/landvalue.js';
 import { BUILDING_TECH, TECH_BY_ID, marcoAt } from './techs.js';
 import { pppActive, pppContract, repayLoan, setPpp, setTax, takeLoan } from '../systems/economy.js';
@@ -233,6 +235,7 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'cancelRace') return cancelRace(state, rt, cmd);
   if (cmd.type === 'raceOptions') return raceOptions(state, rt, cmd);
   if (cmd.type === 'district') return buildDistrict(state, rt, cmd);
+  if (cmd.type === 'disasters') return setDisasterLevel(state, cmd.level);
   if (cmd.type === 'terrain') {
     const result = applyTerrain(state, rt, cmd);
     if (result.ok) computeLandValue(state, rt); // mapa de relevo e vista do alto

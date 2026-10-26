@@ -809,6 +809,37 @@ O mapa tem morros (`src/world/relief.js`, números em `RELIEF` no catálogo):
   - grama amarelada depois de 15, 30 e 45 dias sem chuva.
 - **Saves antigos** (formato 22): ficam no clima subtropical, sem histórico de chuva.
 
+## Desastres (etapa D3a)
+
+Enchente, deslizamento e queimada saem do tempo e do relevo
+(`src/systems/disasters.js`, números em `DISASTERS` no catálogo). Não há
+botão de provocar.
+
+**Opção** no jogo novo e em Arquivo › Desastres:
+- desligados: nunca acontecem;
+- raros: chances ×0,4;
+- normais: o padrão.
+
+| Desastre | Quando | O que faz | O que reduz |
+| --- | --- | --- | --- |
+| Enchente | chuva de 30 dias acima da do mês mais chuvoso do clima (×1,15), ou 60 mm num dia | alaga a terra baixa (até 2 níveis) a até 4 tiles da água por 2 a 5 dias; ruas alagadas fecham e as rotas desviam; prédios ficam danificados e alguns se perdem | *Drenagem sustentável* ×0,5; *Cidade-esponja* ×0,3; mata perto absorve |
+| Deslizamento | 40 mm num dia, ou a chuva de 30 dias da enchente | encosta íngreme ocupada cede: o prédio vira ruína, a rua some e a encosta baixa | *Contenção de encostas* ×0,2; mata na encosta segura |
+| Queimada | 20 dias sem chuva num dia de calor, ou 40 dias sem chuva | o fogo anda pela mata, hora a hora; a mata vira chão queimado (e rebrota), prédios encostados pegam fogo, a fumaça polui; a chuva apaga | *Brigada florestal* ×0,3; bombeiros no raio; parques de conservação |
+
+- **Estragos:**
+  - prédio **danificado**: não recebe moradores nem contrata até o reparo (12 dias);
+  - o reparo é cobrado no fechamento do mês, na linha "Reconstrução" do orçamento;
+  - prédio **perdido**: vira ruína, e quem morava ou trabalhava nele pode morrer.
+- ***Defesa civil*** (prédio no menu Serviços): no raio, estragos até ×0,6 e reparos na metade do tempo.
+- ***Alerta de desastres***: mortes ×0,1.
+- **Na tela:**
+  - água de enchente por cima dos tiles alagados;
+  - chamas e fumaça na queimada;
+  - chão de lama ou de cinza por algumas semanas.
+- **Notícias:** cada desastre vira notícia, com os estragos, as mortes e as críticas quando faltou drenagem, contenção, brigada ou defesa civil.
+- **Saves antigos** (formato 23): desastres normais, sem nada acontecendo.
+- **Ainda virão (D3b):** seca (bombas e poços rendem menos), tempestade (queda de energia e árvores na rua), onda de calor (saúde dos idosos) e os mapas de risco.
+
 ## Ambiente
 
 Efeitos só visuais (nada vai para o save), animados em tempo real mesmo com o
@@ -958,7 +989,8 @@ Saves do formato 20 (antes da zona mista) abrem sem mudança; o formato 21 só
 impede que uma versão antiga do jogo abra um save com prédios mistos.
 Saves do formato 21 (antes do relevo) ganham a altitude da semente, com a
 cidade já construída aplainada no nível 0. Saves do formato 22 (antes do
-clima) ficam no clima subtropical.
+clima) ficam no clima subtropical. Saves do formato 23 (antes dos desastres)
+ficam com desastres normais.
 
 Saves do formato 18 (antes da base) abrem com as escolinhas fechadas e sem propostas.
 
@@ -1015,7 +1047,7 @@ src/world/              estado (world.js), catálogo de prédios, terreno, relev
                         índices derivados (runtime.js), ações do jogador,
                         textos das notícias (stories.js)
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes
-src/systems/            demanda, clima e tempo (weather.js), valor do terreno, energia e água, crescimento e níveis, empresas,
+src/systems/            demanda, clima e tempo (weather.js), desastres (disasters.js), valor do terreno, energia e água, crescimento e níveis, empresas,
                         economia, ordem dos sistemas
 src/render/             projeção isométrica, câmera, renderizador, desenho
                         dos prédios, minimapa

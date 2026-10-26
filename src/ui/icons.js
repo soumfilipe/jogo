@@ -131,6 +131,7 @@ export const ICONS = {
   posto_saude: '<path d="M17 3.5l3.5 3.5M18.75 5.25l-3 3"/><path class="t" d="M15.5 6 18 8.5 9 17.5 6.5 15z"/><path d="M7.75 16.25 3.5 20.5M10 11.5l1.5 1.5M12.5 9l1.5 1.5"/>',
   caps: '<path d="M9 21v-3.5H6.5A1.5 1.5 0 0 1 5 16v-3l-1.5-.5L5 9.5A7 7 0 0 1 19 9.5c0 2.5-1 4.4-2.5 5.5V21"/><path class="t" d="M12 14.2 9.7 11.9a1.5 1.5 0 0 1 2.3-1.9 1.5 1.5 0 0 1 2.3 1.9z"/>',
   delegacia: '<path class="t" d="M12 2.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 15.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  centro_defesa_civil: '<path class="t" d="M12 2.5 21.5 19h-19z"/><path d="M12 9v5M12 16.5v.5"/>',
   guarda_municipal: '<path class="t" d="M12 3 4.5 6v5.5c0 4.5 3.2 8 7.5 9.5 4.3-1.5 7.5-5 7.5-9.5V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
   central_cameras: '<path class="t" d="M3 7.5 15 4l1.8 6L4.8 13.5z"/><path d="M16.2 8l3.3-1 1 3.3-3.3 1M8 12.3 9.3 17H4M4 14.5v5"/>',
   quartel_bombeiros: '<path class="t" d="M9 9v10.5h6V9a3 3 0 0 0-6 0z"/><path d="M12 4.5V6M7.5 21h9M7.5 9h9M6 13h3M15 13h3"/><circle cx="12" cy="13" r="1.2"/>',

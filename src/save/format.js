@@ -26,9 +26,10 @@ import { talentOf } from '../agents/citizens.js';
 import { createNews } from '../systems/news.js';
 import { createSports } from '../systems/sports.js';
 import { createWeather, dayWeather } from '../systems/weather.js';
+import { createDisasters } from '../systems/disasters.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 23;
+export const SAVE_VERSION = 24;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -294,6 +295,13 @@ const MIGRATIONS = {
     weather.today = dayWeather(save.data.seed, weather.climate, day);
     save.data.weather = weather;
     save.version = 23;
+    return save;
+  },
+  // v23 -> v24: desastres. Ligados no nível normal, sem nada acontecendo.
+  23: (save) => {
+    save.data.settings ??= { disasters: 'normal' };
+    save.data.disasters ??= createDisasters();
+    save.version = 24;
     return save;
   },
 };

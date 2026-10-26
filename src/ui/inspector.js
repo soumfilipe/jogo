@@ -56,7 +56,13 @@ function renderBuilding(el, b, state, rt) {
   const upgrade = upgradeBlockers(state, rt, b);
   let next = '';
   const service = rt.service?.get(b.id);
-  if (b.burned) {
+  if (b.ruined) {
+    const why = { enchente: 'Perdido na enchente', deslizamento: 'Destruído por um deslizamento de terra', queimada: 'Destruído pela queimada' }[b.ruined] ?? 'Destruído';
+    next = `${why}: vai desabar se não for demolido.`;
+  } else if (b.damaged) {
+    const days = Math.max(1, Math.ceil((b.damaged.until - state.time.tick) / 1440));
+    next = `Danificado por um desastre: fechado para reparos por mais ${days} dia${days > 1 ? 's' : ''} (sem moradores novos nem contratações).`;
+  } else if (b.burned) {
     next = 'Destruído por um incêndio: vai desabar se não for demolido. Quartéis de bombeiros apagam o fogo no raio deles.';
   } else if (b.abandoned !== undefined) {
     next = 'Abandonado: ninguém mora ou trabalha aqui. Vai desabar se não for demolido.';

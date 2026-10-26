@@ -9,7 +9,8 @@ import { generateForest } from '../src/world/terrain.js';
 import { TICKS_PER_DAY } from '../src/core/time.js';
 
 function world() {
-  const state = createWorld({ width: 32, height: 32, seed: 5 });
+  // Sem desastres: um deslizamento ou uma queimada mudaria o terreno do teste.
+  const state = createWorld({ width: 32, height: 32, seed: 5, disasters: 'off' });
   state.map.terrain.fill(TERRAIN.GRASS);
   state.map.forest.fill(0);
   return state;

@@ -6,8 +6,9 @@
 // e movimento (prédios em volta), e cai com a poluição das indústrias e dos
 // carros e com o barulho de avenidas e vias expressas.
 
-import { BUILDINGS, MIXED, RELIEF, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
+import { BUILDINGS, DISASTERS, MIXED, RELIEF, ROAD_TYPES, TERRAIN, TRAFFIC, WASTE, ZONE } from '../world/catalog.js';
 import { isSteep, tileHeight } from '../world/relief.js';
+import { burningTiles } from './disasters.js';
 import { mod, utilityPollution } from './mods.js';
 import { countOccupancy } from './traffic.js';
 import { computeWaste } from './waste.js';
@@ -40,9 +41,11 @@ export function computeLandValue(state, rt) {
 
   // Rio poluído pelo esgoto vale menos como paisagem (e aparece no mapa de poluição).
   const river = computeSanitation(state, rt).river;
+  const parkValue = mod(rt, 'parkValue');
   for (let i = 0; i < n; i++) {
     if (terrain[i] === TERRAIN.WATER) nature[i] = 1 - 0.5 * river;
-    else if (terrain[i] === TERRAIN.FOREST) nature[i] = state.map.park?.[i] ? 1.6 : 1; // parque vale mais
+    // Parque vale mais (e mais ainda na cidade-esponja).
+    else if (terrain[i] === TERRAIN.FOREST) nature[i] = state.map.park?.[i] ? 1.6 * parkValue : 1;
     else if (terrain[i] === TERRAIN.SAND) nature[i] = 0.5;
   }
   const industryPollution = mod(rt, 'pollution.industry');
@@ -63,6 +66,8 @@ export function computeLandValue(state, rt) {
     if (info.zone === ZONE.RURAL) industry[b.tile] += weight * farmPollution;
     if (info.utility) industry[b.tile] += utilityPollution(rt, b.type);
   }
+  // Fumaça das queimadas.
+  for (const t of burningTiles(state)) industry[t] += DISASTERS.wildfire.smoke;
   // Lixo sem coleta polui em volta.
   const waste = computeWaste(state, rt);
   for (const b of state.buildings) {

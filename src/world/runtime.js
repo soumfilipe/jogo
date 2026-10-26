@@ -136,13 +136,14 @@ export function frontTile(state, b) {
 // Nas zonas comercial e industrial, só contratam as empresas: andar vago não
 // tem vagas.
 export function vacancies(rt, b) {
-  if (b.abandoned !== undefined) return 0;
+  // Danificado por um desastre: fechado até o reparo.
+  if (b.abandoned !== undefined || b.damaged) return 0;
   if (!BUILDINGS[b.type].residents) return 0;
   return capacityOf(b) - rt.residents.get(b.id).size;
 }
 
 export function openJobs(rt, b) {
-  if (b.abandoned !== undefined) return 0;
+  if (b.abandoned !== undefined || b.damaged) return 0;
   const info = BUILDINGS[b.type];
   // Térreo do prédio misto: comércio de bairro, sem empresas.
   if (info.shop) return info.shop - rt.workers.get(b.id).size;

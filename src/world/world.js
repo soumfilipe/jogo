@@ -13,6 +13,7 @@ import { createCulture } from '../systems/culture.js';
 import { createNews } from '../systems/news.js';
 import { createSports } from '../systems/sports.js';
 import { createWeather } from '../systems/weather.js';
+import { createDisasters } from '../systems/disasters.js';
 
 export const DEFAULT_MAP_SIZE = 256;
 
@@ -23,6 +24,7 @@ export function createWorld({
   seed = (Math.random() * 2 ** 32) >>> 0,
   startMarco = 1,
   climate = 'subtropical',
+  disasters = 'normal',
 } = {}) {
   const terrain = generateTerrain(width, height, seed);
   const research = createResearch(startMarco);
@@ -86,6 +88,9 @@ export function createWorld({
     health: { epidemicUntil: 0 },
     // Clima do mapa e tempo do dia (ver systems/weather.js).
     weather: createWeather(seed, climate),
+    // Opções do jogo: desastres desligados, raros ou normais (systems/disasters.js).
+    settings: { disasters },
+    disasters: createDisasters(),
     wellbeing: { health: 0.55, crime: 0, satisfaction: 0.5 },
     nextId: 1,
   };
