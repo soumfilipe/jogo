@@ -557,6 +557,22 @@ export const FOREST = {
   spreadDensity: 3,
 };
 
+// Relevo: altura de cada canto de tile (state.map.elevation, (W+1)×(H+1)), de
+// 0 (nível da água) a maxLevel. Cantos vizinhos (na horizontal ou vertical)
+// diferem no máximo maxStep. O declive de um tile é a diferença entre o canto
+// mais alto e o mais baixo (ver src/world/relief.js):
+//   px:            quantos pixels (zoom 1) sobe cada nível no desenho. Com
+//                  maxStep × px ≤ 16 (meio tile), o chão nunca encobre o chão
+//                  de trás: dá para desenhá-lo em qualquer ordem
+//   maxBuildSlope: até este declive dá para construir rua e prédio (com
+//                  fundação); acima é encosta íngreme
+//   slopeCost:     prédio e rua em declive custam (1 + slopeCost × declive / maxStep)
+//   terraformCost: preço de subir ou descer um canto em um nível
+//   viewBonus:     valor do terreno a mais no alto (vista), cheio a partir de viewFrom + 16 níveis
+export const RELIEF = {
+  maxLevel: 32, px: 4, maxStep: 4, maxBuildSlope: 4, slopeCost: 0.5, terraformCost: 2, viewBonus: 0.06, viewFrom: 8,
+};
+
 // Tipos de rua (o valor de state.map.road: 0 é sem rua). `speed` multiplica a
 // velocidade dos carros, `capacity` é quantos carros cabem num tile antes de
 // engarrafar, `cost` é o preço por tile (a avenida e a via expressa vêm da

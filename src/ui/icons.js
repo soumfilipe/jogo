@@ -74,6 +74,10 @@ export const ICONS = {
   calcadao: '<circle cx="13" cy="4.5" r="1.8"/><path d="M12.5 8 10 13l3 2.5V21M10 13l-2.5 7.5M12.5 8l3.5 3.5 3 .5M12.5 8 9 9.5l-1.5 3"/>',
   residencial: '<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
   comercial: '<path d="M4 10.5V20h16v-9.5"/><path d="M3.5 4h17L22 9a2.5 2.5 0 0 1-5 .5 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0A2.5 2.5 0 0 1 2 9z"/><path d="M9.5 20v-5h5v5"/>',
+  // Terraplanagem: morro com seta para cima, para baixo, e terreno nivelado.
+  subir: '<path d="M2 20h20M4 20l5-7 3 3 3-5 5 9"/><path class="t" d="M12 2.5v6M9.5 5 12 2.5 14.5 5"/>',
+  descer: '<path d="M2 20h20M4 20l5-7 3 3 3-5 5 9"/><path class="t" d="M12 2.5v6M9.5 6 12 8.5 14.5 6"/>',
+  aplainar: '<path d="M2 20h20M3 15.5h18"/><path class="t" d="M5 11l3-3 3 3M13 8l3 3 3-3"/>',
   // Mista: apartamentos com toldo de loja no térreo.
   mista: '<path d="M5.5 20V3.5h13V20M3 20.5h18"/><path d="M8.5 7h2M13.5 7h2M8.5 10.5h2M13.5 10.5h2"/><path class="t" d="M4 13.5h16l-1.5 2.5h-13z"/><path d="M10.5 20v-3h3v3"/>',
   industrial: '<path d="M3 20.5V12l5-3v3l5-3v3l5-3V3.5h2.5v17zM2 20.5h20"/><path d="M6.5 16.5h1.5M10.5 16.5H12M14.5 16.5H16"/>',

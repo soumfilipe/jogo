@@ -13,7 +13,7 @@ import { consumption, isServed, RESOURCES, reserve, spare } from './utilities.js
 import { chance, pick, randomInt } from '../core/rng.js';
 import { TICKS_PER_DAY } from '../core/time.js';
 import { moveInFamily } from './demography.js';
-import { isBuildable } from '../world/world.js';
+import { canBuildOn } from '../world/world.js';
 import { levelUnlocked, mod, ZONE_KEY } from './mods.js';
 import { LEVEL_TECH, TECH_BY_ID } from '../world/techs.js';
 
@@ -230,7 +230,7 @@ function isFreeLot(state, rt, tile, z = state.map.zone[tile]) {
     state.map.zone[tile] === z &&
     !state.map.road[tile] &&
     !rt.buildingAt[tile] &&
-    isBuildable(state, tile)
+    canBuildOn(state, tile)
   );
 }
 

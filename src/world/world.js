@@ -3,7 +3,8 @@
 
 import { createRng } from '../core/rng.js';
 import { DENSITY, ECONOMY, TERRAIN } from './catalog.js';
-import { generateForest, generateTerrain } from './terrain.js';
+import { isSteep } from './relief.js';
+import { generateElevation, generateForest, generateTerrain } from './terrain.js';
 import { createResearch } from '../systems/research.js';
 import { createEducation } from '../systems/education.js';
 import { createPolicies } from '../systems/policies.js';
@@ -50,6 +51,8 @@ export function createWorld({
       height,
       terrain,
       forest: generateForest(terrain, width, height, seed), // densidade da mata (0 = sem)
+      // Altura dos cantos dos tiles, (W+1)×(H+1) (ver src/world/relief.js).
+      elevation: generateElevation(terrain, width, height, seed),
       zone: new Uint8Array(width * height),
       // Densidade de cada tile zoneado (DENSITY no catálogo).
       density: new Uint8Array(width * height).fill(DENSITY.MEDIUM),
@@ -86,4 +89,9 @@ export function createWorld({
 
 export function isBuildable(state, tile) {
   return state.map.terrain[tile] !== TERRAIN.WATER;
+}
+
+/** Dá para ter rua ou prédio no tile: não é água nem encosta íngreme. */
+export function canBuildOn(state, tile) {
+  return isBuildable(state, tile) && !isSteep(state.map, tile);
 }

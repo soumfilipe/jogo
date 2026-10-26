@@ -14,10 +14,11 @@
 
 import { calendar } from '../core/time.js';
 import { decodeTable, encodeTable } from './table.js';
-import { generateForest } from '../world/terrain.js';
+import { generateElevation, generateForest } from '../world/terrain.js';
+import { flattenDeveloped } from '../world/relief.js';
 import { createResearch } from '../systems/research.js';
 import { createEducation } from '../systems/education.js';
-import { EDUCATION } from '../world/catalog.js';
+import { BUILDINGS, EDUCATION } from '../world/catalog.js';
 import { AREA_IDS, marcoAt } from '../world/techs.js';
 import { createRng, hash2 } from '../core/rng.js';
 import { createCulture } from '../systems/culture.js';
@@ -26,7 +27,7 @@ import { createNews } from '../systems/news.js';
 import { createSports } from '../systems/sports.js';
 
 export const SAVE_FORMAT = 'jogo-save';
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 export const GAME_VERSION = '0.9.0';
 export const SAVE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -269,6 +270,19 @@ const MIGRATIONS = {
   // dados; a versão nova só impede que um jogo antigo abra o save.
   20: (save) => {
     save.version = 21;
+    return save;
+  },
+  // v21 -> v22: relevo. A altura dos cantos sai da semente, e o que a cidade
+  // já ocupa (ruas, zonas, parques e prédios) fica plano, no nível 0.
+  21: (save) => {
+    const data = save.data;
+    const m = data.map;
+    const map = { width: m.width, height: m.height, road: decodeState(m.road), zone: decodeState(m.zone), park: m.park && decodeState(m.park) };
+    map.elevation = generateElevation(decodeState(m.terrain), m.width, m.height, data.seed);
+    const lots = decodeTable(data.buildings).map((b) => ({ tile: b.tile, size: BUILDINGS[b.type]?.size ?? 1 }));
+    flattenDeveloped(map, lots);
+    m.elevation = encodeState(map.elevation);
+    save.version = 22;
     return save;
   },
 };

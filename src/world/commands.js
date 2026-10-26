@@ -8,6 +8,7 @@
 //                                         sobre uma rua de tipo menor, melhora ela)
 //   { type: 'zone',     tiles, zone, density? }
 //   { type: 'district', tiles }          (bairro planejado: ruas e zonas de uma vez, com a pesquisa)
+//   { type: 'terrain', tiles, mode }     (terraplanagem: raise | lower | level; ver terraform.js)
 //                       (zone = ZONE.NONE remove a zona; density padrão: média.
 //                        Mudar só a densidade vale também em lote construído)
 //   { type: 'bulldoze', tiles }
@@ -36,9 +37,12 @@
 //   { type: 'race', from, to, day?, name?, marketing?, annual? }  (corrida de rua; ver systems/races.js)
 //   { type: 'cancelRace', id } / { type: 'raceOptions', id, annual?, marketing? }
 
-import { BUILDINGS, COSTS, DENSITY, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
+import { BUILDINGS, COSTS, DENSITY, RELIEF, ROAD_TYPES, TERRAIN, ZONE } from './catalog.js';
 import { addBuilding, clearForest, recomputeRoads, removeBuilding, touchMap } from './runtime.js';
-import { isBuildable } from './world.js';
+import { canBuildOn, isBuildable } from './world.js';
+import { slopeOf } from './relief.js';
+import { applyTerrain, planTerrain } from './terraform.js';
+import { computeLandValue } from '../systems/landvalue.js';
 import { BUILDING_TECH, TECH_BY_ID, marcoAt } from './techs.js';
 import { pppActive, pppContract, repayLoan, setPpp, setTax, takeLoan } from '../systems/economy.js';
 import { computeMods, isUnlocked, mod, utilityCost } from '../systems/mods.js';
@@ -65,6 +69,7 @@ export function planCommand(state, rt, cmd) {
   if (cmd.type === 'revitalize') return planRevitalize(state, rt, cmd);
   if (cmd.type === 'race') return planRace(state, rt, cmd);
   if (cmd.type === 'district') return planDistrict(state, rt, cmd).plan;
+  if (cmd.type === 'terrain') return planTerrain(state, rt, cmd);
   const { road, zone, terrain, density } = state.map;
   const park = state.map.park;
   if (cmd.type === 'park' && !rt.techDone?.has(TOOL_TECH.parque)) {
@@ -90,7 +95,7 @@ export function planCommand(state, rt, cmd) {
       if (!forest || park?.[tile] || road[tile] || rt.buildingAt[tile]) continue;
       cost += COSTS.park * mod(rt, 'buildCost');
     } else if (cmd.type === 'road') {
-      if (rt.buildingAt[tile] || !isBuildable(state, tile)) continue;
+      if (rt.buildingAt[tile] || !canBuildOn(state, tile)) continue;
       // O calçadão troca com qualquer rua (nos dois sentidos); entre as vias de
       // carro, só se melhora (avenida sobre expressa não piora a via).
       const pedestrian = ROAD_TYPES[roadType].pedestrian || ROAD_TYPES[road[tile]]?.pedestrian;
@@ -98,7 +103,7 @@ export function planCommand(state, rt, cmd) {
       // Rua nova paga o tipo inteiro; mudar uma rua paga só a diferença (no mínimo uma rua).
       cost += road[tile]
         ? Math.max(roadCost(rt, 1), roadCost(rt, roadType) - roadCost(rt, road[tile]))
-        : roadCost(rt, roadType) + (forest ? c.clearForest : 0);
+        : roadCost(rt, roadType) * slopeFactor(state, tile) + (forest ? c.clearForest : 0);
     } else if (cmd.type === 'zone') {
       if (road[tile] || !isBuildable(state, tile)) continue;
       const sameZone = zone[tile] === cmd.zone;
@@ -222,6 +227,11 @@ export function applyCommand(state, rt, cmd) {
   if (cmd.type === 'cancelRace') return cancelRace(state, rt, cmd);
   if (cmd.type === 'raceOptions') return raceOptions(state, rt, cmd);
   if (cmd.type === 'district') return buildDistrict(state, rt, cmd);
+  if (cmd.type === 'terrain') {
+    const result = applyTerrain(state, rt, cmd);
+    if (result.ok) computeLandValue(state, rt); // mapa de relevo e vista do alto
+    return result;
+  }
   if (cmd.type === 'policy') {
     const result = setPolicy(state, rt, cmd.id, cmd.on);
     if (result.ok) computeMods(state, rt);
@@ -312,6 +322,8 @@ export function applyCommand(state, rt, cmd) {
 }
 
 const zoneDensity = (cmd) => cmd.density ?? DENSITY.MEDIUM;
+/** Rua ou prédio em declive custa mais (ver RELIEF.slopeCost). */
+const slopeFactor = (state, tile) => 1 + (RELIEF.slopeCost * slopeOf(state.map, tile)) / RELIEF.maxStep;
 
 /**
  * Revitalização: um prédio industrial 1x1 abandonado vira centro cultural
@@ -342,7 +354,7 @@ function planPlace(state, rt, cmd) {
   const { width, height, road, terrain } = state.map;
   const x0 = cmd.tile % width;
   const y0 = Math.floor(cmd.tile / width);
-  const cost = utilityCost(rt, cmd.building);
+  let cost = utilityCost(rt, cmd.building);
   const tiles = [];
   for (let dy = 0; dy < info.size; dy++) {
     for (let dx = 0; dx < info.size; dx++) tiles.push((y0 + dy) * width + x0 + dx);
@@ -353,10 +365,15 @@ function planPlace(state, rt, cmd) {
     return fail(`Precisa da tecnologia ${tech.name} (marco ${marcoAt(tech.order).id}).`);
   }
   if (x0 + info.size > width || y0 + info.size > height) return fail('Fora do mapa.');
+  let slope = 0;
   for (const t of tiles) {
     if (terrain[t] === TERRAIN.WATER) return fail('Não dá para construir na água.');
     if (road[t] || rt.buildingAt[t]) return fail('O terreno precisa estar livre.');
+    if (!canBuildOn(state, t)) return fail('Encosta íngreme demais: aplaine com a terraplanagem.');
+    slope = Math.max(slope, slopeOf(state.map, t));
   }
+  // Terreno inclinado: a fundação encarece a obra.
+  cost = Math.round(cost * (1 + (RELIEF.slopeCost * slope) / RELIEF.maxStep));
   const around = [];
   for (const t of tiles) {
     const x = t % width;

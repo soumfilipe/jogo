@@ -734,6 +734,42 @@ todo diurno). Nos serviços públicos, valem as frações de `SHIFTS` no catálo
 Assim há carros na rua também no horário de almoço, à noite e de madrugada. O turno aparece
 no painel do cidadão.
 
+## Relevo e terraplanagem
+
+O mapa tem morros (`src/world/relief.js`, números em `RELIEF` no catálogo):
+
+- **Altitude nos cantos:** cada canto de tile tem uma altura de 0 (nível da água) a 32.
+  - Vem da semente: sobe longe da água, com morros de um ruído próprio.
+  - Cantos vizinhos diferem no máximo 4 níveis. Assim o chão nunca esconde o
+    chão de trás, e o desenho continua rápido.
+- **Desenho:**
+  - cada tile é um quadrilátero com os cantos na altura deles, iluminado pela
+    inclinação (luz do alto à esquerda) e um pouco mais claro no alto;
+  - as ruas acompanham o declive;
+  - carros, pessoas e árvores andam e ficam na altura do chão;
+  - a borda do mapa mostra um barranco de terra;
+  - o minimapa também clareia no alto.
+- **Prédios:** ficam na altura média do lote. Em lote inclinado, uma
+  **fundação** de concreto desce até o canto mais baixo.
+- **Custo e encostas:**
+  - rua e prédio em declive custam mais (até +50% no declive máximo);
+  - acima de 4 níveis de declive é **encosta íngreme**: não recebe rua nem
+    prédio, e lote zoneado ali não cresce.
+- **Valor do terreno:** a vista do alto valoriza até +6%.
+- **Mapa "Relevo"** (Mapas › Cidade): altura em cores, com as encostas íngremes
+  em vermelho.
+- **Terraplanagem** (menu Ruas › Terreno): arrastar sobre os tiles.
+  - Modos: subir, descer ou aplainar (nivela na altura do primeiro tile).
+  - Custa $2 por nível de cada canto mexido, contando os vizinhos que se
+    ajustam em rampa.
+  - Não mexe embaixo de prédios nem na beira da água.
+  - Recusa se uma rua ficaria íngreme demais.
+- **Seleção do tile:** o tile sob o mouse segue o raio da câmera, então o topo
+  de um morro é selecionado, não o chão atrás dele.
+- **Saves antigos** (formato 21 ou anterior): ganham o relevo da semente, mas
+  tudo o que a cidade já ocupa (ruas, zonas, parques e prédios) fica plano no
+  nível 0, com rampas até os morros em volta.
+
 ## Ambiente
 
 Efeitos só visuais (nada vai para o save), animados em tempo real mesmo com o
@@ -881,6 +917,8 @@ manhã caiu de 3,6 MB para 0,9 MB. O arquivo é gravado como JSON compacto.
 Saves do formato 19 (antes das corridas de rua) abrem sem corridas marcadas.
 Saves do formato 20 (antes da zona mista) abrem sem mudança; o formato 21 só
 impede que uma versão antiga do jogo abra um save com prédios mistos.
+Saves do formato 21 (antes do relevo) ganham a altitude da semente, com a
+cidade já construída aplainada no nível 0.
 
 Saves do formato 18 (antes da base) abrem com as escolinhas fechadas e sem propostas.
 
@@ -932,7 +970,8 @@ server.js               servidor local: arquivos estáticos + API /api/saves
 index.html, styles.css  interface
 src/main.js             liga simulação, renderização, controles e salvamento
 src/core/               relógio/laço, tempo do jogo, RNG com semente
-src/world/              estado (world.js), catálogo de prédios, terreno,
+src/world/              estado (world.js), catálogo de prédios, terreno, relevo
+                        (relief.js) e terraplanagem (terraform.js),
                         índices derivados (runtime.js), ações do jogador,
                         textos das notícias (stories.js)
 src/agents/             cidadãos (rotina e movimento), pathfinding, nomes

@@ -1,5 +1,6 @@
 import { createWorld } from './world/world.js';
-import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, NEWS, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
+import { heightAt } from './world/relief.js';
+import { BUILDINGS, DENSITY, DENSITY_INFO, EDUCATION, NEWS, RELIEF, ROAD_TYPES, ZONE, ZONE_INFO } from './world/catalog.js';
 import { radiusOf, seatsOf } from './systems/education.js';
 import { serviceRadius } from './systems/services.js';
 
@@ -9,7 +10,7 @@ import {
 } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { forecastText } from './systems/census.js';
-import { isUnlocked, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
+import { isUnlocked, mod, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
 import { advance, prepare, tick } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
@@ -45,6 +46,10 @@ const TOOLS = [
   { id: 'avenida', name: 'Avenida', shape: 'line', road: 2, color: 'rgba(255,255,255,0.45)', swatch: '#4c4f57', group: 'road' },
   { id: 'expressa', name: 'Via expressa', label: 'Expressa', shape: 'line', road: 3, color: 'rgba(255,255,255,0.55)', swatch: '#3d4047', group: 'road' },
   { id: 'calcadao', name: 'Calçadão', shape: 'line', road: 4, color: 'rgba(216,207,189,0.7)', swatch: '#d8cfbd', group: 'road' },
+  // Terraplanagem: arrastar sobe, desce ou nivela os cantos dos tiles (ver world/terraform.js).
+  { id: 'subir', name: 'Subir terreno', label: 'Subir', shape: 'rect', terrain: 'raise', color: 'rgba(196,160,110,0.45)', swatch: '#b08a5a', group: 'terrain' },
+  { id: 'descer', name: 'Descer terreno', label: 'Descer', shape: 'rect', terrain: 'lower', color: 'rgba(140,110,80,0.45)', swatch: '#8a6a48', group: 'terrain' },
+  { id: 'aplainar', name: 'Aplainar (na altura do primeiro tile)', label: 'Aplainar', shape: 'rect', terrain: 'level', color: 'rgba(170,190,120,0.45)', swatch: '#9aa86a', group: 'terrain' },
   ...[ZONE.RESIDENTIAL, ZONE.COMMERCIAL, ZONE.MIXED, ZONE.INDUSTRIAL, ZONE.RURAL].map((zone) => ({
     id: `zone-${zone}`, name: ZONE_INFO[zone].name, key: ZONE_INFO[zone].key,
     shape: 'rect', zone, color: ZONE_INFO[zone].color + '88', swatch: ZONE_INFO[zone].color, group: 'zone',
@@ -101,13 +106,13 @@ const TOOLS = [
 // Grupos de ferramentas e os menus da barra, por área. Inspecionar e Demolir
 // ficam fora dos menus, como botões diretos.
 const GROUPS = {
-  road: 'Ruas', zone: 'Zonas', utility: 'Energia e água', waste: 'Lixo e esgoto',
+  road: 'Ruas', terrain: 'Terreno', zone: 'Zonas', utility: 'Energia e água', waste: 'Lixo e esgoto',
   education: 'Educação', services: 'Saúde e segurança', food: 'Alimentos',
   leisure: 'Lazer', tourism: 'Turismo e cultura', transit: 'Transporte público', freight: 'Carga',
   research: 'Pesquisa e estatais',
 };
 const MENUS = [
-  { id: 'ruas', name: 'Ruas', icon: 'roads', groups: ['road'] },
+  { id: 'ruas', name: 'Ruas', icon: 'roads', groups: ['road', 'terrain'] },
   { id: 'zonas', name: 'Zonas', icon: 'zones', groups: ['zone'] },
   { id: 'infra', name: 'Infraestrutura', icon: 'infra', groups: ['utility', 'waste'] },
   { id: 'servicos', name: 'Serviços', icon: 'services', groups: ['education', 'services', 'food'] },
@@ -119,7 +124,7 @@ const MENUS = [
 const MAP_MENU = [
   ['Infraestrutura', ['energia', 'agua', 'lixo', 'transito']],
   ['Serviços', ['escolas', 'saude', 'crime', 'alimentos']],
-  ['Cidade', ['valor', 'poluicao', 'satisfacao', 'escolaridade', 'desemprego']],
+  ['Cidade', ['valor', 'poluicao', 'satisfacao', 'escolaridade', 'desemprego', 'relevo']],
 ];
 // Ícone de cada ferramenta (src/ui/icons.js): o do prédio, da zona ou o id.
 const ZONE_ICON = { [ZONE.RESIDENTIAL]: 'residencial', [ZONE.COMMERCIAL]: 'comercial', [ZONE.MIXED]: 'mista', [ZONE.INDUSTRIAL]: 'industrial', [ZONE.RURAL]: 'rural' };
@@ -139,6 +144,7 @@ function toolCost(t) {
   const c = costs(rt);
   if (t.road) return `$${round(roadCost(rt, t.road))}/tile`;
   if (t.zone) return `$${round(c.zone)}/tile`;
+  if (t.terrain) return `$${round(RELIEF.terraformCost * mod(rt, 'buildCost'))}/nível`;
   if (t.id === 'bulldoze') return 'varia';
   return '';
 }
@@ -829,6 +835,7 @@ function toolCommand() {
   if (tool.road) return { type: 'road', road: tool.road, tiles };
   if (tool.id === 'bulldoze') return { type: 'bulldoze', tiles };
   if (tool.id === 'bairro') return { type: 'district', tiles };
+  if (tool.terrain) return { type: 'terrain', mode: tool.terrain, tiles };
   if (tool.id === 'parque') return { type: 'park', tiles };
   return usesDensity(tool) ? { type: 'zone', zone: tool.zone, density, tiles } : { type: 'zone', zone: tool.zone, tiles };
 }
@@ -841,7 +848,7 @@ function currentPreview() {
     return null;
   }
   const plan = planCommand(state, rt, cmd);
-  const [sx, sy] = worldToScreen(cam, hover.x + 0.5, hover.y + 0.5);
+  const [sx, sy] = worldToScreen(cam, hover.x + 0.5, hover.y + 0.5, heightAt(state.map, hover.x + 0.5, hover.y + 0.5));
   tooltip.hidden = false;
   tooltip.style.left = `${sx + 16}px`;
   tooltip.style.top = `${sy - 10}px`;
@@ -902,7 +909,7 @@ canvas.addEventListener('pointerdown', (e) => {
       return;
     }
     // No toque não existe "passar o mouse": o tile é o que está sob o dedo.
-    hover = screenToTile(cam, sx, sy);
+    hover = screenToTile(cam, sx, sy, state.map);
   }
   if (pinch) return;
   const panButton = e.button === 1 || e.button === 2;
@@ -926,7 +933,7 @@ canvas.addEventListener('pointermove', (e) => {
     }
     return;
   }
-  hover = screenToTile(cam, sx, sy);
+  hover = screenToTile(cam, sx, sy, state.map);
   if (drag?.kind === 'pan') {
     if (Math.hypot(sx - drag.origin[0], sy - drag.origin[1]) > 4) drag.moved = true;
     if (drag.moved) {
@@ -996,14 +1003,14 @@ function pick(sx, sy) {
     const c = rt.citizenById.get(id);
     const pose = moverPose(state, c);
     if (!pose) continue;
-    const [cx, cy] = worldToScreen(cam, pose.x, pose.y);
+    const [cx, cy] = worldToScreen(cam, pose.x, pose.y, pose.h);
     const d = Math.hypot(cx - sx, cy - 2 * cam.zoom - sy);
     if (d < bestDist) {
       best = c;
       bestDist = d;
     }
   }
-  const tile = screenToTile(cam, sx, sy);
+  const tile = screenToTile(cam, sx, sy, state.map);
   const buildingId = tile ? rt.buildingAt[tile.y * state.map.width + tile.x] : 0;
   if (best) select({ type: 'citizen', id: best.id });
   else if (buildingId) select({ type: 'building', id: buildingId });
