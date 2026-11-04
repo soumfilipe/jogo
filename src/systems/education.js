@@ -92,6 +92,21 @@ export function enrollStudents(state, rt) {
   const width = state.map.width;
   const schools = state.buildings.filter((b) => schoolStage(b.type));
   const free = new Map(schools.map((s) => [s.id, seatsOf(rt, s.type) - rt.students.get(s.id).size]));
+  // Escolas de cada etapa, com posição e raio já calculados (os
+  // modificadores não mudam durante a matrícula), na ordem dos prédios.
+  const byStage = new Map();
+  const offering = (stage) => {
+    let list = byStage.get(stage);
+    if (!list) {
+      // A TV educativa leva a EJA para casas longe da escola.
+      const extra = stage === 'eja' ? mod(rt, 'radius.eja') : 1;
+      list = schools.filter((s) => offers(s.type, stage)).map((s) => ({
+        s, x: s.tile % width, y: Math.floor(s.tile / width), radius: radiusOf(rt, s.type) * extra,
+      }));
+      byStage.set(stage, list);
+    }
+    return list;
+  };
 
   for (const c of state.citizens) {
     const wants = wantedStages(rt, c);
@@ -110,13 +125,11 @@ export function enrollStudents(state, rt) {
     let want = null;
     for (const stage of wants) {
       let bestDist = Infinity;
-      for (const s of schools) {
-        if (!offers(s.type, stage) || free.get(s.id) <= 0) continue;
-        const d = Math.abs((s.tile % width) - hx) + Math.abs(Math.floor(s.tile / width) - hy);
-        // A TV educativa leva a EJA para casas longe da escola.
-        const radius = radiusOf(rt, s.type) * (stage === 'eja' ? mod(rt, 'radius.eja') : 1);
-        if (d <= radius && d < bestDist) {
-          best = s;
+      for (const o of offering(stage)) {
+        if (free.get(o.s.id) <= 0) continue;
+        const d = Math.abs(o.x - hx) + Math.abs(o.y - hy);
+        if (d <= o.radius && d < bestDist) {
+          best = o.s;
           bestDist = d;
         }
       }
@@ -218,6 +231,21 @@ export function educationStats(state) {
 export function refreshSchoolMap(state, rt) {
   const schools = state.buildings.filter((b) => schoolStage(b.type));
   const free = new Map(schools.map((s) => [s.id, seatsOf(rt, s.type) - rt.students.get(s.id).size]));
+  // Escolas de cada etapa, com posição e raio já calculados (os
+  // modificadores não mudam durante a matrícula), na ordem dos prédios.
+  const byStage = new Map();
+  const offering = (stage) => {
+    let list = byStage.get(stage);
+    if (!list) {
+      // A TV educativa leva a EJA para casas longe da escola.
+      const extra = stage === 'eja' ? mod(rt, 'radius.eja') : 1;
+      list = schools.filter((s) => offers(s.type, stage)).map((s) => ({
+        s, x: s.tile % width, y: Math.floor(s.tile / width), radius: radiusOf(rt, s.type) * extra,
+      }));
+      byStage.set(stage, list);
+    }
+    return list;
+  };
   fillSchoolMap(state, rt, schools, free);
 }
 

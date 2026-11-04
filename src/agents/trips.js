@@ -54,11 +54,12 @@ const windowOf = (minute) => Math.floor(minute / TRIP_WINDOW) % WINDOWS;
 
 /**
  * Horário livre: cum[i] = minutos (sem trânsito) até chegar ao tile path[i],
- * saindo de (x0, y0). Devolve { cum, total }.
+ * saindo de (x0, y0). Devolve { cum, total }. startTrip faz a mesma conta
+ * (com os mesmos números) junto com a do trânsito.
  */
 function freeSchedule(width, road, path, x0, y0, mode) {
   const speed = CITIZEN_SPEED * (modeOf(mode)?.speed ?? 1);
-  const cum = new Float64Array(path.length);
+  const cum = new Float32Array(path.length);
   let x = x0;
   let y = y0;
   let total = 0;
@@ -98,7 +99,8 @@ function contributions(state, trips, c, cum, total) {
   const { width, road } = state.map;
   const { path } = c;
   const stretch = (c.arrive - c.left + 1) / total;
-  const out = [];
+  const out = new Int32Array(2 * path.length);
+  let n = 0;
   let x = c.x;
   let y = c.y;
   for (let i = 0; i < path.length - 1; i++) {
@@ -108,13 +110,14 @@ function contributions(state, trips, c, cum, total) {
       const amount = Math.round((cum[i + 1] - cum[i]) * stretch * w);
       if (amount > 0) {
         const at = c.left + Math.min(HORIZON, cum[i] * stretch);
-        out.push(windowOf(at) * trips.slots + s, amount);
+        out[n++] = windowOf(at) * trips.slots + s;
+        out[n++] = amount;
       }
     }
     x = (path[i + 1] % width) + 0.5;
     y = Math.floor(path[i + 1] / width) + 0.5;
   }
-  return Int32Array.from(out);
+  return out.slice(0, n);
 }
 const EMPTY = new Int32Array(0);
 
@@ -122,7 +125,7 @@ function addTrip(state, rt, c, cum, total) {
   const trips = rt.trips;
   const parts = contributions(state, trips, c, cum, total);
   for (let i = 0; i < parts.length; i += 2) trips.load[parts[i]] += parts[i + 1];
-  trips.byId.set(c.id, { cum: Float32Array.from(cum), total, parts });
+  trips.byId.set(c.id, { cum, total, parts });
   let due = trips.arrivals.get(c.arrive);
   if (!due) trips.arrivals.set(c.arrive, (due = new Set()));
   due.add(c.id);
@@ -173,7 +176,10 @@ export function rebuildTrips(state, rt) {
  */
 export function startTrip(state, rt, c) {
   const { width, road } = state.map;
-  const { cum, total } = freeSchedule(width, road, c.path, c.x, c.y, c.mode);
+  const path = c.path;
+  const cum = new Float32Array(path.length);
+  const freeSpeed = CITIZEN_SPEED * (modeOf(c.mode)?.speed ?? 1);
+  let total = 0;
   const trips = rt.trips;
   const tables = roadTables(rt);
   const mode = modeOf(c.mode);
@@ -184,12 +190,15 @@ export function startTrip(state, rt, c) {
   let minutes = 0;
   let x = c.x;
   let y = c.y;
-  for (let i = 1; i < c.path.length; i++) {
-    const next = c.path[i];
+  for (let i = 1; i < path.length; i++) {
+    const next = path[i];
     const nx = (next % width) + 0.5;
     const ny = Math.floor(next / width) + 0.5;
     const tile = Math.floor(y) * width + Math.floor(x);
     const type = road[tile];
+    // Horário livre (a mesma conta de freeSchedule).
+    total += (Math.abs(nx - x) + Math.abs(ny - y)) / (freeSpeed * FREE_SPEED[type]);
+    cum[i] = total;
     let factor = 1;
     if (type) {
       let jam = 1;

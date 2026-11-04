@@ -23,6 +23,8 @@ import { jobsOf, mod, utilityOutput, ZONE_KEY } from './mods.js';
 
 // Parte da produção renovável que as baterias conseguem deslocar para a noite.
 const STORAGE_SHARE = 0.5;
+// Nome do modificador de consumo de energia de cada zona (montado uma vez só).
+const CONSUMPTION_KEY = Object.fromEntries(Object.entries(ZONE_KEY).map(([zone, key]) => [zone, `consumption.${key}`]));
 
 export const RESOURCES = ['power', 'water'];
 
@@ -35,7 +37,7 @@ export function consumption(info, people = info.residents || info.jobs, rt = nul
   // Prédios do jogador não consomem (menos o conjunto habitacional, que é casa).
   if ((info.utility && !info.utility.housing) || !info.zone) return { power: 0, water: 0 };
   const per = CONSUMPTION[info.zone];
-  let power = people * (rt ? per.power * mod(rt, `consumption.${ZONE_KEY[info.zone]}`) : per.power);
+  let power = people * (rt ? per.power * mod(rt, CONSUMPTION_KEY[info.zone]) : per.power);
   let water = people * per.water;
   // Prédio misto: o térreo consome como comércio.
   if (info.shop) {
@@ -90,7 +92,7 @@ export function computeUtilities(state, rt) {
         sources.power.push(rt.access.get(b.id));
       }
     } else if (b.abandoned === undefined && info.zone !== ZONE.RURAL) {
-      consumers.push({ b, net, need: consumption(info, capacityOf(b), rt) });
+      consumers.push({ b, net, access: rt.access.get(b.id), need: consumption(info, capacityOf(b), rt) });
       if (net) entry(net);
     }
   }
@@ -117,11 +119,20 @@ export function computeUtilities(state, rt) {
       continue;
     }
     const dist = roadDistances(state, sources[res]);
-    const ranked = consumers
-      .filter((c) => c.net && dist[rt.access.get(c.b.id)] >= 0)
-      .map((c) => ({ ...c, d: dist[rt.access.get(c.b.id)] }))
-      .sort((a, b) => a.d - b.d || a.b.id - b.b.id);
-    for (const { b, net, need } of ranked) {
+    // Do mais perto da fonte ao mais longe (empate: id menor). A chave
+    // distância × 2³² + id ordena igual e é exata num double.
+    const keys = [];
+    const byId = new Map();
+    for (const c of consumers) {
+      if (!c.net) continue;
+      const d = dist[c.access];
+      if (d < 0) continue;
+      keys.push(d * 2 ** 32 + c.b.id);
+      byId.set(c.b.id, c);
+    }
+    const order = Float64Array.from(keys).sort();
+    for (let i = 0; i < order.length; i++) {
+      const { b, net, need } = byId.get(order[i] % 2 ** 32);
       const e = nets.get(net)[res];
       if (e.supply - e.used >= need[res]) {
         e.used += need[res];

@@ -37,7 +37,6 @@ export function computeLandValue(state, rt) {
   const activity = new Float32Array(n);
   const industry = new Float32Array(n);
   const mixed = new Float32Array(n);
-  const view = new Float32Array(n);
 
   // Rio poluído pelo esgoto vale menos como paisagem (e aparece no mapa de poluição).
   const river = computeSanitation(state, rt).river;
@@ -117,16 +116,7 @@ export function computeLandValue(state, rt) {
   const mixedSum = bonusMixed ? boxSum(mixed, width, height, MIXED.landRadius) : null;
 
   const { landValue, pollution } = rt;
-  // Mapa de relevo: altura de 0 a 1 (−1 nas encostas íngremes; NaN na água).
-  if (!rt.reliefMap || rt.reliefMap.length !== n) rt.reliefMap = new Float32Array(n);
-  const relief = rt.reliefMap;
-  for (let i = 0; i < n; i++) {
-    const water = terrain[i] === TERRAIN.WATER;
-    const h = water ? 0 : tileHeight(state.map, i);
-    relief[i] = water ? NaN : isSteep(state.map, i) ? -1 : h / RELIEF.maxLevel;
-    // Vista do alto valoriza.
-    view[i] = RELIEF.viewBonus * Math.min(1, Math.max(0, (h - RELIEF.viewFrom) / 16));
-  }
+  const view = reliefMaps(state, rt);
   for (let i = 0; i < n; i++) {
     const p = Math.min(1, pollutionSum[i] / POLLUTION_FULL);
     pollution[i] = terrain[i] === TERRAIN.WATER ? Math.max(p, river) : p;
@@ -143,6 +133,36 @@ export function computeLandValue(state, rt) {
       + view[i];
     landValue[i] = Math.min(1, Math.max(0, value));
   }
+}
+
+/**
+ * Mapa de relevo (rt.reliefMap: altura de 0 a 1, −1 nas encostas íngremes,
+ * NaN na água) e o bônus da vista do alto de cada tile. Só dependem do relevo
+ * e da água: são refeitos quando eles mudam (terraplenagem, deslizamento).
+ */
+function reliefMaps(state, rt) {
+  const { terrain, elevation } = state.map;
+  const n = terrain.length;
+  const cache = rt.reliefCache;
+  if (cache && cache.terrain.length === n && equal(cache.terrain, terrain) && equal(cache.elevation, elevation)) return cache.view;
+  const relief = (rt.reliefMap = new Float32Array(n));
+  const view = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const water = terrain[i] === TERRAIN.WATER;
+    const h = water ? 0 : tileHeight(state.map, i);
+    relief[i] = water ? NaN : isSteep(state.map, i) ? -1 : h / RELIEF.maxLevel;
+    // Vista do alto valoriza.
+    view[i] = RELIEF.viewBonus * Math.min(1, Math.max(0, (h - RELIEF.viewFrom) / 16));
+  }
+  rt.reliefCache = { terrain: terrain.slice(), elevation: elevation?.slice(), view };
+  return view;
+}
+
+function equal(a, b) {
+  if (!a || !b) return a === b;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 /** Soma de cada quadrado (2r+1)x(2r+1) em volta de cada tile (separável). */

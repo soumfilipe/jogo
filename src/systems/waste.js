@@ -69,15 +69,14 @@ export function computeWaste(state, rt) {
       continue;
     }
     const [x, y] = center(state, b);
-    const dist = ([cx, cy]) => Math.abs(cx - x) + Math.abs(cy - y);
     let share = 1;
-    for (const r of recyclers) if (dist(r.at) <= r.r) share = Math.min(share, r.share);
+    for (const r of recyclers) if (Math.abs(r.at[0] - x) + Math.abs(r.at[1] - y) <= r.r) share = Math.min(share, r.share);
     waste *= share;
     // O lixão/aterro mais perto que alcança (empate: o de id menor).
     let best = null;
     let bestD = Infinity;
     for (const d of dumps) {
-      const dd = dist(d.at);
+      const dd = Math.abs(d.at[0] - x) + Math.abs(d.at[1] - y);
       if (dd <= d.r && (dd < bestD || (dd === bestD && d.b.id < best.b.id))) {
         best = d;
         bestD = dd;
