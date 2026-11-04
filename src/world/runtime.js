@@ -18,7 +18,7 @@ export function buildRuntime(state) {
     companyWorkers: new Map(), // id da empresa -> Set de ids de cidadãos
     students: new Map(), //  id da escola -> Set de ids de alunos (ver systems/education.js)
     departures: new Map(), // minuto do dia -> Set de ids de cidadãos
-    movers: new Set(), //    cidadãos andando agora
+    movers: null, //         cidadãos andando agora (MoverSet, abaixo)
     roadComponent: new Int32Array(width * height), // rede de estradas de cada tile (0 = sem)
     access: new Map(), //    id do prédio -> tile de estrada de acesso (-1 = sem acesso)
     pathCache: new Map(),
@@ -33,11 +33,58 @@ export function buildRuntime(state) {
     dirtyAll: true,
   };
 
+  rt.movers = new MoverSet(rt.citizenById);
   for (const b of state.buildings) indexBuilding(state, rt, b);
   for (const co of state.companies) indexCompany(rt, co);
   for (const c of state.citizens) indexCitizen(rt, c);
   recomputeRoads(state, rt, { reroute: false });
   return rt;
+}
+
+/**
+ * Conjunto dos ids de quem está andando, como um Set, que também guarda o
+ * objeto de cada cidadão: o movimento e o trânsito percorrem `citizens()` a
+ * cada minuto sem consultar rt.citizenById para cada um.
+ */
+export class MoverSet {
+  constructor(byId) {
+    this.byId = byId;
+    this.map = new Map();
+  }
+
+  add(id) {
+    this.map.set(id, this.byId.get(id));
+    return this;
+  }
+
+  delete(id) {
+    return this.map.delete(id);
+  }
+
+  has(id) {
+    return this.map.has(id);
+  }
+
+  clear() {
+    this.map.clear();
+  }
+
+  get size() {
+    return this.map.size;
+  }
+
+  keys() {
+    return this.map.keys();
+  }
+
+  [Symbol.iterator]() {
+    return this.map.keys();
+  }
+
+  /** Os cidadãos andando, na mesma ordem dos ids. */
+  citizens() {
+    return this.map.values();
+  }
 }
 
 /**

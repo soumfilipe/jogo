@@ -1026,8 +1026,7 @@ canvas.addEventListener('wheel', (e) => {
 function pick(sx, sy) {
   let best = null;
   let bestDist = 12;
-  for (const id of rt.movers) {
-    const c = rt.citizenById.get(id);
+  for (const c of rt.movers.citizens()) {
     const pose = moverPose(state, c);
     if (!pose) continue;
     const [cx, cy] = worldToScreen(cam, pose.x, pose.y, pose.h);

@@ -13,15 +13,39 @@
 import { ROAD_TYPES, TRAFFIC } from '../world/catalog.js';
 import { mod } from './mods.js';
 
+/**
+ * Velocidade e capacidade de cada tipo de rua, com os modificadores, numa
+ * tabela por tipo. Os modificadores só mudam quando rt.mods é refeito (ver
+ * systems/mods.js), então a tabela é guardada até lá: assim o movimento de
+ * milhares de carros por minuto não monta textos nem consulta mapas.
+ */
+export function roadTables(rt) {
+  let t = rt.roadTables;
+  if (t && t.mods === rt.mods) return t;
+  const speed = [];
+  const capacity = [];
+  const capMod = mod(rt, 'roadCapacity');
+  for (const [value, type] of Object.entries(ROAD_TYPES)) {
+    speed[value] = type.speed * mod(rt, `speed.${type.id}`);
+    capacity[value] = type.capacity * capMod;
+  }
+  t = rt.roadTables = { mods: rt.mods, speed, capacity, congestion: mod(rt, 'congestion') };
+  return t;
+}
+
 /** Capacidade de um tile de rua do tipo `type` (carros ao mesmo tempo). */
 export function roadCapacity(rt, type) {
-  return ROAD_TYPES[type].capacity * mod(rt, 'roadCapacity');
+  return roadTables(rt).capacity[type];
 }
 
 /** Velocidade do tipo de rua, com os modificadores (ex.: onda verde nas avenidas). */
 export function roadSpeed(rt, type) {
-  return ROAD_TYPES[type].speed * mod(rt, `speed.${ROAD_TYPES[type].id}`);
+  return roadTables(rt).speed[type];
 }
+
+// Tipos de rua só de pedestres (calçadão), por valor do tipo.
+const PEDESTRIAN = new Uint8Array(256);
+for (const [value, type] of Object.entries(ROAD_TYPES)) if (type.pedestrian) PEDESTRIAN[value] = 1;
 
 /** Quanto um viajante pesa na rua (0 para quem anda em trilho ou corredor). */
 function weightOf(c) {
@@ -44,12 +68,12 @@ export function countOccupancy(state, rt) {
   for (const t of rt.occupied) occ[t] = 0;
   rt.occupied.length = 0;
   const road = state.map.road;
-  for (const id of rt.movers) {
-    const c = rt.citizenById.get(id);
+  const pedestrian = PEDESTRIAN;
+  for (const c of rt.movers.citizens()) {
     const w = weightOf(c);
     if (!w) continue;
     const t = Math.floor(c.y) * width + Math.floor(c.x);
-    if (ROAD_TYPES[road[t]]?.pedestrian) continue; // a pé, no calçadão
+    if (pedestrian[road[t]]) continue; // a pé, no calçadão
     if (occ[t] === 0) rt.occupied.push(t);
     occ[t] += w;
   }
@@ -57,7 +81,7 @@ export function countOccupancy(state, rt) {
   for (const id of rt.visitorMovers ?? []) {
     const v = rt.visitorById.get(id);
     const t = Math.floor(v.y) * width + Math.floor(v.x);
-    if (ROAD_TYPES[road[t]]?.pedestrian) continue;
+    if (pedestrian[road[t]]) continue;
     if (occ[t] === 0) rt.occupied.push(t);
     occ[t] += 1;
   }
@@ -66,8 +90,9 @@ export function countOccupancy(state, rt) {
 
 /** Fator de velocidade (0 a 1) pelo engarrafamento no tile. */
 export function congestionFactor(rt, tile, type) {
-  const excess = Math.max(0, rt.occupancy[tile] / roadCapacity(rt, type) - 1);
-  return 1 / (1 + TRAFFIC.slowdown * excess * mod(rt, 'congestion'));
+  const t = roadTables(rt);
+  const excess = Math.max(0, rt.occupancy[tile] / t.capacity[type] - 1);
+  return 1 / (1 + TRAFFIC.slowdown * excess * t.congestion);
 }
 
 /**
@@ -81,12 +106,13 @@ export function updateTrafficMap(state, rt) {
     map = rt.trafficMap = new Float32Array(road.length).fill(NaN);
   }
   const occ = countOccupancy(state, rt);
+  const { capacity } = roadTables(rt);
   for (let t = 0; t < road.length; t++) {
     if (!road[t]) {
       map[t] = NaN;
       continue;
     }
-    const load = Math.min(1, occ[t] / roadCapacity(rt, road[t]) / 2);
+    const load = Math.min(1, occ[t] / capacity[road[t]] / 2);
     const now = 1 - load;
     map[t] = Number.isNaN(map[t]) ? now : map[t] * 0.6 + now * 0.4;
   }

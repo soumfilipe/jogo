@@ -125,8 +125,8 @@ test('calçadão: com a pesquisa; pedestres não engarrafam e o comércio em vol
   assert.ok(rt.landValue[7 * W + 15] > before, 'comércio em volta valoriza');
 
   // Quem está no calçadão não ocupa a rua.
-  rt.movers.add(-9);
   rt.citizenById.set(-9, { id: -9, x: 15.5, y: 5.5, mode: null });
+  rt.movers.add(-9);
   countOccupancy(state, rt);
   assert.equal(rt.occupancy[5 * W + 15], 0);
   rt.movers.delete(-9);

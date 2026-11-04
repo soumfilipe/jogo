@@ -49,7 +49,10 @@ export function decodeTable(table, { moves = {} } = {}) {
     const missing = new Set(col.missing || []);
     for (let i = 0; i < n; i++) if (!missing.has(i)) rows[i][key] = values[i];
   }
-  return rows;
+  // Objetos montados campo a campo (por nome variável) ficam em "modo
+  // dicionário" no motor de JavaScript, com acesso bem mais lento; a cópia
+  // com spread devolve objetos normais (rápidos), como os criados no jogo.
+  return rows.map((row) => ({ ...row }));
 }
 
 function encodeColumn(values) {
