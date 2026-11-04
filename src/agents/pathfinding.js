@@ -47,17 +47,13 @@ export function findRoadPath(map, from, to, blocked = null) {
 
   const tx = to % width;
   const ty = (to - tx) / width;
-  const h = (t) => {
-    const x = t % width;
-    return (Math.abs(x - tx) + Math.abs((t - x) / width - ty)) * MIN_COST;
-  };
 
   seen[from] = stamp;
   g[from] = 0;
   parent[from] = -1;
-  heap.push(from, h(from));
+  heap.push(from, (Math.abs((from % width) - tx) + Math.abs(Math.floor(from / width) - ty)) * MIN_COST);
 
-  while (heap.size) {
+  while (heap.size > 0) {
     const current = heap.pop();
     if (closed[current] === stamp) continue;
     if (current === to) return rebuild(parent, to);
@@ -65,24 +61,45 @@ export function findRoadPath(map, from, to, blocked = null) {
 
     const x = current % width;
     const y = (current - x) / width;
-    // Ordem fixa de vizinhos: mantém o resultado determinístico.
-    if (y > 0) relax(current - width);
-    if (x < width - 1) relax(current + 1);
-    if (y < height - 1) relax(current + width);
-    if (x > 0) relax(current - 1);
-
-    function relax(n) {
-      if (!road[n] || closed[n] === stamp || (blocked && blocked[n] && n !== to)) return;
-      const cost = g[current] + (STEP_COST[road[n]] ?? 1);
+    const base = g[current];
+    // Ordem fixa de vizinhos (cima, direita, baixo, esquerda): mantém o
+    // resultado determinístico.
+    for (let k = 0; k < 4; k++) {
+      let n;
+      if (k === 0) {
+        if (y === 0) continue;
+        n = current - width;
+      } else if (k === 1) {
+        if (x === width - 1) continue;
+        n = current + 1;
+      } else if (k === 2) {
+        if (y === height - 1) continue;
+        n = current + width;
+      } else {
+        if (x === 0) continue;
+        n = current - 1;
+      }
+      const type = road[n];
+      if (!type || closed[n] === stamp || (blocked !== null && blocked[n] && n !== to)) continue;
+      const cost = base + (STEP_COST[type] ?? 1);
       if (seen[n] !== stamp || cost < g[n]) {
         seen[n] = stamp;
         g[n] = cost;
         parent[n] = current;
-        heap.push(n, cost + h(n));
+        const nx = n % width;
+        heap.push(n, cost + (Math.abs(nx - tx) + Math.abs((n - nx) / width - ty)) * MIN_COST);
       }
     }
   }
   return null;
+}
+
+/**
+ * Rota em array tipado, para o cache: Uint16 (metade da memória) quando os
+ * índices dos tiles cabem nele, senão Int32.
+ */
+export function packRoute(map, route) {
+  return map.width * map.height <= 0x10000 ? Uint16Array.from(route) : Int32Array.from(route);
 }
 
 function rebuild(parent, to) {
@@ -91,74 +108,83 @@ function rebuild(parent, to) {
   return path.reverse();
 }
 
-// Heap binária de mínimo. Desempata pela ordem de inserção para que o
-// resultado não dependa de detalhes de implementação.
+// Heap binária de mínimo em arrays tipados (sem gerar lixo). Desempata pela
+// ordem de inserção para que o resultado não dependa de detalhes de
+// implementação.
 class MinHeap {
   constructor() {
-    this.items = [];
-    this.priorities = [];
-    this.order = [];
+    this.capacity = 1024;
+    this.items = new Int32Array(this.capacity);
+    this.priorities = new Float64Array(this.capacity);
+    this.order = new Uint32Array(this.capacity);
+    this.size = 0;
     this.counter = 0;
-  }
-
-  get size() {
-    return this.items.length;
   }
 
   clear() {
-    this.items.length = 0;
-    this.priorities.length = 0;
-    this.order.length = 0;
+    this.size = 0;
     this.counter = 0;
   }
 
+  #grow() {
+    this.capacity *= 2;
+    const items = new Int32Array(this.capacity);
+    const priorities = new Float64Array(this.capacity);
+    const order = new Uint32Array(this.capacity);
+    items.set(this.items);
+    priorities.set(this.priorities);
+    order.set(this.order);
+    this.items = items;
+    this.priorities = priorities;
+    this.order = order;
+  }
+
   push(item, priority) {
+    if (this.size === this.capacity) this.#grow();
     const { items, priorities, order } = this;
-    let i = items.length;
-    items.push(item);
-    priorities.push(priority);
-    order.push(this.counter++);
+    const ord = this.counter++;
+    let i = this.size++;
+    // Sobe "abrindo espaço": desce os pais maiores até achar a posição.
     while (i > 0) {
       const p = (i - 1) >> 1;
-      if (!this.#less(i, p)) break;
-      this.#swap(i, p);
+      const pp = priorities[p];
+      if (pp < priority || (pp === priority && order[p] < ord)) break;
+      items[i] = items[p];
+      priorities[i] = pp;
+      order[i] = order[p];
       i = p;
     }
+    items[i] = item;
+    priorities[i] = priority;
+    order[i] = ord;
   }
 
   pop() {
-    const { items } = this;
+    const { items, priorities, order } = this;
     const top = items[0];
-    const lastIndex = items.length - 1;
-    this.#swap(0, lastIndex);
-    items.pop();
-    this.priorities.pop();
-    this.order.pop();
+    const n = --this.size;
+    if (n === 0) return top;
+    // O último desce a partir da raiz.
+    const item = items[n];
+    const pri = priorities[n];
+    const ord = order[n];
     let i = 0;
     for (;;) {
       const l = 2 * i + 1;
+      if (l >= n) break;
       const r = l + 1;
-      let m = i;
-      if (l < items.length && this.#less(l, m)) m = l;
-      if (r < items.length && this.#less(r, m)) m = r;
-      if (m === i) break;
-      this.#swap(i, m);
+      let m = l;
+      if (r < n && (priorities[r] < priorities[l] || (priorities[r] === priorities[l] && order[r] < order[l]))) m = r;
+      const pm = priorities[m];
+      if (pri < pm || (pri === pm && ord < order[m])) break;
+      items[i] = items[m];
+      priorities[i] = pm;
+      order[i] = order[m];
       i = m;
     }
+    items[i] = item;
+    priorities[i] = pri;
+    order[i] = ord;
     return top;
-  }
-
-  #less(a, b) {
-    const pa = this.priorities[a];
-    const pb = this.priorities[b];
-    return pa < pb || (pa === pb && this.order[a] < this.order[b]);
-  }
-
-  #swap(a, b) {
-    for (const arr of [this.items, this.priorities, this.order]) {
-      const t = arr[a];
-      arr[a] = arr[b];
-      arr[b] = t;
-    }
   }
 }

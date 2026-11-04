@@ -23,7 +23,7 @@ import { CITIZEN_SPEED } from '../world/catalog.js';
 import { touristWeather } from './weather.js';
 import { MINUTES_PER_DAY, calendar } from '../core/time.js';
 import { randomInt } from '../core/rng.js';
-import { findRoadPath } from '../agents/pathfinding.js';
+import { findRoadPath, packRoute } from '../agents/pathfinding.js';
 import { attractionAppeal, eventMultiplier, todaysEvents } from './events.js';
 import { congestionFactor, roadSpeed } from './traffic.js';
 import { mod } from './mods.js';
@@ -232,7 +232,7 @@ function route(state, rt, from, to) {
   let r = rt.pathCache.get(key);
   if (r === undefined) {
     r = findRoadPath(state.map, from, to, rt.blocked);
-    rt.pathCache.set(key, r && Int32Array.from(r));
+    rt.pathCache.set(key, r && packRoute(state.map, r));
   }
   return r;
 }

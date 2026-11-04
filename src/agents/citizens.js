@@ -27,7 +27,7 @@
 // systems/demography.js), menos quem estuda em tempo integral.
 
 import { BUILDINGS, CITIZEN_SPEED, CULTURE, SECTORS, SHIFTS, TRAFFIC } from '../world/catalog.js';
-import { congestionFactor, countOccupancy, roadSpeed } from '../systems/traffic.js';
+import { countOccupancy, roadTables } from '../systems/traffic.js';
 import { chooseMode, payFare, walksToWork } from '../systems/transit.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { pick, random, randomInt } from '../core/rng.js';
@@ -41,7 +41,7 @@ import {
   tileCenter,
   usesCompanies,
 } from '../world/runtime.js';
-import { findRoadPath } from './pathfinding.js';
+import { findRoadPath, packRoute } from './pathfinding.js';
 import { isServed } from '../systems/utilities.js';
 import { mod } from '../systems/mods.js';
 import { isFullTimeStudent, minEduFor } from '../systems/education.js';
@@ -49,7 +49,12 @@ import { FIRST_NAMES, LAST_NAMES } from './names.js';
 
 // Quantas rotas calcular por tick no máximo (o resto espera na fila).
 const PATHS_PER_TICK = 100;
-const PATH_CACHE_LIMIT = 30_000;
+// Rotas guardadas no cache (ver roadRoute). Cada trabalhador usa duas (ida e
+// volta): o limite cresce com a população para que, numa cidade grande, as
+// rotas do dia caibam e não sejam recalculadas toda viagem.
+const PATH_CACHE_MIN = 30_000;
+const PATH_CACHE_PER_CITIZEN = 2;
+const PATH_CACHE_MAX = 250_000;
 export const WORKING_AGE = [18, 64];
 
 /**
@@ -196,8 +201,9 @@ function roadRoute(state, rt, fromBuilding, toBuilding) {
   let route = rt.pathCache.get(key);
   if (route === undefined) {
     route = findRoadPath(state.map, a, b, rt.blocked);
-    if (rt.pathCache.size >= PATH_CACHE_LIMIT) evictOldest(rt.pathCache, PATH_CACHE_LIMIT / 4);
-    rt.pathCache.set(key, route && Int32Array.from(route));
+    const limit = Math.min(PATH_CACHE_MAX, Math.max(PATH_CACHE_MIN, state.citizens.length * PATH_CACHE_PER_CITIZEN));
+    if (rt.pathCache.size >= limit) evictOldest(rt.pathCache, limit / 4);
+    rt.pathCache.set(key, route && packRoute(state.map, route));
   }
   return route;
 }
@@ -213,16 +219,27 @@ function moveCitizens(state, rt) {
   if (rt.movers.size === 0) return;
   const { width, road } = state.map;
   const speed = mod(rt, 'citizenSpeed', CITIZEN_SPEED);
-  for (const id of rt.movers) {
-    const c = rt.citizenById.get(id);
+  // Mesma conta de roadSpeed e congestionFactor, com as tabelas à mão.
+  const tables = roadTables(rt);
+  const occupancy = rt.occupancy;
+  for (const c of rt.movers.citizens()) {
     const tile = Math.floor(c.y) * width + Math.floor(c.x);
     const type = road[tile];
     const mode = c.mode ? TRAFFIC.modes[c.mode] : null;
     let factor = mode ? mode.speed : 1;
-    if (type) factor *= roadSpeed(rt, type) * (mode?.ignoresTraffic ? 1 : congestionFactor(rt, tile, type));
+    if (type) {
+      let jam = 1;
+      if (!mode?.ignoresTraffic) {
+        const excess = Math.max(0, occupancy[tile] / tables.capacity[type] - 1);
+        jam = 1 / (1 + TRAFFIC.slowdown * excess * tables.congestion);
+      }
+      factor *= tables.speed[type] * jam;
+    }
     let budget = speed * factor;
-    while (budget > 0 && c.step < c.path.length - 1) {
-      const next = c.path[c.step + 1];
+    const path = c.path;
+    const end = path.length - 1;
+    while (budget > 0 && c.step < end) {
+      const next = path[c.step + 1];
       const nx = (next % width) + 0.5;
       const ny = Math.floor(next / width) + 0.5;
       const dx = nx - c.x;
@@ -239,13 +256,13 @@ function moveCitizens(state, rt) {
         budget = 0;
       }
     }
-    if (c.step >= c.path.length - 1) {
+    if (c.step >= end) {
       c.state = c.dest;
       c.dest = null;
       c.mode = null;
       c.path = null;
       c.step = 0;
-      rt.movers.delete(id);
+      rt.movers.delete(c.id);
     }
   }
 }

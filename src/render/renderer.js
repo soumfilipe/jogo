@@ -833,8 +833,7 @@ export class Renderer {
     const cars = []; // { pose, color } de cada carro visível
     const carBoxes = []; // [x, y, profundidade] de cada carro, na tela
     const margin = 20;
-    for (const id of rt.movers) {
-      const c = rt.citizenById.get(id);
+    for (const c of rt.movers.citizens()) {
       // Descarta os que estão fora da tela antes de calcular a pose.
       const [cx, cy] = worldToScreen(cam, c.x, c.y);
       if (cx < -margin || cy < -margin || cx > cam.viewW + margin || cy > cam.viewH + margin) continue;
