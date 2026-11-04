@@ -47,11 +47,9 @@ export function roadSpeed(rt, type) {
 const PEDESTRIAN = new Uint8Array(256);
 for (const [value, type] of Object.entries(ROAD_TYPES)) if (type.pedestrian) PEDESTRIAN[value] = 1;
 
-/** Quanto um viajante pesa na rua (0 para quem anda em trilho ou corredor). */
-function weightOf(c) {
-  if (!c.mode) return 1;
-  return TRAFFIC.modes[c.mode].ignoresTraffic ? 0 : TRAFFIC.busShare;
-}
+// Quanto um viajante pesa na rua, por modo de transporte (0 para quem anda
+// em trilho, corredor ou a pé); sem modo (carro) pesa 1.
+const MODE_WEIGHT = new Map(Object.entries(TRAFFIC.modes).map(([id, m]) => [id, m.ignoresTraffic ? 0 : TRAFFIC.busShare]));
 
 /**
  * Conta a ocupação de cada tile de rua agora. Usa um Float32Array reaproveitado
@@ -65,24 +63,25 @@ export function countOccupancy(state, rt) {
     rt.occupied = [];
   }
   const occ = rt.occupancy;
-  for (const t of rt.occupied) occ[t] = 0;
-  rt.occupied.length = 0;
+  const occupied = rt.occupied;
+  for (let i = 0; i < occupied.length; i++) occ[occupied[i]] = 0;
+  occupied.length = 0;
   const road = state.map.road;
-  const pedestrian = PEDESTRIAN;
   for (const c of rt.movers.citizens()) {
-    const w = weightOf(c);
+    const mode = c.mode;
+    const w = mode ? MODE_WEIGHT.get(mode) : 1;
     if (!w) continue;
     const t = Math.floor(c.y) * width + Math.floor(c.x);
-    if (pedestrian[road[t]]) continue; // a pé, no calçadão
-    if (occ[t] === 0) rt.occupied.push(t);
+    if (PEDESTRIAN[road[t]] === 1) continue; // a pé, no calçadão
+    if (occ[t] === 0) occupied.push(t);
     occ[t] += w;
   }
   // Turistas andando de carro.
   for (const id of rt.visitorMovers ?? []) {
     const v = rt.visitorById.get(id);
     const t = Math.floor(v.y) * width + Math.floor(v.x);
-    if (pedestrian[road[t]]) continue;
-    if (occ[t] === 0) rt.occupied.push(t);
+    if (PEDESTRIAN[road[t]] === 1) continue;
+    if (occ[t] === 0) occupied.push(t);
     occ[t] += 1;
   }
   return occ;
