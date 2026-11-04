@@ -17,6 +17,7 @@ import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
 import { MAP_MODES, Renderer, mapColor } from './render/renderer.js';
 import { moverPose } from './render/movers.js';
+import { travelPosition } from './agents/trips.js';
 import { Minimap } from './render/minimap.js';
 import {
   centerOn, createCamera, panBy, screenToTile, worldToScreen, zoomAt,
@@ -242,7 +243,10 @@ const loopStats = startLoop({
     panWithKeys(dt);
     if (following && selection?.type === 'citizen') {
       const c = rt.citizenById.get(selection.id);
-      if (c) centerOn(cam, c.x, c.y);
+      if (c) {
+        const at = c.state === 'viajando' ? travelPosition(state, rt, c) : c;
+        centerOn(cam, at.x, at.y);
+      }
     }
     renderer.render(state, rt, cam, {
       hover,
@@ -1027,7 +1031,7 @@ function pick(sx, sy) {
   let best = null;
   let bestDist = 12;
   for (const c of rt.movers.citizens()) {
-    const pose = moverPose(state, c);
+    const pose = moverPose(state, c, travelPosition(state, rt, c));
     if (!pose) continue;
     const [cx, cy] = worldToScreen(cam, pose.x, pose.y, pose.h);
     const d = Math.hypot(cx - sx, cy - 2 * cam.zoom - sy);

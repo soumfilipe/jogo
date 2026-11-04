@@ -4,6 +4,7 @@
 
 import { BUILDINGS, ROAD_ACCESS_RADIUS, TERRAIN, ZONE, capacityOf } from './catalog.js';
 import { mod, ZONE_KEY } from '../systems/mods.js';
+import { endTrip, rebuildTrips, travelPosition } from '../agents/trips.js';
 
 export function buildRuntime(state) {
   const { width, height } = state.map;
@@ -288,7 +289,7 @@ export function removeCitizen(state, rt, id) {
   setJob(rt, citizen, null);
   leaveSchool(rt, citizen);
   rt.residents.get(citizen.home)?.delete(id);
-  rt.movers.delete(id);
+  endTrip(rt, citizen);
   rt.citizenById.delete(id);
   state.citizens.splice(state.citizens.indexOf(citizen), 1);
 }
@@ -359,8 +360,8 @@ function addDeparture(rt, minute, id) {
 export function sendHome(state, rt, citizen) {
   const home = rt.buildingById.get(citizen.home);
   const [x, y] = tileCenter(state, home.tile);
-  Object.assign(citizen, { state: 'casa', dest: null, path: null, step: 0, x, y, mode: null });
-  rt.movers.delete(citizen.id);
+  endTrip(rt, citizen);
+  Object.assign(citizen, { state: 'casa', dest: null, path: null, step: 0, x, y, mode: null, left: null, arrive: null });
 }
 
 // ---------------------------------------------------------------------------
@@ -405,17 +406,21 @@ export function recomputeRoads(state, rt, { reroute = true } = {}) {
   rt.pathCache.clear();
   touchMap(rt);
 
-  if (!reroute) return;
+  if (!reroute) {
+    rebuildTrips(state, rt);
+    return;
+  }
 
   for (const id of [...rt.movers]) {
     const c = rt.citizenById.get(id);
-    const blocked = c.path.slice(c.step + 1, -1).some((t) => !road[t]);
+    const { step } = travelPosition(state, rt, c);
+    const blocked = c.path.slice(step + 1, -1).some((t) => !road[t]);
     if (!blocked) continue;
     const target = rt.buildingById.get(c.dest === 'trabalho' ? c.job : c.home);
     if (c.dest === 'trabalho' && target && sameNetwork(rt, c.home, c.job)) {
       const [x, y] = tileCenter(state, target.tile);
-      Object.assign(c, { state: 'trabalho', dest: null, path: null, step: 0, x, y });
-      rt.movers.delete(id);
+      endTrip(rt, c);
+      Object.assign(c, { state: 'trabalho', dest: null, path: null, step: 0, x, y, mode: null, left: null, arrive: null });
     } else {
       sendHome(state, rt, c);
     }
@@ -427,6 +432,8 @@ export function recomputeRoads(state, rt, { reroute = true } = {}) {
       setJob(rt, c, null);
     }
   }
+  // O horário livre das viagens depende das ruas: refaz a carga do trânsito.
+  rebuildTrips(state, rt);
 }
 
 export function sameNetwork(rt, buildingA, buildingB) {
