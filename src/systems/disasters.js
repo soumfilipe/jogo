@@ -17,6 +17,7 @@
 // da defesa civil, estragos e reparos diminuem. Os sorteios usam state.rng, na
 // ordem fixa enchente → deslizamento → queimada.
 
+import { rebuildTrips } from '../agents/trips.js';
 import { BUILDINGS, CLIMATES, DISASTERS, TERRAIN } from '../world/catalog.js';
 import { clearForest, removeCitizen, touchMap } from '../world/runtime.js';
 import { chance, randomInt } from '../core/rng.js';
@@ -331,7 +332,10 @@ function landslide(state, rt, t, near) {
     fixed[i] = 1;
   }
   constrain(map, fixed);
-  if (roads) rt.pathCache.clear();
+  if (roads) {
+    rt.pathCache.clear();
+    rebuildTrips(state, rt); // o horário livre das viagens depende das ruas
+  }
   touchMap(rt);
   logEvent(state, { kind: 'deslizamento', tile: t, lost, damaged: 0, deaths, homeless });
   report(state, { kind: 'deslizamento', tile: t, lost, deaths, homeless, roads, contained: mod(rt, 'landslide') < 1 });
@@ -369,7 +373,8 @@ export function spreadFires(state, rt) {
   const done = [];
   for (const fire of d.fires) {
     const next = [];
-    const lit = new Set();
+    // Quem já está queimando nesta rodada não acende de novo (vira chão queimado).
+    const lit = new Set(fire.burning);
     for (const t of fire.burning) {
       // O tile que queimava vira chão queimado (a mata rebrota com o tempo).
       if (terrain[t] === TERRAIN.FOREST) clearForest(state, t);

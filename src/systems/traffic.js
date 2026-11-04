@@ -1,17 +1,18 @@
 // Trânsito: quantos carros há em cada tile de rua e quanto isso atrasa quem
 // passa por ali.
 //
-// A cada tick, a ocupação é contada a partir das posições dos cidadãos em
-// viagem (que estão no estado): assim tudo aqui é derivado, e carregar um save
-// no meio do trânsito continua igual. Cada carro conta 1; quem vai de ônibus
-// conta TRAFFIC.busShare (o ônibus leva muitos); metrô, VLT e BRT não ocupam
-// as ruas dos carros.
+// A ocupação vem da carga das viagens dos cidadãos (o fluxo da janela de
+// agora, ver agents/trips.js) mais os turistas andando: tudo derivado do
+// estado, e carregar um save no meio do trânsito continua igual. Cada carro
+// conta 1; quem vai de ônibus conta TRAFFIC.busShare (o ônibus leva muitos);
+// metrô, VLT, BRT e quem vai a pé não ocupam as ruas dos carros.
 //
 // Velocidade num tile = velocidade do tipo de rua (ROAD_TYPES) ÷
 //   (1 + slowdown × excesso), com excesso = max(0, ocupação ÷ capacidade − 1).
 
 import { ROAD_TYPES, TRAFFIC } from '../world/catalog.js';
 import { mod } from './mods.js';
+import { addTripOccupancy } from '../agents/trips.js';
 
 /**
  * Velocidade e capacidade de cada tipo de rua, com os modificadores, numa
@@ -47,10 +48,6 @@ export function roadSpeed(rt, type) {
 const PEDESTRIAN = new Uint8Array(256);
 for (const [value, type] of Object.entries(ROAD_TYPES)) if (type.pedestrian) PEDESTRIAN[value] = 1;
 
-// Quanto um viajante pesa na rua, por modo de transporte (0 para quem anda
-// em trilho, corredor ou a pé); sem modo (carro) pesa 1.
-const MODE_WEIGHT = new Map(Object.entries(TRAFFIC.modes).map(([id, m]) => [id, m.ignoresTraffic ? 0 : TRAFFIC.busShare]));
-
 /**
  * Conta a ocupação de cada tile de rua agora. Usa um Float32Array reaproveitado
  * e a lista dos tiles tocados, para zerar só eles na próxima vez.
@@ -67,15 +64,8 @@ export function countOccupancy(state, rt) {
   for (let i = 0; i < occupied.length; i++) occ[occupied[i]] = 0;
   occupied.length = 0;
   const road = state.map.road;
-  for (const c of rt.movers.citizens()) {
-    const mode = c.mode;
-    const w = mode ? MODE_WEIGHT.get(mode) : 1;
-    if (!w) continue;
-    const t = Math.floor(c.y) * width + Math.floor(c.x);
-    if (PEDESTRIAN[road[t]] === 1) continue; // a pé, no calçadão
-    if (occ[t] === 0) occupied.push(t);
-    occ[t] += w;
-  }
+  // Cidadãos: a carga das viagens na janela de agora (ver agents/trips.js).
+  addTripOccupancy(state, rt, occ, occupied);
   // Turistas andando de carro.
   for (const id of rt.visitorMovers ?? []) {
     const v = rt.visitorById.get(id);

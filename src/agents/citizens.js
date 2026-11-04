@@ -12,8 +12,10 @@
 //   shift: turno ('diurno', 'noturno', 'madrugada', 'manha', 'tarde'; null sem emprego),
 //   state: 'casa' | 'trabalho' | 'aguardando' (rota sendo calculada) | 'viajando',
 //   dest:  'trabalho' | 'casa' | null,
-//   x, y:  posição em tiles (contínua),
+//   x, y:  posição em tiles (contínua); em viagem, o ponto de saída
+//          (a posição de agora vem de travelPosition, em agents/trips.js)
 //   path:  tiles da viagem atual | null,   step: índice no path
+//   left, arrive: minuto (tick) da saída e da chegada da viagem atual | null
 //   edu, field, school, stage, study: escolaridade e estudo (ver systems/education.js)
 //   mode:  transporte da viagem atual ('onibus', 'brt', 'vlt', 'metro', 'pe' a pé; null = carro)
 //   talent: talento (0 a 1);  calling: vocação ('arte' | 'esporte' | null)
@@ -26,8 +28,9 @@
 // Crianças moram com a família e estudam; trabalham dos 18 aos 64 anos (ver
 // systems/demography.js), menos quem estuda em tempo integral.
 
-import { BUILDINGS, CITIZEN_SPEED, CULTURE, SECTORS, SHIFTS, TRAFFIC } from '../world/catalog.js';
-import { countOccupancy, roadTables } from '../systems/traffic.js';
+import { BUILDINGS, CULTURE, SECTORS, SHIFTS } from '../world/catalog.js';
+import { countOccupancy } from '../systems/traffic.js';
+import { finishArrivals, startTrip } from './trips.js';
 import { chooseMode, payFare, walksToWork } from '../systems/transit.js';
 import { MINUTES_PER_DAY } from '../core/time.js';
 import { pick, random, randomInt } from '../core/rng.js';
@@ -85,6 +88,8 @@ export function createCitizen(state, rt, home, { age, edu = 1, lastName } = {}) 
     path: null,
     step: 0,
     mode: null,
+    left: null,
+    arrive: null,
     ...talentOf(random(state.rng), random(state.rng), CULTURE.calling.esporte * mod(rt, 'calling.esporte')),
   });
 }
@@ -139,16 +144,19 @@ export function pickShift(roll, shares = SHIFT_SHARES) {
   return 'diurno';
 }
 
-/** Roda a cada tick: saídas do minuto, fila de rotas e movimento. */
+/**
+ * Roda a cada tick: saídas do minuto, fila de rotas e chegadas. Ninguém é
+ * movido minuto a minuto: cada viagem já sai com o horário de chegada (ver
+ * agents/trips.js).
+ */
 export function updateCitizens(state, rt) {
   const minute = state.time.tick % MINUTES_PER_DAY;
   startDepartures(state, rt, minute);
   processPathQueue(state, rt);
-  // Ocupação das ruas no começo do movimento: a velocidade de cada um depende
-  // só dela (e não da ordem em que os viajantes andam). Vale também para os
-  // turistas, que andam logo depois (ver systems/tourism.js).
-  if (rt.movers.size || rt.visitorMovers?.size) countOccupancy(state, rt);
-  moveCitizens(state, rt);
+  finishArrivals(state, rt);
+  // Ocupação das ruas agora, para os turistas que andam logo depois (ver
+  // systems/tourism.js).
+  if (rt.visitorMovers?.size) countOccupancy(state, rt);
 }
 
 function startDepartures(state, rt, minute) {
@@ -190,7 +198,7 @@ function processPathQueue(state, rt) {
     const mode = walksToWork(state, rt, from, to) ? 'pe' : chooseMode(rt, from, to);
     if (mode) payFare(state, mode);
     Object.assign(c, { state: 'viajando', path: [from.tile, ...route, to.tile], step: 0, x, y, mode });
-    rt.movers.add(c.id);
+    startTrip(state, rt, c);
   }
 }
 
@@ -212,58 +220,6 @@ function evictOldest(map, count) {
   for (const key of map.keys()) {
     if (count-- <= 0) break;
     map.delete(key);
-  }
-}
-
-function moveCitizens(state, rt) {
-  if (rt.movers.size === 0) return;
-  const { width, road } = state.map;
-  const speed = mod(rt, 'citizenSpeed', CITIZEN_SPEED);
-  // Mesma conta de roadSpeed e congestionFactor, com as tabelas à mão.
-  const tables = roadTables(rt);
-  const occupancy = rt.occupancy;
-  for (const c of rt.movers.citizens()) {
-    const tile = Math.floor(c.y) * width + Math.floor(c.x);
-    const type = road[tile];
-    const mode = c.mode ? TRAFFIC.modes[c.mode] : null;
-    let factor = mode ? mode.speed : 1;
-    if (type) {
-      let jam = 1;
-      if (!mode?.ignoresTraffic) {
-        const excess = Math.max(0, occupancy[tile] / tables.capacity[type] - 1);
-        jam = 1 / (1 + TRAFFIC.slowdown * excess * tables.congestion);
-      }
-      factor *= tables.speed[type] * jam;
-    }
-    let budget = speed * factor;
-    const path = c.path;
-    const end = path.length - 1;
-    while (budget > 0 && c.step < end) {
-      const next = path[c.step + 1];
-      const nx = (next % width) + 0.5;
-      const ny = Math.floor(next / width) + 0.5;
-      const dx = nx - c.x;
-      const dy = ny - c.y;
-      const dist = Math.abs(dx) + Math.abs(dy);
-      if (dist <= budget) {
-        c.x = nx;
-        c.y = ny;
-        c.step++;
-        budget -= dist;
-      } else {
-        c.x += (dx / dist) * budget;
-        c.y += (dy / dist) * budget;
-        budget = 0;
-      }
-    }
-    if (c.step >= end) {
-      c.state = c.dest;
-      c.dest = null;
-      c.mode = null;
-      c.path = null;
-      c.step = 0;
-      rt.movers.delete(c.id);
-    }
   }
 }
 

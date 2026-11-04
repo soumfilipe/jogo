@@ -19,6 +19,7 @@ import { screenToWorld, visibleRange, worldToScreen } from './camera.js';
 import { MAX_FLOORS, addSilhouette, drawBuilding, windowSize } from './buildings.js';
 import { LEVEL_PX, TILE_H, TILE_W } from './iso.js';
 import { addCar, carColor, moverPose, visitorColor } from './movers.js';
+import { travelPosition } from '../agents/trips.js';
 import { LIGHT_COLORS, darkness, isLit, windowSchedules } from './lights.js';
 import { TRUNK, treesFor, waterDepth } from './nature.js';
 import { Smog } from './smog.js';
@@ -835,9 +836,10 @@ export class Renderer {
     const margin = 20;
     for (const c of rt.movers.citizens()) {
       // Descarta os que estão fora da tela antes de calcular a pose.
-      const [cx, cy] = worldToScreen(cam, c.x, c.y);
+      const at = travelPosition(state, rt, c);
+      const [cx, cy] = worldToScreen(cam, at.x, at.y);
       if (cx < -margin || cy < -margin || cx > cam.viewW + margin || cy > cam.viewH + margin) continue;
-      const pose = moverPose(state, c);
+      const pose = moverPose(state, c, at);
       if (!pose) continue;
       cars.push({ pose, color: carColor(c) });
       carBoxes.push([cx, cy, pose.depth]);
@@ -902,7 +904,7 @@ export class Renderer {
     }
 
     const pose = selected && rt.citizenById.has(selected.id) && selected.state === 'viajando'
-      ? moverPose(state, selected)
+      ? moverPose(state, selected, travelPosition(state, rt, selected))
       : null;
     if (pose) {
       const [sx, sy] = worldToScreen(cam, pose.x, pose.y);

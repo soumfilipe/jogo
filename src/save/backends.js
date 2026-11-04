@@ -11,7 +11,7 @@
 //   servidor (ex.: GitHub Pages). Cabe centenas de MB e grava sem travar a tela.
 // - BrowserBackend: localStorage (~5 MB), só para navegadores sem IndexedDB
 
-import { SaveError, isValidSaveId, validateSaveShape } from './format.js';
+import { SaveError, isValidSaveId, saveBytes, saveJson, validateSaveShape } from './format.js';
 
 export class FileBackend {
   constructor(baseUrl = '/api/saves') {
@@ -33,10 +33,13 @@ export class FileBackend {
   }
 
   async write(id, save, { keepalive = false } = {}) {
+    const bytes = saveBytes(save);
+    // Save já em bytes: o envio vai por um Worker (a tela não trava).
+    if (bytes && !keepalive && typeof Worker !== 'undefined') return this.#upload(this.#url(id), bytes);
     const res = await fetch(this.#url(id), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(save),
+      body: bytes ?? saveJson(save),
       keepalive,
     });
     await assertOk(res);
@@ -45,6 +48,23 @@ export class FileBackend {
   async remove(id) {
     const res = await fetch(this.#url(id), { method: 'DELETE' });
     await assertOk(res);
+  }
+
+  #upload(url, bytes) {
+    this.worker ??= new Worker(new URL('./upload-worker.js', import.meta.url));
+    this.pending ??= new Map();
+    this.worker.onmessage ??= ({ data }) => {
+      const done = this.pending.get(data.n);
+      this.pending.delete(data.n);
+      if (data.ok) done.resolve();
+      else done.reject(new SaveError(data.body?.code || `HTTP_${data.status}`, data.body?.error || `Erro ${data.status} no servidor.`));
+    };
+    const n = (this.uploads = (this.uploads ?? 0) + 1);
+    return new Promise((resolve, reject) => {
+      this.pending.set(n, { resolve, reject });
+      // Transfere o buffer (sem cópia): ele é dos bytes deste save só.
+      this.worker.postMessage({ n, url: new URL(url, location.href).href, body: bytes.buffer }, [bytes.buffer]);
+    });
   }
 
   #url(id) {
@@ -83,7 +103,7 @@ export class BrowserBackend {
 
   async write(id, save) {
     try {
-      this.storage.setItem(this.prefix + id, JSON.stringify(save));
+      this.storage.setItem(this.prefix + id, saveJson(save));
     } catch {
       throw new SaveError('STORAGE_FULL', 'Sem espaço no navegador para salvar. Exporte para arquivo.');
     }

@@ -12,7 +12,16 @@
 import { SaveError } from './format.js';
 
 /** `moves`: { campo: largura do mapa } dos campos que são rotas. */
-export function encodeTable(rows, { moves = {} } = {}) {
+export function encodeTable(rows, options) {
+  const steps = encodeTableSteps(rows, options);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** encodeTable em etapas (uma por coluna), para salvar sem travar a tela. */
+export function* encodeTableSteps(rows, { moves = {} } = {}) {
   const keys = [];
   const seen = new Set();
   for (const row of rows) {
@@ -31,9 +40,19 @@ export function encodeTable(rows, { moves = {} } = {}) {
       missing.push(i);
       return null;
     });
-    const col = key in moves ? { moves: values.map((v) => (v === null ? null : encodeMoves(v, moves[key]))) } : encodeColumn(values);
+    let col;
+    if (key in moves) {
+      // Rotas: em blocos de linhas, com pausas (é a coluna mais pesada).
+      const encoded = new Array(values.length);
+      for (let i = 0; i < values.length; i++) {
+        encoded[i] = values[i] === null ? null : encodeMoves(values[i], moves[key]);
+        if (i % 4000 === 3999) yield;
+      }
+      col = { moves: encoded };
+    } else col = encodeColumn(values);
     if (missing.length) col.missing = missing;
     columns[key] = col;
+    yield;
   }
   return { $table: rows.length, columns };
 }
@@ -94,15 +113,27 @@ function decodeColumn(col, n, width) {
 const STEPS = { r: 1, l: -1 };
 
 export function encodeMoves(path, width) {
+  // Junta os passos em códigos de caractere e monta o texto em blocos (bem
+  // mais rápido que somar letra por letra em rotas longas).
   let out = '';
+  const codes = [];
+  const flush = () => {
+    if (codes.length) out += String.fromCharCode.apply(null, codes);
+    codes.length = 0;
+  };
   for (let i = 0; i < path.length; i++) {
     const d = i === 0 ? null : path[i] - path[i - 1];
-    if (d === 1) out += 'r';
-    else if (d === -1) out += 'l';
-    else if (d === width) out += 'd';
-    else if (d === -width) out += 'u';
-    else out += `${path[i]},`;
+    if (d === 1) codes.push(114); // r
+    else if (d === -1) codes.push(108); // l
+    else if (d === width) codes.push(100); // d
+    else if (d === -width) codes.push(117); // u
+    else {
+      flush();
+      out += `${path[i]},`;
+    }
+    if (codes.length >= 4096) flush();
   }
+  flush();
   return out;
 }
 

@@ -34,6 +34,18 @@ import { updateStress } from './childcare.js';
 import { dailyNews, monthlyNews, noteRushHour } from './news.js';
 
 export function tick(state, rt) {
+  const steps = tickSteps(state, rt);
+  while (!steps.next().done);
+}
+
+/**
+ * O mesmo tick em etapas: cada `yield` é um ponto em que o laço do jogo pode
+ * parar para desenhar a tela e continuar no quadro seguinte (as viradas de
+ * hora e de dia pesam numa cidade grande). Nada da simulação roda entre as
+ * etapas, então o resultado é igual ao de tick(). Quem muda o estado (ações do
+ * jogador, salvar, carregar) termina antes o tick em andamento.
+ */
+export function* tickSteps(state, rt) {
   state.time.tick++;
   const t = state.time.tick;
   // Corrida de rua: fecha e abre o percurso (antes das rotas do minuto).
@@ -51,10 +63,12 @@ export function tick(state, rt) {
     // Rush das 8h: quanto das ruas está parado (para as notícias).
     if (t % TICKS_PER_DAY === 8 * 60) noteRushHour(state, rt);
     computeDemand(state, rt);
+    yield;
     // Recalculado aqui, logo antes do uso, e nunca lido de um cálculo antigo:
     // assim o resultado não depende de quando o save foi carregado.
     computeLandValue(state, rt);
     rt.landValueVersion = (rt.landValueVersion || 0) + 1;
+    yield;
     computeUtilities(state, rt);
     // Uma vez por dia: efeitos da falta de energia/água e, depois, prédios
     // lotados sobem de nível (têm prioridade sobre lotes novos).
@@ -63,44 +77,57 @@ export function tick(state, rt) {
       dailyDisasters(state, rt);
       applyUtilityEffects(state, rt);
       reviewCompanies(state, rt);
+      yield;
       enrollStudents(state, rt);
+      yield;
       // Pais sem creche para o filho pequeno: o estresse do dia (depois das matrículas).
       updateStress(state, rt);
+      yield;
       // Bem-estar do dia: cobertura dos serviços, saúde, crime e satisfação;
       // depois quem está insatisfeito se muda e os incêndios do dia.
       computeCoverage(state, rt);
       computeFreight(state, rt);
+      yield;
       computeWellbeing(state, rt);
       state.wellbeing = { ...rt.cityWellbeing };
+      yield;
       // O lixo do dia vai para os lixões e aterros (com a situação usada acima).
       collectWaste(state, rt, rt.waste);
       applyEmigration(state, rt);
       applyFires(state, rt);
+      yield;
       computeUtilities(state, rt);
       upgradeBuildings(state, rt);
       computeDemand(state, rt);
       // Amostra do dia para a previsão de demanda do censo (só interface).
       noteDemand(rt, Math.floor(t / TICKS_PER_DAY));
+      yield;
       // Turistas de hoje (meia-noite): plano de chegadas e gasto do dia.
       // Eventos de hoje (público sorteado, encerramentos, séries) e, com eles,
       // os turistas e o público que vão andar pela cidade.
       runEventsOfDay(state, rt);
       // Jogos do dia dos clubes da cidade (e começo e fim das temporadas).
       runSportsOfDay(state, rt);
+      yield;
       startRacesOfDay(state, rt);
       planDay(state, rt);
+      yield;
       // Notícias do dia, com a cidade já atualizada.
       dailyNews(state, rt);
     }
+    yield;
     // Andares vagos são alugados antes de surgirem prédios novos.
     openCompanies(state, rt);
     growBuildings(state, rt);
+    yield;
     moveIn(state, rt);
     assignJobs(state, rt);
+    yield;
     computeDemand(state, rt);
   }
 
   if (t % TICKS_PER_MONTH === 0) {
+    yield;
     closeMonth(state, rt);
     closeDemographyMonth(state, rt);
     closeHealthMonth(state, rt);

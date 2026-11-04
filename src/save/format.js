@@ -13,7 +13,7 @@
 // }
 
 import { TICKS_PER_DAY, calendar } from '../core/time.js';
-import { decodeTable, encodeTable } from './table.js';
+import { decodeTable, encodeTable, encodeTableSteps } from './table.js';
 import { generateElevation, generateForest } from '../world/terrain.js';
 import { flattenDeveloped } from '../world/relief.js';
 import { createResearch } from '../systems/research.js';
@@ -333,18 +333,35 @@ function unpackLists(data) {
 
 /** Monta o objeto de save a partir do estado do jogo. */
 export function createSave(state, meta) {
+  const steps = createSaveSteps(state, meta);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+
+// Texto JSON do save, guardado por createSaveSteps (ver saveJson).
+const TEXT = Symbol('texto do save');
+
+/**
+ * createSave em etapas (cada `yield` é uma pausa possível), para o salvamento
+ * automático rodar entre os quadros sem travar a tela numa cidade grande. O
+ * estado não pode mudar enquanto as etapas rodam.
+ */
+export function* createSaveSteps(state, meta) {
   if (!meta || !isValidSaveId(meta.id)) {
     throw new SaveError('INVALID_ID', `Id de save inválido: ${meta && meta.id}`);
   }
   // Prédios, cidadãos e empresas vão direto para as colunas (sem a cópia de encodeState).
   const data = encodeState({ ...state, buildings: [], citizens: [], companies: [], visitors: [] });
-  data.buildings = state.buildings;
-  data.citizens = state.citizens;
-  data.companies = state.companies;
-  data.visitors = state.visitors;
-  packLists(data);
+  yield;
+  const moves = { moves: { path: state.map.width } };
+  data.buildings = Array.isArray(state.buildings) ? yield* encodeTableSteps(state.buildings) : state.buildings;
+  data.companies = Array.isArray(state.companies) ? yield* encodeTableSteps(state.companies) : state.companies;
+  data.citizens = Array.isArray(state.citizens) ? yield* encodeTableSteps(state.citizens, moves) : state.citizens;
+  data.visitors = Array.isArray(state.visitors) ? yield* encodeTableSteps(state.visitors, moves) : state.visitors;
   const now = new Date().toISOString();
-  return {
+  const head = {
     format: SAVE_FORMAT,
     version: SAVE_VERSION,
     meta: {
@@ -359,9 +376,72 @@ export function createSave(state, meta) {
       playTimeSeconds: Math.floor(state.playTimeSeconds || 0),
       summary: summarize(state),
     },
-    checksum: checksum(data),
-    data,
   };
+  yield;
+  // Prédios e cidadãos são grandes: serializa campo a campo (o mesmo texto).
+  const dataText = yield* stringifySteps(data, 3);
+  yield;
+  head.checksum = yield* hashSteps(dataText);
+  const save = { ...head, data };
+  // O texto já serializado vai junto (sem enumerar), para gravar sem serializar de novo.
+  const text = `${JSON.stringify(head).slice(0, -1)},"data":${dataText}}`;
+  Object.defineProperty(save, TEXT, { value: text });
+  // E também em UTF-8, convertido aos poucos: mandar um texto de vários MB
+  // pela rede converte tudo de uma vez e trava a tela.
+  if (typeof TextEncoder !== 'undefined') Object.defineProperty(save, BYTES, { value: yield* utf8Steps(text) });
+  return save;
+}
+
+const BYTES = Symbol('save em UTF-8');
+
+/** O texto em UTF-8 (Uint8Array), em blocos de ~1 milhão de caracteres. */
+function* utf8Steps(text) {
+  const encoder = new TextEncoder();
+  const out = new Uint8Array(text.length * 3);
+  let written = 0;
+  for (let start = 0; start < text.length;) {
+    let end = Math.min(text.length, start + 1_000_000);
+    // Não corta um par de surrogates (emoji no nome da cidade, por exemplo).
+    const last = text.charCodeAt(end - 1);
+    if (end < text.length && last >= 0xd800 && last <= 0xdbff) end--;
+    written += encoder.encodeInto(text.slice(start, end), out.subarray(written)).written;
+    start = end;
+    yield;
+  }
+  return out.slice(0, written); // cópia do tamanho certo (solta o buffer maior)
+}
+
+/** O save em UTF-8, se createSaveSteps já converteu (senão, null). */
+export function saveBytes(save) {
+  return save[BYTES] ?? null;
+}
+
+/**
+ * JSON.stringify em etapas: objetos até `depth` níveis viram um texto por
+ * campo, com uma pausa entre eles. Mesmo resultado de JSON.stringify para
+ * dados simples (objetos, arrays, textos, números, booleanos e null).
+ */
+function* stringifySteps(value, depth) {
+  if (depth <= 0 || !value || typeof value !== 'object' || Array.isArray(value) || typeof value.toJSON === 'function') {
+    return JSON.stringify(value);
+  }
+  const parts = [];
+  for (const key of Object.keys(value)) {
+    const v = value[key];
+    // Como no JSON.stringify: campos sem valor JSON ficam de fora.
+    if (v === undefined || typeof v === 'function' || typeof v === 'symbol') continue;
+    parts.push(`${JSON.stringify(key)}:${yield* stringifySteps(v, depth - 1)}`);
+    yield;
+  }
+  return `{${parts.join(',')}}`;
+}
+
+/**
+ * Texto JSON do save (o mesmo de JSON.stringify): o guardado por createSave,
+ * se houver, para não serializar duas vezes um save grande.
+ */
+export function saveJson(save) {
+  return save[TEXT] ?? JSON.stringify(save);
 }
 
 /**
@@ -556,11 +636,23 @@ function migrate(save) {
 // FNV-1a 32 bits: rápido, síncrono e igual no navegador e no Node.
 // Não é segurança, só detecção de corrupção.
 export function checksum(data) {
-  const text = JSON.stringify(data);
+  const steps = hashSteps(JSON.stringify(data));
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** FNV-1a do texto, em etapas de 1 milhão de caracteres. */
+function* hashSteps(text) {
   let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
+  for (let start = 0; start < text.length; start += 1_000_000) {
+    const end = Math.min(text.length, start + 1_000_000);
+    for (let i = start; i < end; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    yield;
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
 }

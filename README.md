@@ -886,6 +886,17 @@ trabalho, ainda dentro do lote, não aparece.
   e os horários das janelas (sorteados uma vez por prédio).
 - Para esconder carros atrás dos prédios, só são recortados os prédios que
   encostam num carro que está atrás deles (busca numa grade da tela).
+- Trânsito por fluxo: quem sai de casa ou do trabalho recebe de uma vez o
+  minuto da chegada (`src/agents/trips.js`); a simulação só trata quem sai e
+  quem chega, e o custo não cresce com o número de carros na rua. A posição de
+  quem está viajando é calculada só para o desenho.
+- O tick vem em etapas (`tickSteps`): numa cidade grande, as viradas de hora e
+  de dia param no meio para desenhar a tela e continuam no quadro seguinte
+  (no máximo 30 ms de simulação por quadro). O resultado é o mesmo do tick
+  inteiro; ações do jogador, salvar e carregar terminam antes o tick em andamento.
+- O salvamento automático monta o save em etapas entre os quadros (a cidade
+  espera um instante, a tela não trava) e manda os bytes ao servidor por um
+  Worker.
 - Caminhos com muitos contornos não usam `closePath` (o `fill` fecha sozinho):
   no Chromium isso deixava o redesenho de mapas grandes até 30 vezes mais lento.
 - No console do navegador, `jogo.state`, `jogo.rt`, `jogo.cam`, `jogo.renderer`,

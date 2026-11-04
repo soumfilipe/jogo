@@ -1,7 +1,8 @@
 // Como os cidadãos em viagem aparecem na tela: carrinhos coloridos andando
 // pela mão direita da rua (ônibus, BRT e VLT maiores, na cor da linha; o
-// metrô anda por baixo e não aparece). É só desenho: a posição simulada
-// (c.x, c.y) fica no meio da rua e não muda.
+// metrô anda por baixo e não aparece). É só desenho: a posição (no meio da
+// rua) vem de travelPosition (agents/trips.js) para os cidadãos e de v.x, v.y
+// para os turistas.
 
 import { hash2 } from '../core/rng.js';
 import { worldToScreen } from './camera.js';
@@ -40,26 +41,28 @@ export function carColor(c) {
 }
 
 /**
- * Posição de desenho e direção do cidadão em viagem, ou null quando ele está
+ * Posição de desenho e direção de quem está em viagem, ou null quando está
  * dentro de um lote (saindo de casa ou chegando ao trabalho): aí não aparece.
+ * `at`: { x, y, step } de agora (padrão: os do próprio viajante, como os turistas).
  */
-export function moverPose(state, c) {
+export function moverPose(state, c, at = c) {
   const { width, road } = state.map;
-  const tx = Math.floor(c.x);
-  const ty = Math.floor(c.y);
+  const { x, y, step } = at;
+  const tx = Math.floor(x);
+  const ty = Math.floor(y);
   if (c.mode === 'metro' || !road[ty * width + tx]) return null;
 
-  const next = c.path[Math.min(c.step + 1, c.path.length - 1)];
+  const next = c.path[Math.min(step + 1, c.path.length - 1)];
   const nx = (next % width) + 0.5;
   const ny = Math.floor(next / width) + 0.5;
-  let dx = nx - c.x;
-  let dy = ny - c.y;
+  let dx = nx - x;
+  let dy = ny - y;
   const len = Math.hypot(dx, dy);
   if (len < 1e-6) {
     // Exatamente no centro do próximo tile: usa a direção de onde veio.
-    const prev = c.path[Math.max(c.step - 1, 0)];
-    dx = c.x - ((prev % width) + 0.5);
-    dy = c.y - (Math.floor(prev / width) + 0.5);
+    const prev = c.path[Math.max(step - 1, 0)];
+    dx = x - ((prev % width) + 0.5);
+    dy = y - (Math.floor(prev / width) + 0.5);
   }
   const norm = Math.hypot(dx, dy) || 1;
   dx /= norm;
@@ -67,10 +70,10 @@ export function moverPose(state, c) {
   // Com y crescendo "para baixo", a direita de (dx, dy) é (-dy, dx).
   // No calçadão (ou indo a pé ao trabalho) a pessoa é um pontinho, mais perto do meio.
   if (c.mode === 'pe' || ROAD_TYPES[road[ty * width + tx]]?.pedestrian) {
-    return { x: c.x - dy * 0.1, y: c.y + dx * 0.1, h: surfaceAt(state.map, c.x, c.y), dx, dy, length: PERSON, width: PERSON, depth: tx + ty };
+    return { x: x - dy * 0.1, y: y + dx * 0.1, h: surfaceAt(state.map, x, y), dx, dy, length: PERSON, width: PERSON, depth: tx + ty };
   }
   const length = c.mode ? BUS_LENGTH : CAR_LENGTH;
-  return { x: c.x - dy * LANE_OFFSET, y: c.y + dx * LANE_OFFSET, h: surfaceAt(state.map, c.x, c.y), dx, dy, length, depth: tx + ty };
+  return { x: x - dy * LANE_OFFSET, y: y + dx * LANE_OFFSET, h: surfaceAt(state.map, x, y), dx, dy, length, depth: tx + ty };
 }
 
 /** Adiciona ao `path` o carrinho (um retângulo no chão, alinhado à rua). */

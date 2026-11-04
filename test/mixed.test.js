@@ -1,3 +1,4 @@
+import { travelPosition } from '../src/agents/trips.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BUILDINGS, CONSUMPTION, ECONOMY, MIXED, ZONE, capacityOf, floorsOf } from '../src/world/catalog.js';
@@ -108,7 +109,10 @@ test('uso misto (pesquisa): quem mora e trabalha em prédio misto perto vai a p�
   let walked = null;
   for (let m = 0; m < 240 && !walked; m += 2) {
     advance(state, rt, 2);
-    walked = walkers().find((c) => rt.movers.has(c.id) && state.map.road[Math.floor(c.y) * S + Math.floor(c.x)]);
+    walked = walkers().find((c) => {
+      const at = travelPosition(state, rt, c);
+      return rt.movers.has(c.id) && state.map.road[Math.floor(at.y) * S + Math.floor(at.x)];
+    });
   }
   assert.ok(walked, 'alguém indo a pé');
   const home = rt.buildingById.get(walked.home);
@@ -117,7 +121,8 @@ test('uso misto (pesquisa): quem mora e trabalha em prédio misto perto vai a p�
   const d = Math.abs((home.tile % S) - (work.tile % S)) + Math.abs(Math.floor(home.tile / S) - Math.floor(work.tile / S));
   assert.ok(d <= MIXED.walkRadius);
   // Não ocupa a rua: a ocupação não muda se ele sumir dos viajantes.
-  const t = Math.floor(walked.y) * S + Math.floor(walked.x);
+  const at = travelPosition(state, rt, walked);
+  const t = Math.floor(at.y) * S + Math.floor(at.x);
   countOccupancy(state, rt);
   const withIt = rt.occupancy[t];
   rt.movers.delete(walked.id);
