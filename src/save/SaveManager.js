@@ -7,6 +7,7 @@
 
 import {
   createSave,
+  createSaveSteps,
   readSave,
   makeSaveId,
   encodeSaveCode,
@@ -15,9 +16,14 @@ import {
 } from './format.js';
 
 export class SaveManager {
-  constructor({ backend, getState, onEvent = () => {} }) {
+  /**
+   * `background(steps)` (opcional): roda as etapas de createSaveSteps aos
+   * poucos, entre os quadros, e devolve uma Promise com o save (ver core/loop.js).
+   */
+  constructor({ backend, getState, onEvent = () => {}, background = null }) {
     this.backend = backend;
     this.getState = getState;
+    this.background = background;
     this.onEvent = onEvent;
     // Metadados da partida em andamento (id do arquivo, data de criação).
     this.current = null;
@@ -33,7 +39,11 @@ export class SaveManager {
     const state = this.getState();
     if (!this.current) this.startNew(state.city.name);
     const id = autosave ? `auto-${this.current.id}`.slice(0, 64) : this.current.id;
-    const save = createSave(state, { ...this.current, id, gameId: this.current.id, autosave });
+    const meta = { ...this.current, id, gameId: this.current.id, autosave };
+    // Saindo da página (keepalive) não dá para esperar os próximos quadros.
+    const save = this.background && !keepalive
+      ? await this.background(createSaveSteps(state, meta))
+      : createSave(state, meta);
     await this.backend.write(id, save, { keepalive });
     this.onEvent({ type: autosave ? 'autosaved' : 'saved', meta: save.meta });
     return save.meta;

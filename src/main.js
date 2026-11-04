@@ -7,12 +7,12 @@ import { serviceRadius } from './systems/services.js';
 
 const SERVICE_NAMES = { saude: 'saúde', policia: 'menos crime', bombeiros: 'apaga incêndios', lazer: 'lazer' };
 import {
-  TOOL_TECH, applyCommand, costs, lineTiles, planCommand, rectTiles, roadCost, roadUnlocked,
+  TOOL_TECH, applyCommand as applyCommandNow, costs, lineTiles, planCommand, rectTiles, roadCost, roadUnlocked,
 } from './world/commands.js';
 import { BUILDING_TECH, MARCOS, TECHS, TECH_BY_ID } from './world/techs.js';
 import { forecastText } from './systems/census.js';
 import { isUnlocked, mod, utilityCost, utilityOutput, utilityUpkeep } from './systems/mods.js';
-import { advance, prepare, tick } from './systems/simulation.js';
+import { advance, prepare, tickSteps } from './systems/simulation.js';
 import { startLoop } from './core/loop.js';
 import { formatDate } from './core/time.js';
 import { MAP_MODES, Renderer, mapColor } from './render/renderer.js';
@@ -175,10 +175,34 @@ const renderer = new Renderer(canvas);
 const sheets = new Sheets(); // painéis do celular (ver mais abaixo)
 const minimap = new Minimap($('minimap'));
 
+// Laço do jogo (criado mais abaixo). Um tick pode ficar pela metade entre dois
+// quadros (ver core/loop.js): tudo que muda ou lê o estado inteiro termina
+// antes o tick em andamento.
+let loop = null;
+const settle = () => loop?.flush();
+/** Roda todas as etapas de um gerador de uma vez e devolve o resultado. */
+function runAll(steps) {
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** Ação do jogador (ver world/commands.js), depois de terminar o tick em andamento. */
+function applyCommand(state, rt, cmd) {
+  settle();
+  return applyCommandNow(state, rt, cmd);
+}
+
 const saves = new SaveManager({
   backend: await detectBackend(),
-  getState: () => state,
+  getState: () => {
+    settle();
+    return state;
+  },
   onEvent: handleSaveEvent,
+  // Monta o save aos poucos entre os quadros (a cidade espera, a tela não trava).
+  background: (steps) => (loop ? loop.background(steps) : Promise.resolve(runAll(steps))),
 });
 $('storage-mode').textContent = `Saves: ${saves.backend.label}`;
 if (saves.backend.migrated) {
@@ -190,6 +214,7 @@ if (saves.backend.migrated) {
 // ---------------------------------------------------------------------------
 
 function setWorld(next) {
+  settle();
   state = next;
   rt = prepare(state);
   renderDisasterOption();
@@ -235,9 +260,9 @@ function newCity(name, startMarco = 1, climate = 'subtropical', disasters = 'nor
 newCity('Nova Cidade');
 saves.startAutosave(AUTOSAVE_MS);
 
-const loopStats = startLoop({
+loop = startLoop({
   getSpeed: () => speed,
-  tick: () => tick(state, rt),
+  steps: () => tickSteps(state, rt),
   render: (dt) => {
     if (speed > 0) state.playTimeSeconds += dt;
     panWithKeys(dt);
@@ -273,10 +298,13 @@ window.jogo = {
     renderer.invalidate();
     return applyCommand(state, rt, cmd);
   },
-  advance: (ticks) => advance(state, rt, ticks),
+  advance: (ticks) => {
+    settle();
+    advance(state, rt, ticks);
+  },
   select: (next) => select(next), // { type: 'building' | 'citizen', id }
   renderer,
-  loop: loopStats,
+  loop: loop.stats,
   saves,
   setSpeed,
 };

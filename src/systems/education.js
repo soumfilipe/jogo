@@ -62,24 +62,34 @@ export function minEduFor(rt, type) {
   return Math.max(EDU.NONE, Math.min(EDU.POS, need));
 }
 
+/** Pesquisas que mudam quem pode estudar (ver wantedStages). */
+export function studyRules(rt) {
+  return {
+    universityForWorkers: mod(rt, 'universityForWorkers', 0) > 0,
+    eja: mod(rt, 'eja', 0) > 0,
+    pos: mod(rt, 'posGraduacao', 0) > 0,
+  };
+}
+
 /**
  * Etapas que o cidadão pode cursar agora, na ordem de preferência (ex.: o
  * médio e, sem vaga nele, o técnico). Vazio se não é hora de estudar.
+ * `rules`: studyRules(rt), passado pronto quando é chamado para muitos.
  */
-export function wantedStages(rt, c) {
-  const inAge = (stage) => c.age >= STAGES[stage].ages[0] && c.age <= STAGES[stage].ages[1];
+export function wantedStages(rt, c, rules = studyRules(rt)) {
+  const age = c.age;
+  const inAge = (stage) => age >= STAGES[stage].ages[0] && age <= STAGES[stage].ages[1];
   const out = [];
   const edu = c.edu ?? EDU.NONE;
   if (inAge('creche')) out.push('creche');
   if (edu < EDU.FUNDAMENTAL && inAge('fundamental')) out.push('fundamental');
   // Tempo integral só para quem não trabalha (ou já está matriculado nela).
-  const free = (stage) => c.job === null || c.stage === stage
-    || (stage === 'superior' && mod(rt, 'universityForWorkers', 0) > 0);
+  const free = (stage) => c.job === null || c.stage === stage || (stage === 'superior' && rules.universityForWorkers);
   if (edu === EDU.FUNDAMENTAL && inAge('medio') && free('medio')) out.push('medio');
   if (edu === EDU.FUNDAMENTAL && inAge('tecnico')) out.push('tecnico');
-  if (edu === EDU.NONE && inAge('eja') && mod(rt, 'eja', 0) > 0) out.push('eja');
+  if (edu === EDU.NONE && inAge('eja') && rules.eja) out.push('eja');
   if (edu === EDU.MEDIO && inAge('superior') && free('superior')) out.push('superior');
-  if (edu === EDU.SUPERIOR && inAge('pos') && free('pos') && mod(rt, 'posGraduacao', 0) > 0) out.push('pos');
+  if (edu === EDU.SUPERIOR && inAge('pos') && free('pos') && rules.pos) out.push('pos');
   return out;
 }
 
@@ -92,28 +102,41 @@ export function enrollStudents(state, rt) {
   const width = state.map.width;
   const schools = state.buildings.filter((b) => schoolStage(b.type));
   const free = new Map(schools.map((s) => [s.id, seatsOf(rt, s.type) - rt.students.get(s.id).size]));
-  // Escolas de cada etapa, com posição e raio já calculados (os
-  // modificadores não mudam durante a matrícula), na ordem dos prédios.
+  const rules = studyRules(rt);
+  // Escolas de cada etapa com vaga, com posição e raio já calculados (os
+  // modificadores não mudam durante a matrícula), na ordem dos prédios. A
+  // lista é refeita quando alguma escola lota ou ganha vaga de novo: numa
+  // cidade com escolas cheias, quem não tem vaga não percorre todas elas.
   const byStage = new Map();
+  let seatsVersion = 0;
   const offering = (stage) => {
-    let list = byStage.get(stage);
-    if (!list) {
+    let entry = byStage.get(stage);
+    if (!entry) {
       // A TV educativa leva a EJA para casas longe da escola.
       const extra = stage === 'eja' ? mod(rt, 'radius.eja') : 1;
-      list = schools.filter((s) => offers(s.type, stage)).map((s) => ({
+      const all = schools.filter((s) => offers(s.type, stage)).map((s) => ({
         s, x: s.tile % width, y: Math.floor(s.tile / width), radius: radiusOf(rt, s.type) * extra,
       }));
-      byStage.set(stage, list);
+      byStage.set(stage, (entry = { all, open: null, version: -1 }));
     }
-    return list;
+    if (entry.version !== seatsVersion) {
+      entry.open = entry.all.filter((o) => free.get(o.s.id) > 0);
+      entry.version = seatsVersion;
+    }
+    return entry.open;
+  };
+  const changeSeats = (id, delta) => {
+    const before = free.get(id);
+    free.set(id, before + delta);
+    if ((before > 0) !== (before + delta > 0)) seatsVersion++;
   };
 
   for (const c of state.citizens) {
-    const wants = wantedStages(rt, c);
+    const wants = wantedStages(rt, c, rules);
     if (c.stage && !wants.includes(c.stage)) {
       // Saiu da idade (ou da etapa) sem terminar: desiste. Da creche, leva o adiantamento.
       if (c.stage === 'creche') c.headStart = true;
-      if (c.school != null) free.set(c.school, free.get(c.school) + 1);
+      if (c.school != null) changeSeats(c.school, 1);
       leaveSchool(rt, c);
       c.study = 0;
     }
@@ -126,7 +149,6 @@ export function enrollStudents(state, rt) {
     for (const stage of wants) {
       let bestDist = Infinity;
       for (const o of offering(stage)) {
-        if (free.get(o.s.id) <= 0) continue;
         const d = Math.abs(o.x - hx) + Math.abs(o.y - hy);
         if (d <= o.radius && d < bestDist) {
           best = o.s;
@@ -149,7 +171,7 @@ export function enrollStudents(state, rt) {
     // passou pela creche ganha o adiantamento.
     c.study = want === 'fundamental' ? Math.max(c.study || 0, c.headStart ? EDUCATION.crecheHeadStart : 0) : 0;
     delete c.headStart;
-    free.set(best.id, free.get(best.id) - 1);
+    changeSeats(best.id, -1);
   }
   fillSchoolMap(state, rt, schools, free);
 }
@@ -231,21 +253,6 @@ export function educationStats(state) {
 export function refreshSchoolMap(state, rt) {
   const schools = state.buildings.filter((b) => schoolStage(b.type));
   const free = new Map(schools.map((s) => [s.id, seatsOf(rt, s.type) - rt.students.get(s.id).size]));
-  // Escolas de cada etapa, com posição e raio já calculados (os
-  // modificadores não mudam durante a matrícula), na ordem dos prédios.
-  const byStage = new Map();
-  const offering = (stage) => {
-    let list = byStage.get(stage);
-    if (!list) {
-      // A TV educativa leva a EJA para casas longe da escola.
-      const extra = stage === 'eja' ? mod(rt, 'radius.eja') : 1;
-      list = schools.filter((s) => offers(s.type, stage)).map((s) => ({
-        s, x: s.tile % width, y: Math.floor(s.tile / width), radius: radiusOf(rt, s.type) * extra,
-      }));
-      byStage.set(stage, list);
-    }
-    return list;
-  };
   fillSchoolMap(state, rt, schools, free);
 }
 
@@ -257,13 +264,17 @@ function fillSchoolMap(state, rt, schools, free) {
   let map = rt.schoolMap;
   if (!map || map.length !== zone.length) map = rt.schoolMap = new Float32Array(zone.length);
   map.fill(NaN);
-  const fundamental = schools.filter((s) => schoolStage(s.type) === 'fundamental');
+  const fundamental = schools.filter((s) => schoolStage(s.type) === 'fundamental').map((s) => ({
+    x: s.tile % width, y: Math.floor(s.tile / width), radius: radiusOf(rt, s.type), open: free.get(s.id) > 0 ? 1 : 0.5,
+  }));
   for (let t = 0; t < zone.length; t++) {
     if (zone[t] !== ZONE.RESIDENTIAL && zone[t] !== ZONE.MIXED) continue;
+    const tx = t % width;
+    const ty = Math.floor(t / width);
     let v = 0;
     for (const s of fundamental) {
-      if (!near(state, s, t, radiusOf(rt, s.type))) continue;
-      v = Math.max(v, free.get(s.id) > 0 ? 1 : 0.5);
+      if (Math.abs(s.x - tx) + Math.abs(s.y - ty) > s.radius) continue;
+      v = Math.max(v, s.open);
       if (v === 1) break;
     }
     map[t] = v;

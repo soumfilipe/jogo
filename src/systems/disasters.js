@@ -373,7 +373,8 @@ export function spreadFires(state, rt) {
   const done = [];
   for (const fire of d.fires) {
     const next = [];
-    const lit = new Set();
+    // Quem já está queimando nesta rodada não acende de novo (vira chão queimado).
+    const lit = new Set(fire.burning);
     for (const t of fire.burning) {
       // O tile que queimava vira chão queimado (a mata rebrota com o tempo).
       if (terrain[t] === TERRAIN.FOREST) clearForest(state, t);

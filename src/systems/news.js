@@ -649,10 +649,13 @@ export function cityProblems(state, rt) {
     put('lixo', share(dirty), share(dirty) > P.lixo, { n: count(dirty) });
   }
 
+  // Uma passada só pelos cidadãos: quem trabalha, quem pode e quem procura.
+  let workers = 0;
+  let able = 0;
+  let jobless = 0;
   if (people >= 50) {
-    let able = 0;
-    let jobless = 0;
     for (const c of state.citizens) {
+      if (c.job !== null) workers++;
       if (!canWork(c)) continue;
       able++;
       if (c.job === null) jobless++;
@@ -673,7 +676,6 @@ export function cityProblems(state, rt) {
     put('esgoto', untreated, untreated > P.esgoto, { pct: pct(untreated) });
   }
   if (people >= 200) {
-    const workers = state.citizens.reduce((n, c) => n + (c.job !== null ? 1 : 0), 0);
     let parents = 0;
     for (const level of overloadedParents(state, rt).values()) if (level >= 1) parents++;
     const rate = workers ? parents / workers : 0;

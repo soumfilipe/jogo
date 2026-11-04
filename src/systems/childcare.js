@@ -29,25 +29,27 @@ export function overloadedParents(state, rt) {
   const out = new Map();
   // Com a pesquisa, a creche resolve de vez.
   const enrolled = mod(rt, 'childcare.full', 0) > 0 ? 0 : CHILDCARE.enrolled;
-  for (const ids of rt.residents.values()) {
-    if (ids.size < 2) continue;
-    // Penalidade de cada sobrenome com criança pequena nesta casa.
-    let families = null;
-    for (const id of ids) {
-      const c = rt.citizenById.get(id);
-      if (!c || !isToddler(c)) continue;
-      const level = c.stage === 'creche' ? enrolled : 1;
-      if (level > 0) {
-        families ??= new Map();
-        families.set(lastName(c), Math.max(families.get(lastName(c)) ?? 0, level));
-      }
-    }
+  // Penalidade de cada sobrenome com criança pequena, por casa (começa pelas
+  // crianças: só as casas com elas precisam ser olhadas).
+  const homes = new Map();
+  for (const c of state.citizens) {
+    if (!isToddler(c)) continue;
+    const level = c.stage === 'creche' ? enrolled : 1;
+    if (level <= 0) continue;
+    const ids = rt.residents.get(c.home);
+    if (!ids || ids.size < 2 || !ids.has(c.id)) continue;
+    let families = homes.get(c.home);
+    if (!families) homes.set(c.home, (families = new Map()));
+    families.set(lastName(c), Math.max(families.get(lastName(c)) ?? 0, level));
+  }
+  if (homes.size === 0) return out;
+  // Pais: quem trabalha e mora numa dessas casas, com o mesmo sobrenome.
+  for (const c of state.citizens) {
+    if (c.job === null || c.age < WORKING_AGE[0]) continue;
+    const families = homes.get(c.home);
     if (!families) continue;
-    for (const id of ids) {
-      const c = rt.citizenById.get(id);
-      const level = c && c.job !== null && c.age >= WORKING_AGE[0] ? families.get(lastName(c)) : undefined;
-      if (level) out.set(id, level);
-    }
+    const level = families.get(lastName(c));
+    if (level) out.set(c.id, level);
   }
   return out;
 }
